@@ -678,7 +678,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 	mmc_debug("mmc_exec_retrieval_cmd: data len is %d bytes", *data_len);
 	
 	if (*data_len) {
-		*data = emalloc(*data_len + 1);
+		*data = emalloc(*data_len + 2 + 1);
 		
 		if ((size = php_stream_read(mmc->stream, *data, *data_len + 2)) != (*data_len + 2)) {
 			efree(*data);
@@ -712,7 +712,6 @@ static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC)
 {
 	char *real_command;
 	int size, response_buf_size;
-	struct timeval tv;
 	
 	real_command = emalloc(
 							  sizeof("delete") - 1
