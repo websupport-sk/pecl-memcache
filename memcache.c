@@ -705,14 +705,14 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 
 	MMC_DEBUG(("mmc_exec_retrieval_cmd: data len is %d bytes", *data_len));
 	
-	if (*data_len) {
+	{
 		int data_to_be_read = *data_len + 2;
 		int offset = 0;
 
-		*data = emalloc(*data_len + 2 + 1);
+		*data = emalloc(data_to_be_read + 1);
 		
 		while (data_to_be_read > 0) {
-		    size = php_stream_read(mmc->stream, *data + offset, *data_len + 2 - offset);
+		    size = php_stream_read(mmc->stream, *data + offset, data_to_be_read);
 		    if (size == 0) break;
 		    offset += size, data_to_be_read -= size;
 		}
@@ -725,10 +725,6 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 
 		(*data) [*data_len] = '\0';
 		MMC_DEBUG(("mmc_exec_retrieval_cmd: data '%s'", *data));
-	}
-	else {
-		/* an error occurred? */
-		return -1;
 	}
 
 	/* read "END" */
