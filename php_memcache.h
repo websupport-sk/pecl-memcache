@@ -53,6 +53,7 @@ PHP_FUNCTION(memcache_get_stats);
 PHP_FUNCTION(memcache_increment);
 PHP_FUNCTION(memcache_decrement);
 PHP_FUNCTION(memcache_close);
+PHP_FUNCTION(memcache_flush);
 
 #define MMC_BUF_SIZE 4096
 #define MMC_SERIALIZED 1

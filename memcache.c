@@ -68,6 +68,7 @@ zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_increment,		NULL)
 	PHP_FE(memcache_decrement,		NULL)
 	PHP_FE(memcache_close,			NULL)
+	PHP_FE(memcache_flush,			NULL)
 	{NULL, NULL, NULL}
 };
 
@@ -84,6 +85,7 @@ static zend_function_entry php_memcache_class_functions[] = {
 	PHP_FALIAS(increment,		memcache_increment,			NULL)	
 	PHP_FALIAS(decrement,		memcache_decrement,			NULL)	
 	PHP_FALIAS(close,			memcache_close,				NULL)	
+	PHP_FALIAS(flush,			memcache_flush,				NULL)	
 	{NULL, NULL, NULL}
 };
 
@@ -135,6 +137,7 @@ static int mmc_exec_storage_cmd(mmc_t *, char *, int, char *, int, int, int, cha
 static int mmc_parse_response(char *, int, int *, int *);
 static int mmc_exec_retrieval_cmd(mmc_t *, char *, int, char *, int, int *, char **, int * TSRMLS_DC);
 static int mmc_delete(mmc_t *, char *, int, int TSRMLS_DC);
+static int mmc_flush(mmc_t * TSRMLS_DC);
 static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *, int);
 static int mmc_get_stats (mmc_t *, zval ** TSRMLS_DC);
 static int mmc_incr_decr (mmc_t *, int, char *, int, int TSRMLS_DC);
@@ -752,6 +755,34 @@ static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC)
 	if(mmc_str_left(mmc->inbuf,"NOT_FOUND", response_buf_size, sizeof("NOT_FOUND") - 1)) {
 		/* return 0, if such wasn't found */
 		return 0;
+	}
+	
+	/* hmm.. */
+	return -1;
+}
+/* }}} */
+
+/* {{{ mmc_flush () */
+static int mmc_flush(mmc_t *mmc TSRMLS_DC) 
+{
+	int response_buf_size;
+	
+	mmc_debug("mmc_flush: flushing the cache");
+	
+	if (mmc_sendcmd(mmc, "flush_all", sizeof("flush_all") - 1 TSRMLS_CC) < 0) {
+		return -1;
+	}
+	
+	/* get server's response */
+	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) < 0){
+		return -1;
+	}
+	
+	mmc_debug("mmc_flush: server's response is '%s'", mmc->inbuf);
+
+	/* ok? */
+	if(mmc_str_left(mmc->inbuf,"OK", response_buf_size, sizeof("OK") - 1)) {
+		return 1;
 	}
 	
 	/* hmm.. */
@@ -1427,6 +1458,31 @@ PHP_FUNCTION(memcache_close)
 	}
 	
 	if (mmc_close(mmc TSRMLS_CC) > 0) {
+		RETURN_TRUE;
+	}
+	RETURN_FALSE;
+}
+/* }}} */
+
+/* {{{ proto bool memcache_flush( object memcache ) 
+   Flushes cache */
+PHP_FUNCTION(memcache_flush)
+{
+	mmc_t *mmc;
+	int inx;
+	zval *mmc_object = getThis();
+	
+	if (mmc_object == NULL) {
+		if (zend_get_parameters(ht, 1, &mmc_object) == FAILURE) {
+			WRONG_PARAM_COUNT;
+		}
+	}
+
+	if ((inx = mmc_get_connection(mmc_object, &mmc TSRMLS_CC)) == 0) {
+		RETURN_FALSE;
+	}
+
+	if (mmc_flush(mmc TSRMLS_CC) > 0) {
 		RETURN_TRUE;
 	}
 	RETURN_FALSE;
