@@ -74,6 +74,8 @@ zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_delete,			NULL)
 	PHP_FE(memcache_debug,			NULL)
 	PHP_FE(memcache_get_stats,		NULL)
+	PHP_FE(memcache_increment,		NULL)
+	PHP_FE(memcache_decrement,		NULL)
 	{NULL, NULL, NULL}
 };
 
@@ -86,6 +88,8 @@ static zend_function_entry php_memcache_class_functions[] = {
 	PHP_FALIAS(get,				memcache_get,				NULL)
 	PHP_FALIAS(delete,			memcache_delete,			NULL)
 	PHP_FALIAS(getstats,		memcache_get_stats,			NULL)	
+	PHP_FALIAS(increment,		memcache_increment,			NULL)	
+	PHP_FALIAS(decrement,		memcache_decrement,			NULL)	
 	{NULL, NULL, NULL}
 };
 
@@ -115,6 +119,12 @@ zend_module_entry memcache_module_entry = {
 ZEND_GET_MODULE(memcache)
 #endif
 
+/* {{{ macros */
+#define PREPARE_KEY(key, key_len) \
+	php_strtr(key, key_len, "\t\r\n ", "____", 4); \
+
+/* }}} */
+
 /* {{{ internal function protos */
 static void _mmc_server_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static int mmc_get_connection(zval *, mmc_t ** TSRMLS_DC);
@@ -132,6 +142,8 @@ static int mmc_exec_retrieval_cmd(mmc_t *, char *, char *, int *, char **, int *
 static int mmc_delete(mmc_t *, char *, int);
 static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *);
 static int mmc_get_stats (mmc_t *, zval **);
+static int mmc_incr_decr (mmc_t *, int, char *, int);
+static void php_mmc_incr_decr (INTERNAL_FUNCTION_PARAMETERS, int);
 /* }}} */
 
 /* {{{ php_memcache_init_globals()
@@ -365,7 +377,6 @@ static int mmc_read(mmc_t *mmc, char *buf, int len)
 /* {{{ mmc_get_version() */
 static char *mmc_get_version(mmc_t *mmc) 
 {
-	char version[MMC_BUF_SIZE];
 	char *version_str;
 	int len;
 	
@@ -455,7 +466,9 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, char *key, int flags,
 							+ datalen_size 
 							+ 1
 							);
-	
+
+	PREPARE_KEY(key, strlen(key));
+
 	size = sprintf(real_command, "%s ", command);
 	size += sprintf(real_command + size, "%s ", key);
 	size += sprintf(real_command + size, "%s ", flags_tmp);
@@ -566,7 +579,9 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, char *key, int *fla
 							+ strlen(key) 
 							+ 1
 							);
-	
+
+	PREPARE_KEY(key, strlen(key));
+
 	size = sprintf(real_command, "%s ", command);
 	size += sprintf(real_command + size, "%s", key);
 
@@ -646,6 +661,7 @@ static int mmc_delete(mmc_t *mmc, char *key, int time)
 							+ 1
 							);
 
+	PREPARE_KEY(key, strlen(key));
 	size = sprintf(real_command, "%s ", "delete");
 	size += sprintf(real_command + size, "%s ", key);
 	size += sprintf(real_command + size, "%s", time_tmp);
@@ -806,6 +822,97 @@ static int mmc_get_stats (mmc_t *mmc, zval **stats)
 	}
 
 	return 1;
+}
+/* }}} */
+
+/* {{{ mmc_incr_decr () */
+static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int value) 
+{
+	char *command;
+	int  cmd_len, response_buf_size;
+
+	command = emalloc(4 + strlen(key) + MAX_LENGTH_OF_LONG + 1);
+
+	PREPARE_KEY(key, strlen(key));
+	
+	if (cmd > 0) {
+		cmd_len = sprintf(command, "incr %s %d", key, value);
+	}
+	else {
+		cmd_len = sprintf(command, "decr %s %d", key, value);
+	}
+	
+	if (mmc_sendcmd(mmc, command, cmd_len) < 0) {
+		efree(command);
+		return -1;
+	}
+	efree(command);
+
+	if ((response_buf_size = mmc_readline(mmc)) > 0) {
+		mmc_debug("mmc_incr_decr: server's answer is: '%s'", mmc->inbuf);
+		if (mmc_str_left(mmc->inbuf, "NOT_FOUND", response_buf_size, 9)) {
+			return -1;
+		}
+		else if (mmc_str_left(mmc->inbuf, "ERROR", response_buf_size, 5)) {
+			return -1;
+		}
+		else if (mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_buf_size, 12)) {
+			return -1;
+		}
+		else if (mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_buf_size, 12)) {
+			return -1;
+		}
+		else {
+			return atoi(mmc->inbuf);
+		}
+	}
+	mmc_debug("mmc_incr_decr: failed to read line from server");
+	return -1;
+
+}
+/* }}} */
+
+/* {{{ php_mmc_incr_decr () */
+static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd)
+{
+	zval *id, **value, **key;
+	mmc_t *mmc;
+	int inx, result, real_value = 1;
+	int ac = ZEND_NUM_ARGS();
+	char *command;
+
+	if ((id = getThis()) != 0) {
+		if ((inx = mmc_get_connection(id, &mmc TSRMLS_CC)) == 0) {
+			RETURN_FALSE;
+		}
+
+		if (ac < 1 || ac > 2 || zend_get_parameters_ex(ac, &key, &value) == FAILURE) {
+			WRONG_PARAM_COUNT;
+		}
+
+		convert_to_string_ex(key);
+
+		if (ac == 2) {
+			convert_to_long_ex(value);
+			real_value = Z_LVAL_PP(value);
+		}
+
+		if ((result = mmc_incr_decr(mmc, cmd, Z_STRVAL_PP(key), real_value)) < 0) {
+			RETURN_FALSE;
+		}
+		RETURN_LONG(result);
+	}
+
+	if (cmd > 0) {
+		command = estrdup("increment");
+	}
+	else {
+		command = estrdup("decrement");
+	}
+	
+	php_error_docref(NULL TSRMLS_CC, E_NOTICE, "memcache_%s() should not be called like this. Use $memcache->%s($key,$value) to %s item", command, command, command);
+	efree(command);
+	RETURN_FALSE;
 }
 /* }}} */
 
@@ -1019,7 +1126,6 @@ PHP_FUNCTION(memcache_get_stats)
 	zval *id;
 	mmc_t *mmc;
 	int inx;
-	char *version;
 
 	if ((id = getThis()) != 0) {
 		if ((inx = mmc_get_connection(id, &mmc TSRMLS_CC)) == 0) {
@@ -1034,6 +1140,22 @@ PHP_FUNCTION(memcache_get_stats)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache_get_stats() should not be called like this. Use $memcache->getStats() to get server's statistics");
 		RETURN_FALSE;
 	}
+}
+/* }}} */
+
+/* {{{ proto int memcache_increment( string key [, int value ] ) 
+   Increments existing variable */
+PHP_FUNCTION(memcache_increment)
+{
+	php_mmc_incr_decr(INTERNAL_FUNCTION_PARAM_PASSTHRU, 1);
+}
+/* }}} */
+
+/* {{{ proto int memcache_decrement( string key [, int value ] ) 
+   Decrements existing variable */
+PHP_FUNCTION(memcache_decrement)
+{
+	php_mmc_incr_decr(INTERNAL_FUNCTION_PARAM_PASSTHRU, 0);
 }
 /* }}} */
 
