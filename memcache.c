@@ -640,6 +640,10 @@ static int mmc_parse_response(char *response, int response_len, int *flags, int 
 	*flags = atoi(response + spaces[1]);
 	*value_len = atoi(response + spaces[2]);
 
+	if (*flags < 0 || *value_len < 0) {
+		return -1;
+	}
+
 	MMC_DEBUG(("mmc_parse_response: 1st space is at %d position", spaces[1]));
 	MMC_DEBUG(("mmc_parse_response: 2nd space is at %d position", spaces[2]));
 	MMC_DEBUG(("mmc_parse_response: flags = %d", *flags));
@@ -707,14 +711,24 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 	MMC_DEBUG(("mmc_exec_retrieval_cmd: data len is %d bytes", *data_len));
 	
 	if (*data_len) {
+		int data_to_be_read = *data_len + 2;
+		int offset = 0;
+
 		*data = emalloc(*data_len + 2 + 1);
 		
-		if ((size = php_stream_read(mmc->stream, *data, *data_len + 2)) != (*data_len + 2)) {
-			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "got invalid data block");
+		while (data_to_be_read > 0) {
+		    size = php_stream_read(mmc->stream, *data + offset, *data_len + 2 - offset);
+		    if (size == 0) break;
+		    offset += size, data_to_be_read -= size;
+		}
+
+		if (data_to_be_read > 0) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "incomplete data block (expected %d, got %d)", (*data_len + 2), offset);
 			efree(*data);
 			return -1;
 		}
-		(*data) [size - 2] = '\0';
+
+		(*data) [*data_len] = '\0';
 		MMC_DEBUG(("mmc_exec_retrieval_cmd: data '%s'", *data));
 	}
 	else {
@@ -1412,7 +1426,6 @@ PHP_FUNCTION(memcache_delete)
 		RETURN_TRUE;
 	}
 	else if (result == 0) {
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "such key doesn't exist");
 		RETURN_FALSE;
 	}
 	else {
