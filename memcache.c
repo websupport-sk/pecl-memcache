@@ -370,6 +370,7 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 	}
 
 	mmc->stream = NULL;
+	mmc->persistent = persistent ? 1 : 0;
 	
 #if PHP_API_VERSION > 20020918	
 	mmc->stream = php_stream_xport_create( hostname, hostname_len, 
@@ -421,11 +422,12 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 	
 	if ((version = mmc_get_version(mmc TSRMLS_CC)) == NULL) {
 		MMC_DEBUG(("mmc_open: failed to get server's version"));
-		mmc_close(mmc TSRMLS_CC);
 		if (persistent) {
+			php_stream_pclose(mmc->stream);
 			free(mmc);
 		}
 		else {
+			php_stream_close(mmc->stream);
 			efree(mmc);
 		}
 		return NULL;
@@ -443,19 +445,12 @@ static int mmc_close(mmc_t *mmc TSRMLS_DC) /* {{{ */
 		return 0;
 	}
 
-	if (mmc->stream) {
+	if (!mmc->persistent && mmc->stream) {
 		mmc_sendcmd(mmc,"quit", 4 TSRMLS_CC);
-		if (mmc->persistent) {
-			php_stream_pclose(mmc->stream);
-		}
-		else {
-			php_stream_close(mmc->stream);
-		}
+		php_stream_close(mmc->stream);
 	}
 
 	mmc->stream = NULL;
-	
-	zend_list_delete(mmc->id);
 	
 	return 1;
 }
@@ -1174,8 +1169,8 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 					MEMCACHE_G(num_persistent)--;
 					if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
 						MMC_DEBUG(("php_mmc_connect: reconnect failed"));						
-						efree(hash_key);
 						zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
+						efree(hash_key);
 						goto connect_done;
 					}
 
@@ -1198,8 +1193,8 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 				MMC_DEBUG(("php_mmc_connect: smthing was wrong, reconnecting.."));
 				if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
 					MMC_DEBUG(("php_mmc_connect: reconnect failed"));
-					efree(hash_key);
 					zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
+					efree(hash_key);
 					goto connect_done;
 				}
 
@@ -1232,8 +1227,6 @@ connect_done:
 		RETURN_FALSE;
 	}
 
-	mmc->persistent = persistent;
-	
 	if (mmc_object == NULL) {
 		object_init_ex(return_value, memcache_class_entry_ptr);
 		add_property_resource(return_value, "connection",mmc->id);
