@@ -731,7 +731,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 			efree(*data);
 			return -1;
 		}
-
+		
 		(*data) [*data_len] = '\0';
 		MMC_DEBUG(("mmc_exec_retrieval_cmd: data '%s'", *data));
 	}
@@ -845,7 +845,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_t *mmc, zval *keys, zval **result TS
 			MMC_DEBUG(("mmc_exec_retrieval_cmd: data '%s'", data));
 		}
 
-		if (!data || !data_len) {
+		if (!data) {
 			add_assoc_bool(*result, tmp_name, 0);
 			efree(tmp_name);
 			continue;
@@ -1526,7 +1526,7 @@ PHP_FUNCTION(memcache_get)
 
 		if (mmc_exec_retrieval_cmd(mmc, "get", sizeof("get") - 1, Z_STRVAL_P(key), Z_STRLEN_P(key), &flags, &data, &data_len TSRMLS_CC) > 0) {
 
-			if (!data || !data_len) {
+			if (!data) {
 				RETURN_EMPTY_STRING();
 			}
 			
