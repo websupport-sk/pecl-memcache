@@ -1381,7 +1381,7 @@ PHP_FUNCTION(memcache_get)
 				RETURN_STRINGL(result_data, result_len, 0);
 			}
 		}
-		else if (flags == MMC_SERIALIZED) {
+		else if (flags & MMC_SERIALIZED) {
 			tmp = data;
 			PHP_VAR_UNSERIALIZE_INIT(var_hash);
 			if (!php_var_unserialize(&return_value, &tmp, tmp + data_len,  &var_hash TSRMLS_CC)) {
