@@ -18,13 +18,13 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>0.4</version>
-		<date>2004-03-26</date>
+		<version>1.0</version>
+		<date>2004-05-21</date>
 		<state>beta</state>
 		<notes>
-			1) Added on-the-fly data (de)compression support.
-			2) Added procedural API.
-			3) Extension was fairly refactored and accelerated.
+			1) Ifdef'ed debug routines, so they are available only in debug mode.
+			This should add more speed to extension. 
+			2) Minor code decorations.
 		</notes>
 	</release>
 	<filelist>
@@ -39,6 +39,16 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+		    <version>1.0</version>
+		    <date>2004-05-21</date>
+		    <state>beta</state>
+		    <notes>
+				1) Ifdef'ed debug routines, so they are available only in debug mode.
+				This should add more speed to extension. 
+				2) Minor code decorations.
+		    </notes>
+		</release>
 		<release>
 			<version>0.4</version>
 			<date>2004-xx-xx</date>

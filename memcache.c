@@ -118,6 +118,22 @@ ZEND_GET_MODULE(memcache)
 #define MMC_PREPARE_KEY(key, key_len) \
 	php_strtr(key, key_len, "\t\r\n ", "____", 4); \
 
+#if ZEND_DEBUG
+	
+#define MMC_DEBUG(info) \
+{\
+	mmc_debug info; \
+}\
+
+#else
+
+#define MMC_DEBUG(info) \
+{\
+}\
+
+#endif 
+
+	
 /* }}} */
 
 /* {{{ internal function protos */
@@ -219,8 +235,11 @@ PHP_MINFO_FUNCTION(memcache)
 }
 /* }}} */
 
-/* {{{ _mmc_server_list_dtor() */
-static void _mmc_server_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
+/* ------------------
+   internal functions 
+   ------------------ */
+
+static void _mmc_server_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc = (mmc_t *)rsrc->ptr;
 	mmc_close(mmc TSRMLS_CC);
@@ -228,8 +247,7 @@ static void _mmc_server_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 }
 /* }}} */
 
-/* {{{ _mmc_pserver_list_dtor() */
-static void _mmc_pserver_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
+static void _mmc_pserver_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc = (mmc_t *)rsrc->ptr;
 	mmc_close(mmc TSRMLS_CC);
@@ -238,8 +256,7 @@ static void _mmc_pserver_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 }
 /* }}} */
 
-/* {{{ mmc_compress() */
-static int mmc_compress(char **result_data, int *result_len, char *data, int data_len TSRMLS_DC) 
+static int mmc_compress(char **result_data, int *result_len, char *data, int data_len TSRMLS_DC) /* {{{ */ 
 {
 	int   status, level = MEMCACHE_G(compression_level);
 	
@@ -267,8 +284,7 @@ static int mmc_compress(char **result_data, int *result_len, char *data, int dat
 }
 /* }}}*/
 
-/* {{{ mmc_uncompress() */
-static int mmc_uncompress(char **result_data, long *result_len, char *data, int data_len) 
+static int mmc_uncompress(char **result_data, long *result_len, char *data, int data_len) /* {{{ */
 {
 	int status;
 	unsigned int factor=1, maxfactor=16;
@@ -292,8 +308,7 @@ static int mmc_uncompress(char **result_data, long *result_len, char *data, int 
 }
 /* }}}*/
 
-/* {{{ mmc_debug() */
-static void mmc_debug( const char *format, ...)
+static void mmc_debug( const char *format, ...) /* {{{ */
 {
 	TSRMLS_FETCH();
 
@@ -310,9 +325,7 @@ static void mmc_debug( const char *format, ...)
 }
 /* }}} */
 
-/* {{{ mmc_get_connection()
-*/
-static int mmc_get_connection(zval *id, mmc_t **mmc TSRMLS_DC)
+static int mmc_get_connection(zval *id, mmc_t **mmc TSRMLS_DC) /* {{{ */
 {
 	zval	**connection;
 	int		resource_type;
@@ -333,8 +346,7 @@ static int mmc_get_connection(zval *id, mmc_t **mmc TSRMLS_DC)
 }
 /* }}} */
 
-/* {{{ mmc_open() */
-static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout, int persistent TSRMLS_DC) 
+static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout, int persistent TSRMLS_DC) /* {{{ */
 {
 	mmc_t			*mmc;
 	struct timeval	tv;
@@ -392,7 +404,7 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 	}
 	
 	if (!mmc->stream) {
-		mmc_debug("mmc_open: can't open socket to host");
+		MMC_DEBUG(("mmc_open: can't open socket to host"));
 		efree(mmc);
 		return NULL;
 	}
@@ -403,7 +415,7 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 	mmc->timeout = timeout;
 	
 	if ((version = mmc_get_version(mmc TSRMLS_CC)) == NULL) {
-		mmc_debug("mmc_open: failed to get server's version");
+		MMC_DEBUG(("mmc_open: failed to get server's version"));
 		mmc_close(mmc TSRMLS_CC);
 		efree(mmc);
 		return NULL;
@@ -413,10 +425,9 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 }
 /* }}} */
 
-/* {{{ mmc_close() */
-static int mmc_close(mmc_t *mmc TSRMLS_DC) 
+static int mmc_close(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
-	mmc_debug("mmc_close: closing connection to server");
+	MMC_DEBUG(("mmc_close: closing connection to server"));
 
 	if (mmc == NULL) {
 		return 0;
@@ -440,35 +451,33 @@ static int mmc_close(mmc_t *mmc TSRMLS_DC)
 }
 /* }}} */
 
-/* {{{ mmc_readline() */
-static int mmc_readline(mmc_t *mmc TSRMLS_DC) 
+static int mmc_readline(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	char *buf;
 
 	if (mmc->stream == NULL) {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "cannot read data from already closed socket");
-		mmc_debug("mmc_readline: socket is already closed");
+		MMC_DEBUG(("mmc_readline: socket is already closed"));
 		return -1;
 	}
 	
 	buf = php_stream_gets(mmc->stream, mmc->inbuf, MMC_BUF_SIZE);
 	if (buf) {
-		mmc_debug("mmc_readline: read data:");
-		mmc_debug("mmc_readline:---");
-		mmc_debug("%s", buf);
-		mmc_debug("mmc_readline:---");
+		MMC_DEBUG(("mmc_readline: read data:"));
+		MMC_DEBUG(("mmc_readline:---"));
+		MMC_DEBUG(("%s", buf));
+		MMC_DEBUG(("mmc_readline:---"));
 		return strlen(buf);
 	}
 	else {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to read the server's response");
-		mmc_debug("mmc_readline: cannot read a line from the server");
+		MMC_DEBUG(("mmc_readline: cannot read a line from the server"));
 		return -1;
 	}
 }
 /* }}} */
 
-/* {{{ mmc_get_version() */
-static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) 
+static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	char *version_str;
 	int len;
@@ -486,13 +495,12 @@ static char *mmc_get_version(mmc_t *mmc TSRMLS_DC)
 		return version_str;
 	}
 	
-	mmc_debug("mmc_get_version: data is not valid version string");	
+	MMC_DEBUG(("mmc_get_version: data is not valid version string"));	
 	return NULL;
 }
 /* }}} */
 
-/* {{{ mmc_str_left() */
-static int mmc_str_left(char *haystack, char *needle, int haystack_len, int needle_len) 
+static int mmc_str_left(char *haystack, char *needle, int haystack_len, int needle_len) /* {{{ */
 {
 	char *found;
 	
@@ -504,8 +512,7 @@ static int mmc_str_left(char *haystack, char *needle, int haystack_len, int need
 }
 /* }}} */
 
-/* {{{ mmc_sendcmd ()*/
-static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC)
+static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC) /* {{{ */
 {
 	char *command;
     int command_len;
@@ -514,7 +521,7 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC)
 		return -1;
 	}
 
-	mmc_debug("mmc_sendcmd: sending command '%s'", cmd);
+	MMC_DEBUG(("mmc_sendcmd: sending command '%s'", cmd));
 
 	command = emalloc(cmdlen + sizeof("\r\n"));
 	memcpy(command, cmd, cmdlen);
@@ -525,7 +532,7 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC)
 	if (php_stream_write(mmc->stream, command, command_len) != command_len) {
 		efree(command);
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to send command to the server");		
-		mmc_debug("mmc_sendcmd: write failed");
+		MMC_DEBUG(("mmc_sendcmd: write failed"));
 		return -1;
 	}
 	efree(command);
@@ -534,8 +541,7 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC)
 }
 /* }}}*/
 
-/* {{{ mmc_exec_storage_cmd () */
-static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char *key, int key_len, int flags, int expire, char *data, int data_len TSRMLS_DC) 
+static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char *key, int key_len, int flags, int expire, char *data, int data_len TSRMLS_DC) /* {{{ */
 {
 	char *real_command;
 	int size;
@@ -566,8 +572,8 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 	size = size + data_len + sizeof("\r\n") - 1;
 	real_command[size] = '\0';
 	
-	mmc_debug("mmc_exec_storage_cmd: store cmd is '%s'", real_command);
-	mmc_debug("mmc_exec_storage_cmd: trying to store '%s', %d bytes", data, data_len);
+	MMC_DEBUG(("mmc_exec_storage_cmd: store cmd is '%s'", real_command));
+	MMC_DEBUG(("mmc_exec_storage_cmd: trying to store '%s', %d bytes", data, data_len));
 	
 	/* send command & data */
 	if (php_stream_write(mmc->stream, real_command, size) != size) {
@@ -582,7 +588,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 		return -1;
 	}
 
-	mmc_debug("mmc_exec_storage_cmd: response is '%s'", mmc->inbuf);
+	MMC_DEBUG(("mmc_exec_storage_cmd: response is '%s'", mmc->inbuf));
 
 	/* stored or not? */
 	if(mmc_str_left(mmc->inbuf,"STORED", response_buf_size, sizeof("STORED") - 1)) {
@@ -594,8 +600,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 }
 /* }}} */
 
-/* {{{ mmc_parse_response ()*/
-static int mmc_parse_response(char *response, int response_len, int *flags, int *value_len) 
+static int mmc_parse_response(char *response, int response_len, int *flags, int *value_len) /* {{{ */
 {
 	int i=0, n=0;
 	int spaces[3];
@@ -604,7 +609,7 @@ static int mmc_parse_response(char *response, int response_len, int *flags, int 
 		return -1;
 	}
 
-	mmc_debug("mmc_parse_response: got response '%s'", response);
+	MMC_DEBUG(("mmc_parse_response: got response '%s'", response));
 	
 	for (i = 0; i < response_len; i++) {
 		if (response[i] == ' ') {
@@ -616,7 +621,7 @@ static int mmc_parse_response(char *response, int response_len, int *flags, int 
 		}
 	}
 
-	mmc_debug("mmc_parse_response: found %d spaces", n);
+	MMC_DEBUG(("mmc_parse_response: found %d spaces", n));
 
 	if (n < 3) {
 		return -1;
@@ -625,18 +630,17 @@ static int mmc_parse_response(char *response, int response_len, int *flags, int 
 	*flags = atoi(response + spaces[1]);
 	*value_len = atoi(response + spaces[2]);
 
-	mmc_debug("mmc_parse_response: 1st space is at %d position", spaces[1]);
-	mmc_debug("mmc_parse_response: 2nd space is at %d position", spaces[2]);
-	mmc_debug("mmc_parse_response: flags = %d", *flags);
-	mmc_debug("mmc_parse_response: value_len = %d ", *value_len);
+	MMC_DEBUG(("mmc_parse_response: 1st space is at %d position", spaces[1]));
+	MMC_DEBUG(("mmc_parse_response: 2nd space is at %d position", spaces[2]));
+	MMC_DEBUG(("mmc_parse_response: flags = %d", *flags));
+	MMC_DEBUG(("mmc_parse_response: value_len = %d ", *value_len));
 	
 	return 1;
 }
 
 /* }}} */
 
-/* {{{ mmc_exec_retrieval_cmd () */
-static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, char *key, int key_len, int *flags, char **data, int *data_len TSRMLS_DC) 
+static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, char *key, int key_len, int *flags, char **data, int *data_len TSRMLS_DC) /* {{{ */
 {
 	char *real_command, *tmp;
 	int size, response_buf_size;
@@ -654,7 +658,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 
 	real_command [size] = '\0';
 
-	mmc_debug("mmc_exec_retrieval_cmd: trying to get '%s'", key);
+	MMC_DEBUG(("mmc_exec_retrieval_cmd: trying to get '%s'", key));
 	
 	/* gimme! =) */
 	if (mmc_sendcmd(mmc, real_command, size TSRMLS_CC) < 0) {
@@ -668,7 +672,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 		return -1;
 	}
 
-	mmc_debug("mmc_exec_retrieval_cmd: got response '%s'", mmc->inbuf);
+	MMC_DEBUG(("mmc_exec_retrieval_cmd: got response '%s'", mmc->inbuf));
 	
 	/* what's this? */
 
@@ -690,7 +694,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 	}
 	efree(tmp);
 
-	mmc_debug("mmc_exec_retrieval_cmd: data len is %d bytes", *data_len);
+	MMC_DEBUG(("mmc_exec_retrieval_cmd: data len is %d bytes", *data_len));
 	
 	if (*data_len) {
 		*data = emalloc(*data_len + 2 + 1);
@@ -701,7 +705,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 			return -1;
 		}
 		(*data) [size - 2] = '\0';
-		mmc_debug("mmc_exec_retrieval_cmd: data '%s'", *data);
+		MMC_DEBUG(("mmc_exec_retrieval_cmd: data '%s'", *data));
 	}
 	else {
 		/* an error occurred? */
@@ -724,8 +728,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 }
 /* }}} */
 
-/* {{{ mmc_delete () */
-static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC) 
+static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC) /* {{{ */
 {
 	char *real_command;
 	int size, response_buf_size;
@@ -745,7 +748,7 @@ static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC)
 	
 	real_command [size] = '\0';
 
-	mmc_debug("mmc_delete: trying to delete '%s'", key);
+	MMC_DEBUG(("mmc_delete: trying to delete '%s'", key));
 	
 	/* drop it! =) */
 	if (mmc_sendcmd(mmc, real_command, size TSRMLS_CC) < 0) {
@@ -759,7 +762,7 @@ static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC)
 		return -1;
 	}
 	
-	mmc_debug("mmc_delete: server's response is '%s'", mmc->inbuf);
+	MMC_DEBUG(("mmc_delete: server's response is '%s'", mmc->inbuf));
 
 	/* ok? */
 	if(mmc_str_left(mmc->inbuf,"DELETED", response_buf_size, sizeof("DELETED") - 1)) {
@@ -778,12 +781,11 @@ static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC)
 }
 /* }}} */
 
-/* {{{ mmc_flush () */
-static int mmc_flush(mmc_t *mmc TSRMLS_DC) 
+static int mmc_flush(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	int response_buf_size;
 	
-	mmc_debug("mmc_flush: flushing the cache");
+	MMC_DEBUG(("mmc_flush: flushing the cache"));
 	
 	if (mmc_sendcmd(mmc, "flush_all", sizeof("flush_all") - 1 TSRMLS_CC) < 0) {
 		return -1;
@@ -794,7 +796,7 @@ static int mmc_flush(mmc_t *mmc TSRMLS_DC)
 		return -1;
 	}
 	
-	mmc_debug("mmc_flush: server's response is '%s'", mmc->inbuf);
+	MMC_DEBUG(("mmc_flush: server's response is '%s'", mmc->inbuf));
 
 	/* ok? */
 	if(mmc_str_left(mmc->inbuf,"OK", response_buf_size, sizeof("OK") - 1)) {
@@ -808,8 +810,118 @@ static int mmc_flush(mmc_t *mmc TSRMLS_DC)
 }
 /* }}} */
 
-/* {{{ php_mmc_store ()*/
-static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int command_len) 
+static int mmc_get_stats (mmc_t *mmc, zval **stats TSRMLS_DC) /* {{{ */
+{
+	int response_buf_size, stats_tmp_len, space_len, i = 0;
+	char *stats_tmp, *space_tmp = NULL;
+	char *key, *val;
+
+	if ( mmc_sendcmd(mmc, "stats", sizeof("stats") - 1 TSRMLS_CC) < 0) {
+		return -1;
+	}
+
+	array_init(*stats);
+
+	while ( (response_buf_size = mmc_readline(mmc TSRMLS_CC)) > 0 ) {
+		if (mmc_str_left(mmc->inbuf, "STAT", response_buf_size, sizeof("STAT") - 1)) {
+			stats_tmp_len = response_buf_size - (sizeof("STAT ") - 1) - (sizeof("\r\n") - 1);
+			stats_tmp = estrndup(mmc->inbuf + (sizeof("STAT ") - 1), stats_tmp_len);
+			space_tmp = php_memnstr(stats_tmp, " ", 1, stats_tmp + stats_tmp_len);
+
+			if (space_tmp) {
+				space_len = strlen(space_tmp);
+				key = estrndup(stats_tmp, stats_tmp_len - space_len);
+				val = estrndup(stats_tmp + (stats_tmp_len - space_len) + 1, space_len - 1);
+				add_assoc_string(*stats, key, val, 1);
+
+				efree(key);
+				efree(val);
+			}
+
+			efree(stats_tmp);
+			i++;
+		}
+		else if (mmc_str_left(mmc->inbuf, "END", response_buf_size, sizeof("END") - 1)) {
+			/* END of stats*/
+			break;
+		}
+		else {
+			/* unknown error */
+			break;
+		}
+	}
+
+	if (i == 0) {
+		efree(*stats);
+	}
+
+	return 1;
+}
+/* }}} */
+
+static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int key_len, int value TSRMLS_DC) /* {{{ */
+{
+	char *command, *command_name;
+	int  cmd_len, response_buf_size;
+	
+	/* 4 is for strlen("incr") or strlen("decr"), doesn't matter */
+	command = emalloc(4 + key_len + MAX_LENGTH_OF_LONG + 1); 
+
+	MMC_PREPARE_KEY(key, key_len);
+	
+	if (cmd > 0) {
+		command_name = emalloc(sizeof("incr"));
+		sprintf(command_name, "incr");
+		cmd_len = sprintf(command, "incr %s %d", key, value);
+	}
+	else {
+		command_name = emalloc(sizeof("decr"));
+		sprintf(command_name, "decr");
+		cmd_len = sprintf(command, "decr %s %d", key, value);
+	}
+	
+	if (mmc_sendcmd(mmc, command, cmd_len TSRMLS_CC) < 0) {
+		efree(command);
+		efree(command_name);
+		return -1;
+	}
+	efree(command);
+
+	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) > 0) {
+		MMC_DEBUG(("mmc_incr_decr: server's answer is: '%s'", mmc->inbuf));
+		if (mmc_str_left(mmc->inbuf, "NOT_FOUND", response_buf_size, sizeof("NOT_FOUND") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - item with such key not found", command_name);
+			efree(command_name);
+			return -1;
+		}
+		else if (mmc_str_left(mmc->inbuf, "ERROR", response_buf_size, sizeof("ERROR") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - an error occured", command_name);
+			efree(command_name);
+			return -1;
+		}
+		else if (mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_buf_size, sizeof("CLIENT_ERROR") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - client error occured", command_name);
+			efree(command_name);
+			return -1;
+		}
+		else if (mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_buf_size, sizeof("SERVER_ERROR") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - server error occured", command_name);
+			efree(command_name);
+			return -1;
+		}
+		else {
+			efree(command_name);
+			return atoi(mmc->inbuf);
+		}
+	}
+
+	efree(command_name);
+	return -1;
+
+}
+/* }}} */
+
+static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int command_len) /* {{{ */
 {
 	mmc_t *mmc;
 	int inx, data_len = 0, real_expire = 0, real_flags = 0, key_len;
@@ -915,121 +1027,7 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 }
 /* }}} */
 
-/* {{{ mmc_get_stats ()*/
-static int mmc_get_stats (mmc_t *mmc, zval **stats TSRMLS_DC)
-{
-	int response_buf_size, stats_tmp_len, space_len, i = 0;
-	char *stats_tmp, *space_tmp = NULL;
-	char *key, *val;
-
-	if ( mmc_sendcmd(mmc, "stats", sizeof("stats") - 1 TSRMLS_CC) < 0) {
-		return -1;
-	}
-
-	array_init(*stats);
-
-	while ( (response_buf_size = mmc_readline(mmc TSRMLS_CC)) > 0 ) {
-		if (mmc_str_left(mmc->inbuf, "STAT", response_buf_size, sizeof("STAT") - 1)) {
-			stats_tmp_len = response_buf_size - (sizeof("STAT ") - 1) - (sizeof("\r\n") - 1);
-			stats_tmp = estrndup(mmc->inbuf + (sizeof("STAT ") - 1), stats_tmp_len);
-			space_tmp = php_memnstr(stats_tmp, " ", 1, stats_tmp + stats_tmp_len);
-
-			if (space_tmp) {
-				space_len = strlen(space_tmp);
-				key = estrndup(stats_tmp, stats_tmp_len - space_len);
-				val = estrndup(stats_tmp + (stats_tmp_len - space_len) + 1, space_len - 1);
-				add_assoc_string(*stats, key, val, 1);
-
-				efree(key);
-				efree(val);
-			}
-
-			efree(stats_tmp);
-			i++;
-		}
-		else if (mmc_str_left(mmc->inbuf, "END", response_buf_size, sizeof("END") - 1)) {
-			/* END of stats*/
-			break;
-		}
-		else {
-			/* unknown error */
-			break;
-		}
-	}
-
-	if (i == 0) {
-		efree(*stats);
-	}
-
-	return 1;
-}
-/* }}} */
-
-/* {{{ mmc_incr_decr () */
-static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int key_len, int value TSRMLS_DC) 
-{
-	char *command, *command_name;
-	int  cmd_len, response_buf_size;
-	
-	/* 4 is for strlen("incr") or strlen("decr"), doesn't matter */
-	command = emalloc(4 + key_len + MAX_LENGTH_OF_LONG + 1); 
-
-	MMC_PREPARE_KEY(key, key_len);
-	
-	if (cmd > 0) {
-		command_name = emalloc(sizeof("incr"));
-		sprintf(command_name, "incr");
-		cmd_len = sprintf(command, "incr %s %d", key, value);
-	}
-	else {
-		command_name = emalloc(sizeof("decr"));
-		sprintf(command_name, "decr");
-		cmd_len = sprintf(command, "decr %s %d", key, value);
-	}
-	
-	if (mmc_sendcmd(mmc, command, cmd_len TSRMLS_CC) < 0) {
-		efree(command);
-		efree(command_name);
-		return -1;
-	}
-	efree(command);
-
-	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) > 0) {
-		mmc_debug("mmc_incr_decr: server's answer is: '%s'", mmc->inbuf);
-		if (mmc_str_left(mmc->inbuf, "NOT_FOUND", response_buf_size, sizeof("NOT_FOUND") - 1)) {
-			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - item with such key not found", command_name);
-			efree(command_name);
-			return -1;
-		}
-		else if (mmc_str_left(mmc->inbuf, "ERROR", response_buf_size, sizeof("ERROR") - 1)) {
-			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - an error occured", command_name);
-			efree(command_name);
-			return -1;
-		}
-		else if (mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_buf_size, sizeof("CLIENT_ERROR") - 1)) {
-			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - client error occured", command_name);
-			efree(command_name);
-			return -1;
-		}
-		else if (mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_buf_size, sizeof("SERVER_ERROR") - 1)) {
-			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - server error occured", command_name);
-			efree(command_name);
-			return -1;
-		}
-		else {
-			efree(command_name);
-			return atoi(mmc->inbuf);
-		}
-	}
-
-	efree(command_name);
-	return -1;
-
-}
-/* }}} */
-
-/* {{{ php_mmc_incr_decr () */
-static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd)
+static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 {
 	mmc_t *mmc;
 	int inx, result, real_value = 1;
@@ -1071,8 +1069,7 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd)
 }
 /* }}} */
 
-/* {{{ php_mmc_connect () */
-static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent)
+static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{{ */
 {
 	zval **host, **port, **timeout, *mmc_object = getThis();
 	mmc_t *mmc = NULL;
@@ -1101,17 +1098,17 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent)
 	if (persistent) {
 		list_entry *le;
 
-		mmc_debug("php_mmc_connect: seeking for persistent connection");
+		MMC_DEBUG(("php_mmc_connect: seeking for persistent connection"));
 		
 		hash_key = emalloc(sizeof("mmc_connect___") - 1 + Z_STRLEN_PP(host) + MAX_LENGTH_OF_LONG + 1);
 		hash_key_len = sprintf(hash_key, "mmc_connect___%s:%d", Z_STRVAL_PP(host), real_port);
 		if (zend_hash_find(&EG(persistent_list), hash_key, hash_key_len+1, (void **) &le) == FAILURE) {
 			list_entry new_le;
 			
-			mmc_debug("php_mmc_connect: connection wasn't found in the hash");
+			MMC_DEBUG(("php_mmc_connect: connection wasn't found in the hash"));
 
 			if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
-				mmc_debug("php_mmc_connect: connection failed");
+				MMC_DEBUG(("php_mmc_connect: connection failed"));
 				efree(hash_key);
 				goto connect_done;
 			}
@@ -1129,14 +1126,14 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent)
 			MEMCACHE_G(num_persistent)++;
 		}
 		else {
-			mmc_debug("php_mmc_connect: connection found in the hash");
+			MMC_DEBUG(("php_mmc_connect: connection found in the hash"));
 			
 			if (le->type == le_pmemcache && le->ptr != NULL) {
 
 				if ((version = mmc_get_version(le->ptr TSRMLS_CC)) != NULL) {
 					mmc = (mmc_t *)le->ptr;
 
-					mmc_debug("memcache_connect: all right");
+					MMC_DEBUG(("memcache_connect: all right"));
 					mmc->id = zend_list_insert(mmc,le_pmemcache);
 
 					/* Ok, server is alive and working */
@@ -1147,12 +1144,12 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent)
 				else {
 					list_entry new_le;
 					
-					mmc_debug("php_mmc_connect: server has gone away, reconnecting..");
+					MMC_DEBUG(("php_mmc_connect: server has gone away, reconnecting.."));
 
 					/* Daemon has gone away, reconnecting */
 					MEMCACHE_G(num_persistent)--;
 					if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
-						mmc_debug("php_mmc_connect: reconnect failed");						
+						MMC_DEBUG(("php_mmc_connect: reconnect failed"));						
 						efree(hash_key);
 						zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
 						goto connect_done;
@@ -1174,9 +1171,9 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent)
 			else {
 				list_entry new_le;
 
-				mmc_debug("php_mmc_connect: smthing was wrong, reconnecting..");
+				MMC_DEBUG(("php_mmc_connect: smthing was wrong, reconnecting.."));
 				if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
-					mmc_debug("php_mmc_connect: reconnect failed");
+					MMC_DEBUG(("php_mmc_connect: reconnect failed"));
 					efree(hash_key);
 					zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
 					goto connect_done;
@@ -1197,7 +1194,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent)
 		}
 	}
 	else {
-		mmc_debug("php_mmc_connect: creating regular connection");
+		MMC_DEBUG(("php_mmc_connect: creating regular connection"));
 		mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC);
 		if (mmc != NULL) {
 			mmc->id = zend_list_insert(mmc,le_memcache);
@@ -1225,6 +1222,10 @@ connect_done:
 	}	
 }
 /* }}} */
+
+/* ---------------- 
+   module functions 
+   ---------------- */
 
 /* {{{ proto object memcache_connect( string host [, int port [, int timeout ] ]) 
    Connects to server and returns Memcache object */
@@ -1415,12 +1416,13 @@ PHP_FUNCTION(memcache_delete)
    Turns on/off internal debugging */
 PHP_FUNCTION(memcache_debug)
 {
+#if ZEND_DEBUG
 	zval **onoff;
-
+	
 	if (zend_get_parameters_ex(1, &onoff) == FAILURE) {
 		WRONG_PARAM_COUNT;
 	}
-
+	
 	convert_to_long_ex(onoff);
 	if (Z_LVAL_PP(onoff) != 0) {
 		MEMCACHE_G(debug_mode) = 1;
@@ -1430,6 +1432,10 @@ PHP_FUNCTION(memcache_debug)
 	}
 	
 	RETURN_TRUE;
+#else
+	RETURN_FALSE;
+#endif
+	
 }
 /* }}} */
 
