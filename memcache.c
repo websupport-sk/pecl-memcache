@@ -73,6 +73,7 @@ zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_get,			NULL)
 	PHP_FE(memcache_delete,			NULL)
 	PHP_FE(memcache_debug,			NULL)
+	PHP_FE(memcache_get_stats,		NULL)
 	{NULL, NULL, NULL}
 };
 
@@ -84,6 +85,7 @@ static zend_function_entry php_memcache_class_functions[] = {
 	PHP_FALIAS(replace,			memcache_replace,			NULL)
 	PHP_FALIAS(get,				memcache_get,				NULL)
 	PHP_FALIAS(delete,			memcache_delete,			NULL)
+	PHP_FALIAS(getstats,		memcache_get_stats,			NULL)	
 	{NULL, NULL, NULL}
 };
 
@@ -129,6 +131,7 @@ static int mmc_parse_response(char *, int *, int *);
 static int mmc_exec_retrieval_cmd(mmc_t *, char *, char *, int *, char **, int *);
 static int mmc_delete(mmc_t *, char *, int);
 static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *);
+static int mmc_get_stats (mmc_t *, zval **);
 /* }}} */
 
 /* {{{ php_memcache_init_globals()
@@ -760,6 +763,52 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command)
 }
 /* }}} */
 
+/* {{{ mmc_get_stats ()*/
+static int mmc_get_stats (mmc_t *mmc, zval **stats)
+{
+	int response_buf_size, stats_tmp_len, space_len, i = 0;
+	char *stats_tmp, *space_tmp = NULL;
+	char *key, *val;
+
+	if ( mmc_sendcmd(mmc, "stats", 5) < 0) {
+		return -1;
+	}
+
+	array_init(*stats);
+
+	while ( (response_buf_size = mmc_readline(mmc)) > 0 ) {
+		if (mmc_str_left(mmc->inbuf, "STAT", response_buf_size, 4)) {
+			stats_tmp_len = response_buf_size - 5 - 2;
+			stats_tmp = estrndup(mmc->inbuf + 5, stats_tmp_len);
+			space_tmp = php_memnstr(stats_tmp, " ", 1, stats_tmp + stats_tmp_len);
+
+			if (space_tmp) {
+				space_len = strlen(space_tmp);
+				key = estrndup(stats_tmp, stats_tmp_len - space_len);
+				val = estrndup(stats_tmp + (stats_tmp_len - space_len) + 1, space_len - 1);
+				add_assoc_string(*stats, key, val, 1);
+
+				efree(key);
+				efree(val);
+			}
+
+			efree(stats_tmp);
+			i++;
+		}
+		else {
+			/* END of stats or some error */
+			break;
+		}
+	}
+
+	if (i == 0) {
+		efree(*stats);
+	}
+
+	return 1;
+}
+/* }}} */
+
 /* {{{ proto object memcache_connect( string host, int port [, int timeout ]) 
    Connects to server and returns Memcache object */
 PHP_FUNCTION(memcache_connect)
@@ -960,6 +1009,31 @@ PHP_FUNCTION(memcache_debug)
 	}
 	
 	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto array memcache_get_stats( void )
+   Returns server's statistics */
+PHP_FUNCTION(memcache_get_stats)
+{
+	zval *id;
+	mmc_t *mmc;
+	int inx;
+	char *version;
+
+	if ((id = getThis()) != 0) {
+		if ((inx = mmc_get_connection(id, &mmc TSRMLS_CC)) == 0) {
+			RETURN_FALSE;
+		}
+
+		if (mmc_get_stats(mmc, &return_value) < 0) {
+			RETURN_FALSE;
+		}
+	}
+	else {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache_get_stats() should not be called like this. Use $memcache->getStats() to get server's statistics");
+		RETURN_FALSE;
+	}
 }
 /* }}} */
 
