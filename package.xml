@@ -18,13 +18,12 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>1.0</version>
-		<date>2004-05-21</date>
-		<state>beta</state>
+		<version>1.1</version>
+		<date>2004-06-08</date>
+		<state>stable</state>
 		<notes>
-			1) Ifdef'ed debug routines, so they are available only in debug mode.
-			This should add more speed to extension. 
-			2) Minor code decorations.
+			1) Fixed couple of possible segfaults and one error (many thanks to Anight).
+			2) Minor improvements.
 		</notes>
 	</release>
 	<filelist>
@@ -36,6 +35,7 @@
 			<file role="src">config.w32</file>
 			<file role="doc">php_memcache.h</file>
 			<file role="src">memcache.c</file>
+			<file role="src">memcache.dsp</file>
          </dir>
 	</filelist>
 	<changelog>
