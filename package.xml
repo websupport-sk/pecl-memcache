@@ -18,12 +18,14 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>1.1</version>
-		<date>2004-06-08</date>
+		<version>1.2</version>
+		<date>2004-07-20</date>
 		<state>stable</state>
 		<notes>
-			1) Fixed couple of possible segfaults and one error (many thanks to Anight).
-			2) Minor improvements.
+			1) Fixed typo, preventing to use set() with flags and expire in the same time (thanks to Troy Hakala [troy at recipezaar dot com] for noticing).
+			2) Added possibility to store objects and arrays compressed.
+			3) Hopefully fixed all possible problems with persistent connections (thanks to [anight at monamour dot ru]).
+			4) Some uncritical impovements.
 		</notes>
 	</release>
 	<filelist>
@@ -39,6 +41,15 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>1.1</version>
+			<date>2004-06-08</date>
+			<state>stable</state>
+			<notes>
+				1) Fixed couple of possible segfaults and one error (many thanks to Anight).
+				2) Minor improvements.
+			</notes>
+		</release>
 		<release>
 		    <version>1.0</version>
 		    <date>2004-05-21</date>
