@@ -956,7 +956,7 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 			WRONG_PARAM_COUNT;
 		}
 
-		if (ac == 4) {
+		if (ac >= 4) {
 			convert_to_long(flags);
 			real_flags = Z_LVAL_P(flags);
 		}
@@ -972,7 +972,7 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 			WRONG_PARAM_COUNT;
 		}
 
-		if (ac == 3) {
+		if (ac >= 3) {
 			convert_to_long(flags);
 			real_flags = Z_LVAL_P(flags);
 		}
