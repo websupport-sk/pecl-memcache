@@ -41,6 +41,7 @@ PHP_RSHUTDOWN_FUNCTION(memcache);
 PHP_MINFO_FUNCTION(memcache);
 
 PHP_FUNCTION(memcache_connect);
+PHP_FUNCTION(memcache_pconnect);
 PHP_FUNCTION(memcache_get_version);
 PHP_FUNCTION(memcache_add);
 PHP_FUNCTION(memcache_set);
@@ -58,17 +59,21 @@ PHP_FUNCTION(memcache_close);
 #define MMC_COMPRESSED 2
 #define MMC_DEFAULT_TIMEOUT 1 /* seconds */
 #define MMC_KEY_MAX_SIZE 250 /* stoled from memcached sources =) */
+#define MMC_DEFAULT_PORT 11211
 
 typedef struct mmc {
 	int						id;
 	php_stream				*stream;
 	char					inbuf[MMC_BUF_SIZE];
 	long					timeout;
+	int						persistent;
 } mmc_t;
 
 /* our globals */
 typedef struct {
 	long debug_mode;
+	long default_port;
+	long num_persistent;
 } php_memcache_globals;
 
 #ifdef ZTS

@@ -18,12 +18,8 @@
 
 /* $Id$ */
 
-/*
- * XXX fix all error messages
- */
-
 /* TODO
- * - should we add compression support ? bzip || gzip ?
+ * - should we add a compression support ? bzip || gzip ?
  * - more and better error messages
  * - we should probably do a cleanup if some call failed, 
  *   because it can cause further calls to fail
@@ -51,7 +47,7 @@
 #include "php_memcache.h"
 
 /* True global resources - no need for thread safety here */
-static int le_memcache;
+static int le_memcache, le_pmemcache;
 static zend_class_entry *memcache_class_entry_ptr;
 
 #ifdef ZTS
@@ -64,6 +60,7 @@ PHP_MEMCACHE_API php_memcache_globals memcache_globals;
  */
 zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_connect,		NULL)
+	PHP_FE(memcache_pconnect,		NULL)
 	PHP_FE(memcache_get_version,	NULL)
 	PHP_FE(memcache_add,			NULL)
 	PHP_FE(memcache_set,			NULL)
@@ -80,6 +77,7 @@ zend_function_entry memcache_functions[] = {
 
 static zend_function_entry php_memcache_class_functions[] = {
 	PHP_FALIAS(connect,			memcache_connect,			NULL)
+	PHP_FALIAS(pconnect,		memcache_pconnect,			NULL)
 	PHP_FALIAS(getversion,		memcache_get_version,		NULL)
 	PHP_FALIAS(add,				memcache_add,				NULL)
 	PHP_FALIAS(set,				memcache_set,				NULL)
@@ -120,15 +118,16 @@ ZEND_GET_MODULE(memcache)
 #endif
 
 /* {{{ macros */
-#define PREPARE_KEY(key, key_len) \
+#define MMC_PREPARE_KEY(key, key_len) \
 	php_strtr(key, key_len, "\t\r\n ", "____", 4); \
 
 /* }}} */
 
 /* {{{ internal function protos */
 static void _mmc_server_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
+static void _mmc_pserver_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static int mmc_get_connection(zval *, mmc_t ** TSRMLS_DC);
-static mmc_t* mmc_open(const char *, short, long TSRMLS_DC);
+static mmc_t* mmc_open(const char *, short, long, int TSRMLS_DC);
 static int mmc_close(mmc_t *);
 static int mmc_write(mmc_t *, const char *, int);
 static int mmc_readline(mmc_t *);
@@ -144,13 +143,16 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *);
 static int mmc_get_stats (mmc_t *, zval **);
 static int mmc_incr_decr (mmc_t *, int, char *, int);
 static void php_mmc_incr_decr (INTERNAL_FUNCTION_PARAMETERS, int);
+static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int);
 /* }}} */
 
 /* {{{ php_memcache_init_globals()
 */
 static void php_memcache_init_globals(php_memcache_globals *memcache_globals_p TSRMLS_DC)
 { 
-	MEMCACHE_G(debug_mode)	= 0;
+	MEMCACHE_G(debug_mode)		= 0;
+	MEMCACHE_G(default_port)	= MMC_DEFAULT_PORT;
+	MEMCACHE_G(num_persistent)	= 0;
 }
 /* }}} */
 
@@ -163,6 +165,7 @@ PHP_MINIT_FUNCTION(memcache)
 	memcache_class_entry_ptr = zend_register_internal_class(&memcache_class_entry TSRMLS_CC);	
 
 	le_memcache = zend_register_list_destructors_ex(_mmc_server_list_dtor, NULL, "memcache connection", module_number);
+	le_pmemcache = zend_register_list_destructors_ex(NULL, _mmc_pserver_list_dtor, "persistent memcache connection", module_number);
 
 #ifdef ZTS
 	ts_allocate_id(&memcache_globals_id, sizeof(php_memcache_globals), (ts_allocate_ctor) php_memcache_init_globals, NULL);
@@ -206,9 +209,14 @@ PHP_RSHUTDOWN_FUNCTION(memcache)
  */
 PHP_MINFO_FUNCTION(memcache)
 {
+	char buf[16];
+
+	sprintf(buf, "%ld", MEMCACHE_G(num_persistent));
+	
 	php_info_print_table_start();
 	php_info_print_table_header(2, "memcache support", "enabled");
-	php_info_print_table_header(2, "Revision", "$Revision$");
+	php_info_print_table_row(2, "Active persistent connections", buf);
+	php_info_print_table_row(2, "Revision", "$Revision$");
 	php_info_print_table_end();
 }
 /* }}} */
@@ -218,6 +226,17 @@ static void _mmc_server_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 {
 	mmc_t *mmc = (mmc_t *)rsrc->ptr;
 	mmc_close(mmc);
+	efree(mmc);
+}
+/* }}} */
+
+/* {{{ _mmc_pserver_list_dtor() */
+static void _mmc_pserver_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
+{
+	mmc_t *mmc = (mmc_t *)rsrc->ptr;
+	mmc_close(mmc);
+	free(mmc);
+	MEMCACHE_G(num_persistent)--;
 }
 /* }}} */
 
@@ -252,8 +271,8 @@ static int mmc_get_connection(zval *id, mmc_t **mmc TSRMLS_DC)
 	}
 
 	*mmc = (mmc_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
-	
-	if (!*mmc || resource_type != le_memcache) {
+
+	if (!*mmc || (resource_type != le_pmemcache && resource_type != le_memcache )) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "connection identifier not found");
 		return 0;
 	}
@@ -263,19 +282,42 @@ static int mmc_get_connection(zval *id, mmc_t **mmc TSRMLS_DC)
 /* }}} */
 
 /* {{{ mmc_open() */
-static mmc_t* mmc_open(const char *host, short port, long timeout TSRMLS_DC) 
+static mmc_t* mmc_open(const char *host, short port, long timeout, int persistent TSRMLS_DC) 
 {
 	mmc_t			*mmc;
 	struct timeval	tv;
-
-	if ( !(mmc = emalloc( sizeof(mmc_t) )) ) {
-		return NULL;
-	}
-
+	char			*hostname = NULL, *hash_key = NULL, *errstr = NULL, *version;
+	int				hostname_len, hash_key_len, err;
+	
 	tv.tv_sec = timeout;
 	tv.tv_usec = 0;
 	
-	mmc->stream = php_stream_sock_open_host( host, (unsigned short) port, SOCK_STREAM, 0, 0);
+	hostname_len = strlen(host) + MAX_LENGTH_OF_LONG + 1;
+	hostname = emalloc(hostname_len + 1);
+	sprintf(hostname, "%s:%d", host, port);
+
+	if (persistent) {
+		mmc = malloc( sizeof(mmc_t) );
+
+		hash_key_len = sizeof("mmc_open___") + hostname_len;
+		hash_key = emalloc(hash_key_len + 1);
+		sprintf(hash_key, "mmc_open___%s", hostname);
+	}
+	else {
+		mmc = emalloc( sizeof(mmc_t) );
+	}
+	
+	mmc->stream = php_stream_xport_create( hostname, hostname_len, 
+										   ENFORCE_SAFE_MODE | REPORT_ERRORS,
+										   STREAM_XPORT_CLIENT | STREAM_XPORT_CONNECT,
+										   hash_key, &tv, NULL, &errstr, &err);
+			
+	efree(hostname);
+
+	if (hash_key) {
+		efree(hash_key);
+	}
+	
 	if (mmc->stream == NULL) {
 		mmc_debug("mmc_open: can't open socket to host");
 		efree(mmc);
@@ -287,15 +329,13 @@ static mmc_t* mmc_open(const char *host, short port, long timeout TSRMLS_DC)
 		
 	mmc->timeout = timeout;
 	
-	if (mmc_get_version(mmc) == NULL) {
+	if ((version = mmc_get_version(mmc)) == NULL) {
 		mmc_debug("mmc_open: failed to get server's version");
 		mmc_close(mmc);
 		efree(mmc);
 		return NULL;
 	}
-
-	mmc->id = zend_list_insert(mmc,le_memcache);
-
+	efree(version);
 	return mmc;
 }
 /* }}} */
@@ -305,15 +345,19 @@ static int mmc_close(mmc_t *mmc)
 {
 	mmc_debug("mmc_close: closing connection to server");
 
-	if (mmc == NULL || mmc->stream == NULL) {
+	if (mmc == NULL) {
 		return 0;
 	}
 
-	mmc_sendcmd(mmc,"quit", 4);
-	php_stream_close(mmc->stream);
+	if (mmc->stream) {
+		mmc_sendcmd(mmc,"quit", 4);
+		php_stream_close(mmc->stream);
+	}
 
 	mmc->stream = NULL;
-
+	
+	zend_list_delete(mmc->id);
+	
 	return 1;
 }
 /* }}} */
@@ -483,7 +527,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, char *key, int flags,
 							+ 1
 							);
 
-	PREPARE_KEY(key, strlen(key));
+	MMC_PREPARE_KEY(key, strlen(key));
 
 	size = sprintf(real_command, "%s ", command);
 	size += sprintf(real_command + size, "%s ", key);
@@ -596,7 +640,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, char *key, int *fla
 							+ 1
 							);
 
-	PREPARE_KEY(key, strlen(key));
+	MMC_PREPARE_KEY(key, strlen(key));
 
 	size = sprintf(real_command, "%s ", command);
 	size += sprintf(real_command + size, "%s", key);
@@ -634,9 +678,10 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, char *key, int *fla
 	mmc_debug("mmc_exec_retrieval_cmd: data len is %d bytes", *data_len);
 	
 	if (*data_len) {
-		*data = emalloc(*data_len);
+		*data = emalloc(*data_len + 1);
 		
 		if ((size = mmc_read(mmc, *data, *data_len)) != *data_len) {
+			efree(*data);
 			return -1;
 		}
 		mmc_debug("mmc_exec_retrieval_cmd: data '%s'", *data);
@@ -647,10 +692,12 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, char *key, int *fla
 	
 	/* read "END" */
 	if ((response_buf_size = mmc_readline(mmc)) < 0) {
+		efree(*data);
 		return -1;
 	}
 
 	if(mmc_str_left(mmc->inbuf,"END", response_buf_size, 3) < 0) {
+		efree(*data);
 		return -1;
 	}
 	
@@ -677,7 +724,7 @@ static int mmc_delete(mmc_t *mmc, char *key, int time)
 							+ 1
 							);
 
-	PREPARE_KEY(key, strlen(key));
+	MMC_PREPARE_KEY(key, strlen(key));
 	size = sprintf(real_command, "%s ", "delete");
 	size += sprintf(real_command + size, "%s ", key);
 	size += sprintf(real_command + size, "%s", time_tmp);
@@ -793,9 +840,11 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command)
 	}
 
 	if (mmc_exec_storage_cmd(mmc, command, real_key, flags, real_expire, data, data_len) > 0) {
+		smart_str_free(&buf);
 		efree(real_key);
 		RETURN_TRUE;
 	}
+	smart_str_free(&buf);
 	efree(real_key);
 	RETURN_FALSE;
 }
@@ -855,7 +904,7 @@ static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int value)
 
 	command = emalloc(4 + strlen(key) + MAX_LENGTH_OF_LONG + 1);
 
-	PREPARE_KEY(key, strlen(key));
+	MMC_PREPARE_KEY(key, strlen(key));
 	
 	if (cmd > 0) {
 		cmd_len = sprintf(command, "incr %s %d", key, value);
@@ -937,34 +986,148 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd)
 }
 /* }}} */
 
-/* {{{ proto object memcache_connect( string host, int port [, int timeout ]) 
-   Connects to server and returns Memcache object */
-PHP_FUNCTION(memcache_connect)
+/* {{{ php_mmc_connect () */
+static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent)
 {
 	zval **host, **port, **timeout, *mmc_object = getThis();
 	mmc_t *mmc = NULL;
-	int timeout_sec = MMC_DEFAULT_TIMEOUT;
+	int timeout_sec = MMC_DEFAULT_TIMEOUT, real_port, hash_key_len;
 	int ac = ZEND_NUM_ARGS();
+	char *hash_key = NULL, *version;
 
-	if (ac < 2 || ac > 3 || zend_get_parameters_ex(ac, &host, &port, &timeout) == FAILURE) {
+	if (ac < 1 || ac > 3 || zend_get_parameters_ex(ac, &host, &port, &timeout) == FAILURE) {
 		WRONG_PARAM_COUNT;
 	}
 
 	convert_to_string_ex(host);
-	convert_to_long_ex(port);
+	
+	real_port = MEMCACHE_G(default_port);
+	
+	if (ac > 1) {
+		convert_to_long_ex(port);
+		real_port = Z_LVAL_PP(port);
+	}
 
 	if (ac == 3) {
 		convert_to_long_ex(timeout);
 		timeout_sec = Z_LVAL_PP(timeout);
 	}
-	
-	mmc = mmc_open(Z_STRVAL_PP(host), Z_LVAL_PP(port), timeout_sec);
+
+	if (persistent) {
+		list_entry *le;
+
+		mmc_debug("php_mmc_connect: seeking for persistent connection");
+		
+		hash_key = emalloc(sizeof("mmc_connect___") + Z_STRLEN_PP(host) + MAX_LENGTH_OF_LONG + 1);
+		hash_key_len = sprintf(hash_key, "mmc_connect___%s:%d", Z_STRVAL_PP(host), real_port);
+		if (zend_hash_find(&EG(persistent_list), hash_key, hash_key_len+1, (void **) &le) == FAILURE) {
+			list_entry new_le;
+			
+			mmc_debug("php_mmc_connect: connection wasn't found in the hash");
+
+			if ((mmc = mmc_open(Z_STRVAL_PP(host), real_port, timeout_sec, persistent)) == NULL) {
+				mmc_debug("php_mmc_connect: connection failed");
+				efree(hash_key);
+				goto connect_done;
+			}
+
+			mmc->id = zend_list_insert(mmc,le_pmemcache);
+			
+			new_le.type = le_pmemcache;
+			new_le.ptr  = mmc;
+			
+			if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(list_entry), NULL)==FAILURE) {
+				efree(hash_key);
+				goto connect_done;
+			}
+			efree(hash_key);
+			MEMCACHE_G(num_persistent)++;
+		}
+		else {
+			mmc_debug("php_mmc_connect: connection found in the hash");
+			
+			if (le->type == le_pmemcache && le->ptr != NULL) {
+
+				if ((version = mmc_get_version(le->ptr)) != NULL) {
+					mmc = (mmc_t *)le->ptr;
+
+					mmc_debug("memcache_connect: all right");
+					mmc->id = zend_list_insert(mmc,le_pmemcache);
+
+					/* Ok, server is alive and working */
+					efree(version);
+					efree(hash_key);
+					goto connect_done;
+				}
+				else {
+					list_entry new_le;
+					
+					mmc_debug("php_mmc_connect: server has gone away, reconnecting..");
+
+					/* Daemon has gone away, reconnecting */
+					MEMCACHE_G(num_persistent)--;
+					if ((mmc = mmc_open(Z_STRVAL_PP(host), real_port, timeout_sec, persistent)) == NULL) {
+						mmc_debug("php_mmc_connect: reconnect failed");						
+						efree(hash_key);
+						zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
+						goto connect_done;
+					}
+
+					mmc->id = zend_list_insert(mmc,le_pmemcache);
+					
+					new_le.type = le_pmemcache;
+					new_le.ptr  = mmc;
+					
+					if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(list_entry), NULL)==FAILURE) {
+						efree(hash_key);
+						goto connect_done;
+					}
+					efree(hash_key);
+					MEMCACHE_G(num_persistent)++;
+				}
+			}
+			else {
+				list_entry new_le;
+
+				mmc_debug("php_mmc_connect: smthing was wrong, reconnecting..");
+				if ((mmc = mmc_open(Z_STRVAL_PP(host), real_port, timeout_sec, persistent)) == NULL) {
+					mmc_debug("php_mmc_connect: reconnect failed");
+					efree(hash_key);
+					zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
+					goto connect_done;
+				}
+
+				mmc->id = zend_list_insert(mmc,le_pmemcache);
+				
+				new_le.type = le_pmemcache;
+				new_le.ptr  = mmc;
+				
+				if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(list_entry), NULL)==FAILURE) {
+					efree(hash_key);
+					goto connect_done;
+				}
+				efree(hash_key);
+				MEMCACHE_G(num_persistent)++;
+			}
+		}
+	}
+	else {
+		mmc_debug("php_mmc_connect: creating regular connection");
+		mmc = mmc_open(Z_STRVAL_PP(host), real_port, timeout_sec, persistent);
+		if (mmc != NULL) {
+			mmc->id = zend_list_insert(mmc,le_memcache);
+		}
+	}
+
+connect_done:
 	
 	if (mmc == NULL) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%ld.",Z_STRVAL_PP(host), Z_LVAL_PP(port));
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d",Z_STRVAL_PP(host), real_port);
 		RETURN_FALSE;
 	}
 
+	mmc->persistent = persistent;
+	
 	if (mmc_object == NULL) {
 		object_init_ex(return_value, memcache_class_entry_ptr);
 		add_property_resource(return_value, "connection",mmc->id);
@@ -975,6 +1138,22 @@ PHP_FUNCTION(memcache_connect)
 		add_property_resource(mmc_object, "connection",mmc->id);
 		RETURN_TRUE;
 	}	
+}
+/* }}} */
+
+/* {{{ proto object memcache_connect( string host [, int port [, int timeout ] ]) 
+   Connects to server and returns Memcache object */
+PHP_FUNCTION(memcache_connect)
+{
+	php_mmc_connect(INTERNAL_FUNCTION_PARAM_PASSTHRU, 0);
+}
+/* }}} */
+
+/* {{{ proto object memcache_pconnect( string host [, int port [, int timeout ] ]) 
+   Connects to server and returns Memcache object */
+PHP_FUNCTION(memcache_pconnect)
+{
+	php_mmc_connect(INTERNAL_FUNCTION_PARAM_PASSTHRU, 1);
 }
 /* }}} */
 
@@ -998,7 +1177,7 @@ PHP_FUNCTION(memcache_get_version)
 	}
 
 	if ( (version = mmc_get_version(mmc)) ) {
-		RETURN_STRING(version, 1);
+		RETURN_STRING(version, 0);
 	}
 	RETURN_FALSE;
 }
@@ -1070,8 +1249,10 @@ PHP_FUNCTION(memcache_get)
 				PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 				zval_dtor(return_value);
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Error at offset %d of %d bytes", tmp - data, data_len);
+				efree(data);
 				RETURN_FALSE;
 			}
+			efree(data);
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 		}
 		else {
@@ -1216,6 +1397,10 @@ PHP_FUNCTION(memcache_close)
 		RETURN_FALSE;
 	}
 
+	if (mmc->persistent) {
+		RETURN_TRUE;
+	}
+	
 	if (mmc_close(mmc) > 0) {
 		RETURN_TRUE;
 	}
