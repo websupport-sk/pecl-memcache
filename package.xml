@@ -16,23 +16,45 @@
 			<name>Antony Dovgal</name>
 			<email>tony2001@phpclub.net</email>
         </maintainer>
-    </maintainers>
+	</maintainers>
     <release>
-		<version>0.1</version>
-		<date>2004-02-08</date>
-		<state>alpha</state>
-        <notes>
-			Initial release in PECL
-        </notes>
-    </release>
+	    <version>0.2</version>
+	    <date>2004-02-26</date>
+		<state>beta</state>
+		<notes>
+			1) Added new methods: getStats(), increment(), decrement().
+			2) Keys are processed to keep syntax consistency.
+			Extension should be stable enough since this version.
+		</notes>
+	</release>
     <filelist>
         <dir role="src" name="/">
             <file role="doc">CREDITS</file>
 			<file role="doc">README</file>
+			<file role="doc">example.php</file>
 			<file role="src">config.m4</file>
 			<file role="src">config.w32</file>
 			<file role="doc">php_memcache.h</file>
 			<file role="src">memcache.c</file>
          </dir>
-     </filelist>
+	</filelist>
+	<changelog>
+		<release>
+			<version>0.2</version>
+			<date>2004-02-26</date>
+			<state>beta</state>
+			<notes>
+				New methods: getStats(), increment(), decrement().
+				Extension should be rather stable.
+			</notes>
+		</release>
+		<release>
+			<version>0.1</version>
+			<date>2004-02-08</date>
+			<state>alpha</state>
+			<notes>
+				Initial release in PECL
+			</notes>
+		</release>
+	</changelog>
 </package>
