@@ -1026,8 +1026,15 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 			
 			real_flags |= MMC_SERIALIZED;
 
-			data = buf.c;
-			data_len = buf.len;
+			if (real_flags & MMC_COMPRESSED) {
+				if (!mmc_compress(&data, &data_len, buf.c, buf.len TSRMLS_CC)) {
+					RETURN_FALSE;
+				}
+			}
+			else {
+				data = buf.c;
+				data_len = buf.len;
+			}
 			break;
 	}
 
@@ -1035,11 +1042,17 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 		if (real_flags & MMC_SERIALIZED) {
 			smart_str_free(&buf);
 		}
+		if (real_flags & MMC_COMPRESSED) {
+			efree(data);
+		}
 		efree(real_key);
 		RETURN_TRUE;
 	}
 	if (real_flags & MMC_SERIALIZED) {
 		smart_str_free(&buf);
+	}
+	if (real_flags & MMC_COMPRESSED) {
+		efree(data);
 	}
 	efree(real_key);
 	RETURN_FALSE;
@@ -1346,9 +1359,34 @@ PHP_FUNCTION(memcache_get)
 			RETURN_EMPTY_STRING();
 		}
 		
-		tmp = data;
-		
-		if (flags & MMC_SERIALIZED) {
+		if (flags & MMC_COMPRESSED) {
+			if (!mmc_uncompress(&result_data, &result_len, data, data_len)) {
+				RETURN_FALSE;
+			}
+			
+			tmp = result_data;
+			
+			if (flags & MMC_SERIALIZED) {
+				PHP_VAR_UNSERIALIZE_INIT(var_hash);
+				if (!php_var_unserialize(&return_value, &tmp, tmp + result_len,  &var_hash TSRMLS_CC)) {
+					PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+					zval_dtor(return_value);
+					php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Error at offset %d of %d bytes", tmp - data, data_len);
+					efree(data);
+					efree(result_data);
+					RETURN_FALSE;
+				}
+				efree(data);
+				efree(result_data);
+				PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+			}
+			else {
+				efree(data);
+				RETURN_STRINGL(result_data, result_len, 0);
+			}
+		}
+		else if (flags == MMC_SERIALIZED) {
+			tmp = data;
 			PHP_VAR_UNSERIALIZE_INIT(var_hash);
 			if (!php_var_unserialize(&return_value, &tmp, tmp + data_len,  &var_hash TSRMLS_CC)) {
 				PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
@@ -1359,13 +1397,6 @@ PHP_FUNCTION(memcache_get)
 			}
 			efree(data);
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-		}
-		else if (flags & MMC_COMPRESSED) {
-			if (mmc_uncompress(&result_data, &result_len, data, data_len)) {
-				result_data[result_len] = '\0';
-				RETURN_STRINGL(result_data, result_len, 0);
-			}
-			RETURN_FALSE;
 		}
 		else {
 			RETURN_STRINGL(data, data_len, 0);
