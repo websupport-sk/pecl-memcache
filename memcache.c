@@ -368,7 +368,7 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 	if (persistent) {
 		switch(php_stream_from_persistent_id(hash_key, &(mmc->stream) TSRMLS_CC)) {
 			case PHP_STREAM_PERSISTENT_SUCCESS:
-				if (!_php_network_is_stream_alive(mmc->stream TSRMLS_CC)) {
+				if (php_stream_eof(mmc->stream)) {
 					php_stream_pclose(mmc->stream);
 					mmc->stream = NULL;
 					break;
