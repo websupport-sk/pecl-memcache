@@ -39,6 +39,7 @@
 
 #if HAVE_MEMCACHE
 
+#include <zlib.h>
 #include "ext/standard/info.h"
 #include "ext/standard/php_string.h"
 #include "ext/standard/php_var.h"
@@ -126,6 +127,8 @@ ZEND_GET_MODULE(memcache)
 /* {{{ internal function protos */
 static void _mmc_server_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static void _mmc_pserver_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
+static int mmc_compress(char **, int *, char *, int);
+static int mmc_uncompress(char **, long *, char *, int);
 static int mmc_get_connection(zval *, mmc_t ** TSRMLS_DC);
 static mmc_t* mmc_open(const char *, short, long, int TSRMLS_DC);
 static int mmc_close(mmc_t *);
@@ -150,9 +153,10 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int);
 */
 static void php_memcache_init_globals(php_memcache_globals *memcache_globals_p TSRMLS_DC)
 { 
-	MEMCACHE_G(debug_mode)		= 0;
-	MEMCACHE_G(default_port)	= MMC_DEFAULT_PORT;
-	MEMCACHE_G(num_persistent)	= 0;
+	MEMCACHE_G(debug_mode)		  = 0;
+	MEMCACHE_G(default_port)	  = MMC_DEFAULT_PORT;
+	MEMCACHE_G(num_persistent)	  = 0;
+	MEMCACHE_G(compression_level) = Z_DEFAULT_COMPRESSION;
 }
 /* }}} */
 
@@ -173,7 +177,6 @@ PHP_MINIT_FUNCTION(memcache)
 	php_memcache_init_globals(&memcache_globals TSRMLS_CC);
 #endif
 	
-	REGISTER_LONG_CONSTANT("MEMCACHE_SERIALIZED",MMC_SERIALIZED, CONST_CS | CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("MEMCACHE_COMPRESSED",MMC_COMPRESSED, CONST_CS | CONST_PERSISTENT);
 	
 	return SUCCESS;
@@ -239,6 +242,60 @@ static void _mmc_pserver_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC)
 	MEMCACHE_G(num_persistent)--;
 }
 /* }}} */
+
+/* {{{ mmc_compress() */
+static int mmc_compress(char **result_data, int *result_len, char *data, int data_len) 
+{
+	int   status, level = MEMCACHE_G(compression_level);
+	
+	*result_len = data_len + (data_len / 1000) + 15 + 1; /* some magic from zlib.c */
+    *result_data = (char *) emalloc(*result_len);
+    
+	if (!*result_data) {
+        return 0;
+    }
+
+    if (level >= 0) {
+        status = compress2(*result_data, (unsigned long *)result_len, data, data_len, level);
+    } else {
+        status = compress(*result_data, (unsigned long *)result_len, data, data_len);
+    }
+
+    if (status == Z_OK) {
+        *result_data = erealloc(*result_data, *result_len + 1);
+        (*result_data)[*result_len] = '\0';
+		return 1;
+    } else {
+        efree(*result_data);
+		return 0;
+    }
+}
+/* }}}*/
+
+/* {{{ mmc_uncompress() */
+static int mmc_uncompress(char **result_data, long *result_len, char *data, int data_len) 
+{
+	int status;
+	unsigned int factor=1, maxfactor=16;
+	char *tmp1=NULL;
+	
+    do {
+        *result_len = (unsigned long)data_len * (1 << factor++);
+        *result_data = (char *) erealloc(tmp1, *result_len);
+        status = uncompress(*result_data, result_len, data, data_len);
+        tmp1 = *result_data;
+    } while ((status == Z_BUF_ERROR) && (factor < maxfactor));
+
+    if (status == Z_OK) {
+        *result_data = erealloc(*result_data, *result_len + 1);
+        (*result_data)[ *result_len ] = '\0';
+		return 1;
+    } else {
+        efree(*result_data);
+		return 0;
+    }
+}
+/* }}}*/
 
 /* {{{ mmc_debug() */
 static void mmc_debug( const char *format, ...)
@@ -400,7 +457,7 @@ static int mmc_write(mmc_t *mmc, const char *buf, int len)
 		return -1;
 	}
 	
-	mmc_debug("mmc_write: sending to server:");
+	mmc_debug("mmc_write: sending to server %d bytes", len);
 	mmc_debug("mmc_write:---");
 	mmc_debug("%s", buf);
 	mmc_debug("mmc_write:---");
@@ -525,7 +582,7 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen)
 /* {{{ mmc_exec_storage_cmd () */
 static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, char *key, int flags, int expire, char *data, int data_len) 
 {
-	char *real_command, *real_data;
+	char *real_command;
 	char *flags_tmp, *expire_tmp, *datalen_tmp;
 	int size, flags_size, expire_size, datalen_size = 0;
 	int response_buf_size;
@@ -569,6 +626,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, char *key, int flags,
 	efree(datalen_tmp);
 
 	mmc_debug("mmc_exec_storage_cmd: store cmd is '%s'", real_command);
+	mmc_debug("mmc_exec_storage_cmd: trying to store '%s', %d bytes", data, data_len);
 	
 	/* tell server, that we're going to store smthng */
 	if (mmc_sendcmd(mmc, real_command, size) < 0) {
@@ -577,25 +635,12 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, char *key, int flags,
 	}
 	efree(real_command);
 	
-	real_data = emalloc (data_len + 1);
-	
-	if (data_len > 0) {
-		size = sprintf(real_data, "%s", data);
-	}
-	else {
-		size = 0;		
-	}
-	
-	real_data[size] = '\0';
-
-	mmc_debug("mmc_exec_storage_cmd: sending data to server", real_data);
+	mmc_debug("mmc_exec_storage_cmd: sending data to server: '%s', %d bytes", data, data_len);
 
 	/* send data */
-	if (mmc_sendcmd(mmc, real_data, size) < 0) {
-		efree(real_data);
+	if (mmc_sendcmd(mmc, data, data_len) < 0) {
 		return -1;
 	}
-	efree(real_data);
 	
 	/* get server's response */
 	if ((response_buf_size = mmc_readline(mmc)) < 0) {
@@ -714,7 +759,11 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, char *key, int *fla
 		}
 		mmc_debug("mmc_exec_retrieval_cmd: data '%s'", *data);
 	}
-	
+	else {
+		/* an error occurred? */
+		return -1;
+	}
+
 	/* clean those stupid \r\n's */
 	mmc_readline(mmc);
 	
@@ -796,30 +845,41 @@ static int mmc_delete(mmc_t *mmc, char *key, int time)
 static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command) 
 {
 	mmc_t *mmc;
-	int inx, flags, data_len, real_expire = 0;
-	char *data, *real_key;
+	int inx, data_len, real_expire = 0, real_flags = 0;
+	char *data = NULL, *real_key;
 	int ac = ZEND_NUM_ARGS();
-	zval *key, *var, *expire, *mmc_object = getThis();
+	zval *key, *var, *flags, *expire, *mmc_object = getThis();
 
     php_serialize_data_t var_hash;
     smart_str buf = {0};
 
 	if (mmc_object == NULL) {
-		if (ac < 3 || ac > 4 || zend_get_parameters(ht, ac, &mmc_object, &key, &var, &expire) == FAILURE) {
+		if (ac < 3 || ac > 5 || zend_get_parameters(ht, ac, &mmc_object, &key, &var, &flags, &expire) == FAILURE) {
 			WRONG_PARAM_COUNT;
 		}
 
-		if (ac > 3) {
+		if (ac == 4) {
+			convert_to_long(flags);
+			real_flags = Z_LVAL_P(flags);
+		}
+
+		if (ac == 5) {
 			convert_to_long(expire);
 			real_expire = Z_LVAL_P(expire);
 		}
+
 	}
 	else {
-		if (ac < 2 || ac > 3 || zend_get_parameters(ht, ac, &key, &var, &expire) == FAILURE) {
+		if (ac < 2 || ac > 4 || zend_get_parameters(ht, ac, &key, &var, &flags, &expire) == FAILURE) {
 			WRONG_PARAM_COUNT;
 		}
 
-		if (ac > 2) {
+		if (ac == 3) {
+			convert_to_long(flags);
+			real_flags = Z_LVAL_P(flags);
+		}
+
+		if (ac == 4) {
 			convert_to_long(expire);
 			real_expire = Z_LVAL_P(expire);
 		}
@@ -838,17 +898,21 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command)
 		real_key = estrdup(Z_STRVAL_P(key));
 	}
 	
-	/* default flags & expire */
-	flags = 0;
-
 	switch (Z_TYPE_P(var)) {
 		case IS_STRING:
 		case IS_LONG:
 		case IS_DOUBLE:
 		case IS_BOOL:
 			convert_to_string(var);
-			data = Z_STRVAL_P(var);
-			data_len = Z_STRLEN_P(var);
+			if (real_flags & MMC_COMPRESSED) {
+				if (!mmc_compress(&data, &data_len, Z_STRVAL_P(var), Z_STRLEN_P(var))) {
+					RETURN_FALSE;
+				}
+			}
+			else {
+				data = Z_STRVAL_P(var);
+				data_len = Z_STRLEN_P(var);
+			}
 			break;
 		default:
 			PHP_VAR_SERIALIZE_INIT(var_hash);
@@ -860,19 +924,18 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command)
 				RETURN_FALSE;
 			}
 			
-			flags |= MMC_SERIALIZED;
+			real_flags |= MMC_SERIALIZED;
 
 			data = buf.c;
 			data_len = buf.len;
+			smart_str_free(&buf);
 			break;
 	}
 
-	if (mmc_exec_storage_cmd(mmc, command, real_key, flags, real_expire, data, data_len) > 0) {
-		smart_str_free(&buf);
+	if (mmc_exec_storage_cmd(mmc, command, real_key, real_flags, real_expire, data, data_len) > 0) {
 		efree(real_key);
 		RETURN_TRUE;
 	}
-	smart_str_free(&buf);
 	efree(real_key);
 	RETURN_FALSE;
 }
@@ -1240,8 +1303,9 @@ PHP_FUNCTION(memcache_replace)
 PHP_FUNCTION(memcache_get)
 {
 	mmc_t *mmc;
+	long result_len = 0;
 	int inx, flags = 0, data_len = 0;
-	char *data = NULL;
+	char *data = NULL, *result_data = NULL;
 	const char *tmp = NULL;
     php_unserialize_data_t var_hash;
 	zval *key, *mmc_object = getThis();
@@ -1283,8 +1347,15 @@ PHP_FUNCTION(memcache_get)
 			efree(data);
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 		}
+		else if (flags & MMC_COMPRESSED) {
+			if (mmc_uncompress(&result_data, &result_len, data, data_len)) {
+				result_data[result_len] = '\0';
+				RETURN_STRINGL(result_data, result_len, 0);
+			}
+			RETURN_FALSE;
+		}
 		else {
-			RETVAL_STRINGL(data, data_len, 0);
+			RETURN_STRINGL(data, data_len, 0);
 		}
 	}
 	else {

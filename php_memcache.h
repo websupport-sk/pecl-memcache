@@ -74,6 +74,7 @@ typedef struct {
 	long debug_mode;
 	long default_port;
 	long num_persistent;
+	long compression_level;
 } php_memcache_globals;
 
 #ifdef ZTS
