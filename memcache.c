@@ -149,8 +149,9 @@ static char * mmc_get_version(mmc_t * TSRMLS_DC);
 static int mmc_str_left(char *, char *, int, int);
 static int mmc_sendcmd(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_exec_storage_cmd(mmc_t *, char *, int, char *, int, int, int, char *, int TSRMLS_DC);
-static int mmc_parse_response(char *, int, int *, int *);
+static int mmc_parse_response(char *, char **, int, int *, int *);
 static int mmc_exec_retrieval_cmd(mmc_t *, char *, int, char *, int, int *, char **, int * TSRMLS_DC);
+static int mmc_exec_retrieval_cmd_multi(mmc_t *, zval *, zval ** TSRMLS_DC);
 static int mmc_delete(mmc_t *, char *, int, int TSRMLS_DC);
 static int mmc_flush(mmc_t * TSRMLS_DC);
 static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *, int);
@@ -605,7 +606,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 }
 /* }}} */
 
-static int mmc_parse_response(char *response, int response_len, int *flags, int *value_len) /* {{{ */
+static int mmc_parse_response(char *response, char **item_name, int response_len, int *flags, int *value_len) /* {{{ */
 {
 	int i=0, n=0;
 	int spaces[3];
@@ -632,6 +633,14 @@ static int mmc_parse_response(char *response, int response_len, int *flags, int 
 		return -1;
 	}
 
+	if (item_name != NULL) {
+		int item_name_len = spaces[1] - spaces[0] - 1;
+		
+		*item_name = emalloc(item_name_len + 1);
+		memcpy(*item_name, response + spaces[0] + 1, item_name_len);
+		(*item_name)[item_name_len] = '\0';
+	}
+	
 	*flags = atoi(response + spaces[1]);
 	*value_len = atoi(response + spaces[2]);
 
@@ -696,7 +705,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 	}
 	
 	tmp = estrdup(mmc->inbuf);
-	if (mmc_parse_response(tmp, response_buf_size, flags, data_len) < 0) {
+	if (mmc_parse_response(tmp, NULL, response_buf_size, flags, data_len) < 0) {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "got invalid server's response");
 		efree(tmp);
 		return -1;
@@ -739,6 +748,171 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 		return -1;
 	}
 	
+	return 1;
+}
+/* }}} */
+
+static int mmc_exec_retrieval_cmd_multi(mmc_t *mmc, zval *keys, zval **result TSRMLS_DC) /* {{{ */
+{
+	HashPosition pos;
+	zval	**tmp_zval, *tmp_serialize;
+	int		flags, data_len;
+	char	*data = NULL;
+	char	*real_command = NULL, *tmp_c, *tmp_name;
+	int		size, response_buf_size;
+	smart_str	implstr = {0};
+
+	zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(keys), &pos);
+	
+	while (zend_hash_get_current_data_ex(Z_ARRVAL_P(keys), (void **) &tmp_zval, &pos) == SUCCESS) {
+		if (Z_TYPE_PP(tmp_zval) != IS_STRING) {
+			SEPARATE_ZVAL(tmp_zval);
+			convert_to_string(*tmp_zval);
+		} 
+
+		MMC_PREPARE_KEY(Z_STRVAL_PP(tmp_zval), Z_STRLEN_PP(tmp_zval));
+
+		smart_str_appendl(&implstr, Z_STRVAL_PP(tmp_zval), Z_STRLEN_PP(tmp_zval));
+		smart_str_appendl(&implstr, " ", 1);
+		zend_hash_move_forward_ex(Z_ARRVAL_P(keys), &pos);
+	}
+	smart_str_0(&implstr);
+
+	real_command = emalloc(
+							  sizeof("get") - 1
+							+ 1				/* space */ 
+							+ implstr.len 
+							+ 1
+							);
+
+	if (!real_command) {
+		smart_str_free(&implstr);
+		return -1;
+	}
+	
+	size = sprintf(real_command, "get %s", implstr.c);
+	real_command [size] = '\0';
+
+	MMC_DEBUG(("mmc_exec_retrieval_cmd_multi: trying to get '%s'", implstr.c));
+	
+	smart_str_free(&implstr);
+
+	if (mmc_sendcmd(mmc, real_command, size TSRMLS_CC) < 0) {
+		efree(real_command);
+		return -1;
+	}
+	efree(real_command);
+
+	array_init(*result);
+
+	while ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) > 0) {
+
+		tmp_c = estrdup(mmc->inbuf);
+		if(mmc_str_left(mmc->inbuf,"END", response_buf_size, sizeof("END") - 1)) {
+			/* reached the end of the data */
+			efree(tmp_c);
+			return 1;
+		}
+		else if (mmc_parse_response(tmp_c, &tmp_name, response_buf_size, &flags, &data_len) < 0) {
+			efree(tmp_name);
+			efree(tmp_c);
+			return -1;
+		}
+		efree(tmp_c);
+
+		MMC_DEBUG(("mmc_exec_retrieval_cmd: data len is %d bytes", data_len));
+		
+		{
+			int data_to_be_read = data_len + 2;
+			int offset = 0;
+
+			data = emalloc(data_to_be_read + 1);
+			
+			while (data_to_be_read > 0) {
+				size = php_stream_read(mmc->stream, data + offset, data_to_be_read);
+				if (size == 0) break;
+				offset += size, data_to_be_read -= size;
+			}
+
+			if (data_to_be_read > 0) {
+				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "incomplete data block (expected %d, got %d)", (data_len + 2), offset);
+				efree(tmp_name);
+				efree(data);
+				return -1;
+			}
+
+			data [data_len] = '\0';
+			MMC_DEBUG(("mmc_exec_retrieval_cmd: data '%s'", data));
+		}
+
+		if (!data || !data_len) {
+			add_assoc_bool(*result, tmp_name, 0);
+			efree(tmp_name);
+			continue;
+		}
+		
+		if (flags & MMC_COMPRESSED) {
+			const char *tmp;
+			long result_len = 0;
+			char *result_data; 
+
+			if (!mmc_uncompress(&result_data, &result_len, data, data_len)) {
+				add_assoc_bool(*result, tmp_name, 0);
+				efree(tmp_name);
+				efree(data);
+				continue;
+			}
+			
+			tmp = result_data;
+			if (flags & MMC_SERIALIZED) {
+			    php_unserialize_data_t var_hash;
+				
+				MAKE_STD_ZVAL(tmp_serialize);
+				PHP_VAR_UNSERIALIZE_INIT(var_hash);
+				if (!php_var_unserialize(&tmp_serialize, (const unsigned char **) &tmp, tmp + result_len,  &var_hash TSRMLS_CC)) {
+					PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+					
+					php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Error at offset %d of %d bytes", tmp - data, data_len);
+					efree(data);
+					efree(result_data);
+					add_assoc_bool(*result, tmp_name, 0);
+				}
+				else {
+					efree(data);
+					efree(result_data);
+					PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+					add_assoc_zval(*result, tmp_name, tmp_serialize);
+				}
+			}
+			else {
+				efree(data);
+				add_assoc_stringl(*result, tmp_name, result_data, result_len, 1);
+			}
+		}
+		else if (flags & MMC_SERIALIZED) {
+			const char *tmp = data;
+		    php_unserialize_data_t var_hash;
+			
+			MAKE_STD_ZVAL(tmp_serialize);
+			PHP_VAR_UNSERIALIZE_INIT(var_hash);
+			if (!php_var_unserialize(&tmp_serialize, (const unsigned char **) &tmp, tmp + data_len,  &var_hash TSRMLS_CC)) {
+				PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Error at offset %d of %d bytes", tmp - data, data_len);
+				efree(data);
+				add_assoc_bool(*result, tmp_name, 0);
+			}
+			else {
+				efree(data);
+				PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+				add_assoc_zval(*result, tmp_name, tmp_serialize);
+			}
+		}
+		else {
+			add_assoc_stringl(*result, tmp_name, data, data_len, 1);
+			efree(data);
+		}
+		efree(tmp_name);
+	}	
 	return 1;
 }
 /* }}} */
@@ -1347,59 +1521,66 @@ PHP_FUNCTION(memcache_get)
 		RETURN_FALSE;
 	}
 
-	convert_to_string(key);
+	if (Z_TYPE_P(key) != IS_ARRAY) {
+		convert_to_string(key);
 
-	if (mmc_exec_retrieval_cmd(mmc, "get", sizeof("get") - 1, Z_STRVAL_P(key), Z_STRLEN_P(key), &flags, &data, &data_len TSRMLS_CC) > 0) {
+		if (mmc_exec_retrieval_cmd(mmc, "get", sizeof("get") - 1, Z_STRVAL_P(key), Z_STRLEN_P(key), &flags, &data, &data_len TSRMLS_CC) > 0) {
 
-		if (!data || !data_len) {
-			RETURN_EMPTY_STRING();
-		}
-		
-		if (flags & MMC_COMPRESSED) {
-			if (!mmc_uncompress(&result_data, &result_len, data, data_len)) {
-				RETURN_FALSE;
+			if (!data || !data_len) {
+				RETURN_EMPTY_STRING();
 			}
 			
-			tmp = result_data;
-			
-			if (flags & MMC_SERIALIZED) {
+			if (flags & MMC_COMPRESSED) {
+				if (!mmc_uncompress(&result_data, &result_len, data, data_len)) {
+					RETURN_FALSE;
+				}
+				
+				tmp = result_data;
+				
+				if (flags & MMC_SERIALIZED) {
+					PHP_VAR_UNSERIALIZE_INIT(var_hash);
+					if (!php_var_unserialize(&return_value, (const unsigned char **) &tmp, tmp + result_len,  &var_hash TSRMLS_CC)) {
+						PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+						zval_dtor(return_value);
+						php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Error at offset %d of %d bytes", tmp - data, data_len);
+						efree(data);
+						efree(result_data);
+						RETURN_FALSE;
+					}
+					efree(data);
+					efree(result_data);
+					PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+				}
+				else {
+					efree(data);
+					RETURN_STRINGL(result_data, result_len, 0);
+				}
+			}
+			else if (flags & MMC_SERIALIZED) {
+				tmp = data;
 				PHP_VAR_UNSERIALIZE_INIT(var_hash);
-				if (!php_var_unserialize(&return_value, &tmp, tmp + result_len,  &var_hash TSRMLS_CC)) {
+				if (!php_var_unserialize(&return_value, (const unsigned char **) &tmp, tmp + data_len,  &var_hash TSRMLS_CC)) {
 					PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 					zval_dtor(return_value);
 					php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Error at offset %d of %d bytes", tmp - data, data_len);
 					efree(data);
-					efree(result_data);
 					RETURN_FALSE;
 				}
 				efree(data);
-				efree(result_data);
 				PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 			}
 			else {
-				efree(data);
-				RETURN_STRINGL(result_data, result_len, 0);
+				RETURN_STRINGL(data, data_len, 0);
 			}
-		}
-		else if (flags & MMC_SERIALIZED) {
-			tmp = data;
-			PHP_VAR_UNSERIALIZE_INIT(var_hash);
-			if (!php_var_unserialize(&return_value, &tmp, tmp + data_len,  &var_hash TSRMLS_CC)) {
-				PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-				zval_dtor(return_value);
-				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Error at offset %d of %d bytes", tmp - data, data_len);
-				efree(data);
-				RETURN_FALSE;
-			}
-			efree(data);
-			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 		}
 		else {
-			RETURN_STRINGL(data, data_len, 0);
-		}
+			RETURN_FALSE;
+		}		
 	}
 	else {
-		RETURN_FALSE;
+		if (mmc_exec_retrieval_cmd_multi(mmc, key, &return_value TSRMLS_CC) < 0) {
+			RETURN_FALSE;	
+		}
 	}
 }
 /* }}} */
