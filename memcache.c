@@ -306,19 +306,42 @@ static mmc_t* mmc_open(const char *host, short port, long timeout, int persisten
 	else {
 		mmc = emalloc( sizeof(mmc_t) );
 	}
+
+	mmc->stream = NULL;
 	
+#if PHP_API_VERSION > 20020918	
 	mmc->stream = php_stream_xport_create( hostname, hostname_len, 
 										   ENFORCE_SAFE_MODE | REPORT_ERRORS,
 										   STREAM_XPORT_CLIENT | STREAM_XPORT_CONNECT,
 										   hash_key, &tv, NULL, &errstr, &err);
-			
+#else
+	if (persistent) {
+		switch(php_stream_from_persistent_id(hash_key, &(mmc->stream) TSRMLS_CC)) {
+			case PHP_STREAM_PERSISTENT_SUCCESS:
+				if (!_php_network_is_stream_alive(mmc->stream TSRMLS_CC)) {
+					php_stream_pclose(mmc->stream);
+					mmc->stream = NULL;
+					break;
+				}
+			case PHP_STREAM_PERSISTENT_FAILURE:
+				break;
+		}
+	}
+
+	if (!mmc->stream) {
+		int socktype = SOCK_STREAM;
+		mmc->stream = php_stream_sock_open_host(host, (unsigned short)port, socktype, &tv, hash_key);
+	}
+	
+#endif
+	
 	efree(hostname);
 
 	if (hash_key) {
 		efree(hash_key);
 	}
 	
-	if (mmc->stream == NULL) {
+	if (!mmc->stream) {
 		mmc_debug("mmc_open: can't open socket to host");
 		efree(mmc);
 		return NULL;
@@ -351,7 +374,12 @@ static int mmc_close(mmc_t *mmc)
 
 	if (mmc->stream) {
 		mmc_sendcmd(mmc,"quit", 4);
-		php_stream_close(mmc->stream);
+		if (mmc->persistent) {
+			php_stream_pclose(mmc->stream);
+		}
+		else {
+			php_stream_close(mmc->stream);
+		}
 	}
 
 	mmc->stream = NULL;
