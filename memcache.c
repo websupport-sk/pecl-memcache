@@ -405,7 +405,12 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 	
 	if (!mmc->stream) {
 		MMC_DEBUG(("mmc_open: can't open socket to host"));
-		efree(mmc);
+		if (persistent) {
+			free(mmc);
+		}
+		else {
+			efree(mmc);
+		}
 		return NULL;
 	}
 	
@@ -417,7 +422,12 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 	if ((version = mmc_get_version(mmc TSRMLS_CC)) == NULL) {
 		MMC_DEBUG(("mmc_open: failed to get server's version"));
 		mmc_close(mmc TSRMLS_CC);
-		efree(mmc);
+		if (persistent) {
+			free(mmc);
+		}
+		else {
+			efree(mmc);
+		}
 		return NULL;
 	}
 	efree(version);
