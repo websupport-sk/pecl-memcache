@@ -7,7 +7,7 @@
 		dynamic web applications to decrease database load by 
 		storing objects in memory.
 		This extension allows you to work with memcached through
-		handy OO interface.
+		handy OO and procedural interfaces.
     </description>
     <license>PHP License</license>
     <maintainers>
@@ -17,19 +17,19 @@
 			<email>tony2001@phpclub.net</email>
         </maintainer>
 	</maintainers>
-    <release>
-	    <version>0.2</version>
-	    <date>2004-02-26</date>
+	<release>
+		<version>0.4</version>
+		<date>2004-xx-xx</date>
 		<state>beta</state>
 		<notes>
-			1) Added new methods: getStats(), increment(), decrement().
-			2) Keys are processed to keep syntax consistency.
-			Extension should be stable enough since this version.
+			1) Added on-the-fly data (de)compression support.
+			2) Added procedural API.
+			3) Extension was fairly refactored and accelerated.
 		</notes>
 	</release>
-    <filelist>
+	<filelist>
         <dir role="src" name="/">
-            <file role="doc">CREDITS</file>
+			<file role="doc">CREDITS</file>
 			<file role="doc">README</file>
 			<file role="doc">example.php</file>
 			<file role="src">config.m4</file>
@@ -39,6 +39,16 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>0.4</version>
+			<date>2004-xx-xx</date>
+			<state>beta</state>
+			<notes>
+				1) Added on-the-fly data (de)compression support.
+				2) Added procedural API.
+				3) Extension was fairly refactored and accelerated.
+			</notes>
+		</release>
 		<release>
 			<version>0.2</version>
 			<date>2004-02-26</date>

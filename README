@@ -1,9 +1,9 @@
 memcached module for PHP
 ------------------------
-This module doesn't require any libraries or headers to be built.
-But you'll need memcached to use it =)
+This module requires zlib library, used for on-the-fly data (de)compression.
+Also, you'll need memcached to use it =)
 
-The memcached website is at:
+The memcached website is here:
     http://www.danga.com/memcached/
 
 You will probably need libevent to install memcached:
