@@ -3,7 +3,7 @@
 
 ARG_ENABLE("memcache", "memcache support", "yes");
 
-if (PHP_FTP == "yes") {
+if (PHP_MEMCACHE == "yes") {
 	EXTENSION("memcache", "memcache.c");
 	AC_DEFINE('HAVE_MEMCACHE', 1, 'Have memcache support');
 }
