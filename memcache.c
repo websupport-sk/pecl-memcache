@@ -555,22 +555,24 @@ static int mmc_str_left(char *haystack, char *needle, int haystack_len, int need
 /* {{{ mmc_sendcmd ()*/
 static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC)
 {
+	char *command;
+    int command_len;
+
 	if (!mmc || !cmd) {
 		return -1;
 	}
 
 	mmc_debug("mmc_sendcmd: sending command '%s'", cmd);
 
-	if (mmc_write(mmc, cmd, cmdlen TSRMLS_CC) != cmdlen) {
+	command = emalloc(cmdlen + 2 + 1); /* 2 is for \r\n */
+	command_len = sprintf(command, "%s%s", cmd, "\r\n");
+	command[command_len] = '\0';
+
+	if (mmc_write(mmc, command, command_len TSRMLS_CC) != command_len) {
 		mmc_debug("mmc_sendcmd: write failed");
 		return -1;
 	}
 
-	if (mmc_write(mmc, "\r\n", 2 TSRMLS_CC) != 2) {
-		mmc_debug("mmc_sendcmd: write failed");
-		return -1;
-	}
-	
 	return 1;
 }
 /* }}}*/
