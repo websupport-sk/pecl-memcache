@@ -18,12 +18,12 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>1.3</version>
-		<date>2004-08-29</date>
+		<version>1.4</version>
+		<date>2004-12-02</date>
 		<state>stable</state>
 		<notes>
-			1) Fixed potential problem with empty datasets (yet another patch from Andrey Nigmatulin [anight at monamour dot ru]).
-			2) Fixed bug #2167 (thanks to [pbnadeau at gmail dot com] for noticing, testing and patching).
+			1) Added multi get support (i.e. you're now able to get multiple items with one get() call, 
+			just pass array of keys to get() and it will return associative array of found items).
 		</notes>
 	</release>
 	<filelist>
@@ -39,6 +39,15 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>1.3</version>
+			<date>2004-08-29</date>
+			<state>stable</state>
+			<notes>
+				1) Fixed potential problem with empty datasets (yet another patch from Andrey Nigmatulin [anight at monamour dot ru]).
+				2) Fixed bug #2167 (thanks to [pbnadeau at gmail dot com] for noticing, testing and patching).
+			</notes>
+		</release>
 		<release>
 			<version>1.2</version>
 			<date>2004-07-20</date>
