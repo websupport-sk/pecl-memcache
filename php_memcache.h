@@ -70,12 +70,12 @@ typedef struct mmc {
 } mmc_t;
 
 /* our globals */
-typedef struct {
+ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long debug_mode;
 	long default_port;
 	long num_persistent;
 	long compression_level;
-} php_memcache_globals;
+ZEND_END_MODULE_GLOBALS(memcache)
 
 #ifdef ZTS
 #define MEMCACHE_G(v) TSRMG(memcache_globals_id, zend_memcache_globals *, v)
