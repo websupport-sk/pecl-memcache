@@ -1,9 +1,9 @@
 // $Id$
 // vim:ft=javascript
 
-ARG_ENABLE("memcache", "memcache support", "yes");
+ARG_ENABLE("memcache", "memcache support", "no");
 
-if (PHP_MEMCACHE == "yes") {
+if (PHP_MEMCACHE != "no") {
 	EXTENSION("memcache", "memcache.c");
 	AC_DEFINE('HAVE_MEMCACHE', 1, 'Have memcache support');
 }
