@@ -1,0 +1,11 @@
+memcached module for PHP
+------------------------
+This module doesn't require any libraries or headers to be built.
+But you'll need memcached to use it =)
+
+The memcached website is at:
+    http://www.danga.com/memcached/
+
+You will probably need libevent to install memcached:
+You can download it here: http://www.monkey.org/~provos/libevent/
+
