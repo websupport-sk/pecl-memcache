@@ -19,7 +19,6 @@
 /* $Id$ */
 
 /* TODO
- * - more and better error messages
  * - we should probably do a cleanup if some call failed, 
  *   because it can cause further calls to fail
  * */
@@ -447,6 +446,7 @@ static int mmc_readline(mmc_t *mmc TSRMLS_DC)
 	char *buf;
 
 	if (mmc->stream == NULL) {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "cannot read data from already closed socket");
 		mmc_debug("mmc_readline: socket is already closed");
 		return -1;
 	}
@@ -460,7 +460,8 @@ static int mmc_readline(mmc_t *mmc TSRMLS_DC)
 		return strlen(buf);
 	}
 	else {
-		mmc_debug("mmc_readline: cannot read a line from server");
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to read the server's response");
+		mmc_debug("mmc_readline: cannot read a line from the server");
 		return -1;
 	}
 }
@@ -523,6 +524,7 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC)
 
 	if (php_stream_write(mmc->stream, command, command_len) != command_len) {
 		efree(command);
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to send command to the server");		
 		mmc_debug("mmc_sendcmd: write failed");
 		return -1;
 	}
@@ -569,6 +571,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 	
 	/* send command & data */
 	if (php_stream_write(mmc->stream, real_command, size) != size) {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to send command and data to the server");
 		efree(real_command);
 		return -1;
 	}
@@ -585,7 +588,8 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 	if(mmc_str_left(mmc->inbuf,"STORED", response_buf_size, sizeof("STORED") - 1)) {
 		return 1;
 	}
-
+	
+	php_error_docref(NULL TSRMLS_CC, E_NOTICE, "an error occured while trying to store the item on the server");
 	return -1;
 }
 /* }}} */
@@ -667,12 +671,20 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 	mmc_debug("mmc_exec_retrieval_cmd: got response '%s'", mmc->inbuf);
 	
 	/* what's this? */
-	if(mmc_str_left(mmc->inbuf,"VALUE", response_buf_size, sizeof("VALUE") - 1) < 0) {
+
+	if (mmc_str_left(mmc->inbuf,"END", response_buf_size, sizeof("END") - 1)) {
+		/* not found */
+		return -1;
+	}
+	
+	if(mmc_str_left(mmc->inbuf,"VALUE", response_buf_size, sizeof("VALUE") - 1) <= 0) {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "got invalid server's response header");
 		return -1;
 	}
 	
 	tmp = estrdup(mmc->inbuf);
 	if (mmc_parse_response(tmp, response_buf_size, flags, data_len) < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "got invalid server's response");
 		efree(tmp);
 		return -1;
 	}
@@ -684,6 +696,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 		*data = emalloc(*data_len + 2 + 1);
 		
 		if ((size = php_stream_read(mmc->stream, *data, *data_len + 2)) != (*data_len + 2)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "got invalid data block");
 			efree(*data);
 			return -1;
 		}
@@ -702,6 +715,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 	}
 
 	if(mmc_str_left(mmc->inbuf,"END", response_buf_size, sizeof("END") - 1) < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "got invalid data end delimiter");
 		efree(*data);
 		return -1;
 	}
@@ -757,6 +771,8 @@ static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC)
 		return 0;
 	}
 	
+	php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to delete item");
+	
 	/* hmm.. */
 	return -1;
 }
@@ -784,6 +800,8 @@ static int mmc_flush(mmc_t *mmc TSRMLS_DC)
 	if(mmc_str_left(mmc->inbuf,"OK", response_buf_size, sizeof("OK") - 1)) {
 		return 1;
 	}
+	
+	php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to flush server's cache");
 	
 	/* hmm.. */
 	return -1;
@@ -929,8 +947,12 @@ static int mmc_get_stats (mmc_t *mmc, zval **stats TSRMLS_DC)
 			efree(stats_tmp);
 			i++;
 		}
+		else if (mmc_str_left(mmc->inbuf, "END", response_buf_size, sizeof("END") - 1)) {
+			/* END of stats*/
+			break;
+		}
 		else {
-			/* END of stats or some error */
+			/* unknown error */
 			break;
 		}
 	}
@@ -946,7 +968,7 @@ static int mmc_get_stats (mmc_t *mmc, zval **stats TSRMLS_DC)
 /* {{{ mmc_incr_decr () */
 static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int key_len, int value TSRMLS_DC) 
 {
-	char *command;
+	char *command, *command_name;
 	int  cmd_len, response_buf_size;
 	
 	/* 4 is for strlen("incr") or strlen("decr"), doesn't matter */
@@ -955,14 +977,19 @@ static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int key_len, int value
 	MMC_PREPARE_KEY(key, key_len);
 	
 	if (cmd > 0) {
+		command_name = emalloc(sizeof("incr"));
+		sprintf(command_name, "incr");
 		cmd_len = sprintf(command, "incr %s %d", key, value);
 	}
 	else {
+		command_name = emalloc(sizeof("decr"));
+		sprintf(command_name, "decr");
 		cmd_len = sprintf(command, "decr %s %d", key, value);
 	}
 	
 	if (mmc_sendcmd(mmc, command, cmd_len TSRMLS_CC) < 0) {
 		efree(command);
+		efree(command_name);
 		return -1;
 	}
 	efree(command);
@@ -970,22 +997,32 @@ static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int key_len, int value
 	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) > 0) {
 		mmc_debug("mmc_incr_decr: server's answer is: '%s'", mmc->inbuf);
 		if (mmc_str_left(mmc->inbuf, "NOT_FOUND", response_buf_size, sizeof("NOT_FOUND") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - item with such key not found", command_name);
+			efree(command_name);
 			return -1;
 		}
 		else if (mmc_str_left(mmc->inbuf, "ERROR", response_buf_size, sizeof("ERROR") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - an error occured", command_name);
+			efree(command_name);
 			return -1;
 		}
 		else if (mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_buf_size, sizeof("CLIENT_ERROR") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - client error occured", command_name);
+			efree(command_name);
 			return -1;
 		}
 		else if (mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_buf_size, sizeof("SERVER_ERROR") - 1)) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to %sement variable - server error occured", command_name);
+			efree(command_name);
 			return -1;
 		}
 		else {
+			efree(command_name);
 			return atoi(mmc->inbuf);
 		}
 	}
-	mmc_debug("mmc_incr_decr: failed to read line from server");
+
+	efree(command_name);
 	return -1;
 
 }
@@ -1227,6 +1264,7 @@ PHP_FUNCTION(memcache_get_version)
 	if ( (version = mmc_get_version(mmc TSRMLS_CC)) ) {
 		RETURN_STRING(version, 0);
 	}
+	php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to get server's version");
 	RETURN_FALSE;
 }
 /* }}} */
@@ -1414,6 +1452,7 @@ PHP_FUNCTION(memcache_get_stats)
 	}
 
 	if (mmc_get_stats(mmc, &return_value TSRMLS_CC) < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "failed to get server's statistics");
 		RETURN_FALSE;
 	}
 }
