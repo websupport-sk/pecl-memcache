@@ -15,7 +15,7 @@ if test "$PHP_MEMCACHE" != "no"; then
   dnl # zlib
   AC_MSG_CHECKING([for the location of zlib])
   if test "$PHP_ZLIB_DIR" = "no"; then
-    AC_MSG_RESULT([no. If configure fails, try --with-zlib-dir=<DIR>])
+    AC_MSG_ERROR([memcache support requires ZLIB. Use --with-zlib-dir=<DIR>])
   else
     AC_MSG_RESULT([$PHP_ZLIB_DIR])
     PHP_ADD_LIBRARY_WITH_PATH(z, $PHP_ZLIB_DIR/lib, MEMCACHE_SHARED_LIBADD)
