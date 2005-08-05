@@ -18,12 +18,12 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>1.4</version>
-		<date>2004-12-02</date>
+		<version>1.5</version>
+		<date>2005-08-05</date>
 		<state>stable</state>
 		<notes>
-			1) Added multi get support (i.e. you're now able to get multiple items with one get() call, 
-			just pass array of keys to get() and it will return associative array of found items).
+			1) Fixed minor leak.
+			2) Class Memcache made inheritable.
 		</notes>
 	</release>
 	<filelist>
@@ -39,6 +39,15 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>1.4</version>
+			<date>2004-12-02</date>
+			<state>stable</state>
+			<notes>
+				1) Added multi get support (i.e. you're now able to get multiple items with one get() call, 
+				just pass array of keys to get() and it will return associative array of found items).
+			</notes>
+		</release>
 		<release>
 			<version>1.3</version>
 			<date>2004-08-29</date>
