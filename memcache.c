@@ -190,7 +190,7 @@ PHP_MINIT_FUNCTION(memcache)
 #endif
 	
 	REGISTER_LONG_CONSTANT("MEMCACHE_COMPRESSED",MMC_COMPRESSED, CONST_CS | CONST_PERSISTENT);
-	
+
 	return SUCCESS;
 }
 /* }}} */
@@ -725,7 +725,7 @@ static int mmc_exec_retrieval_cmd(mmc_t *mmc, char *command, int command_len, ch
 		    if (size == 0) break;
 		    offset += size, data_to_be_read -= size;
 		}
-
+		
 		if (data_to_be_read > 0) {
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "incomplete data block (expected %d, got %d)", (*data_len + 2), offset);
 			efree(*data);
@@ -1415,8 +1415,6 @@ connect_done:
 		add_property_resource(return_value, "connection",mmc->id);
 	}
 	else {
-		zval_dtor(mmc_object);
-		object_init_ex(mmc_object, memcache_class_entry_ptr);
 		add_property_resource(mmc_object, "connection",mmc->id);
 		RETURN_TRUE;
 	}	
