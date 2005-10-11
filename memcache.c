@@ -142,7 +142,7 @@ static void _mmc_pserver_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static int mmc_compress(char **, int *, char *, int TSRMLS_DC);
 static int mmc_uncompress(char **, long *, char *, int);
 static int mmc_get_connection(zval *, mmc_t ** TSRMLS_DC);
-static mmc_t* mmc_open(const char *, int, short, long, int TSRMLS_DC);
+static mmc_t* mmc_open(const char *, int, short, long, int, char ** TSRMLS_DC);
 static int mmc_close(mmc_t * TSRMLS_DC);
 static int mmc_readline(mmc_t * TSRMLS_DC);
 static char * mmc_get_version(mmc_t * TSRMLS_DC);
@@ -347,7 +347,7 @@ static int mmc_get_connection(zval *id, mmc_t **mmc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout, int persistent TSRMLS_DC) /* {{{ */
+static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout, int persistent, char **error_string TSRMLS_DC) /* {{{ */
 {
 	mmc_t			*mmc;
 	struct timeval	tv;
@@ -412,6 +412,9 @@ static mmc_t* mmc_open(const char *host, int host_len, short port, long timeout,
 		}
 		else {
 			efree(mmc);
+		}
+		if (error_string && errstr) {
+			*error_string = errstr;
 		}
 		return NULL;
 	}
@@ -1277,7 +1280,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	mmc_t *mmc = NULL;
 	int timeout_sec = MMC_DEFAULT_TIMEOUT, real_port, hash_key_len;
 	int ac = ZEND_NUM_ARGS();
-	char *hash_key = NULL, *version;
+	char *hash_key = NULL, *version, *error_string = NULL;
 
 	if (ac < 1 || ac > 3 || zend_get_parameters_ex(ac, &host, &port, &timeout) == FAILURE) {
 		WRONG_PARAM_COUNT;
@@ -1309,7 +1312,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 			
 			MMC_DEBUG(("php_mmc_connect: connection wasn't found in the hash"));
 
-			if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
+			if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent, &error_string TSRMLS_CC)) == NULL) {
 				MMC_DEBUG(("php_mmc_connect: connection failed"));
 				efree(hash_key);
 				goto connect_done;
@@ -1350,7 +1353,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 
 					/* Daemon has gone away, reconnecting */
 					MEMCACHE_G(num_persistent)--;
-					if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
+					if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent, &error_string TSRMLS_CC)) == NULL) {
 						MMC_DEBUG(("php_mmc_connect: reconnect failed"));						
 						zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
 						efree(hash_key);
@@ -1374,7 +1377,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 				list_entry new_le;
 
 				MMC_DEBUG(("php_mmc_connect: smthing was wrong, reconnecting.."));
-				if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC)) == NULL) {
+				if ((mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent, &error_string TSRMLS_CC)) == NULL) {
 					MMC_DEBUG(("php_mmc_connect: reconnect failed"));
 					zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
 					efree(hash_key);
@@ -1397,7 +1400,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	}
 	else {
 		MMC_DEBUG(("php_mmc_connect: creating regular connection"));
-		mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent TSRMLS_CC);
+		mmc = mmc_open(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, timeout_sec, persistent, &error_string TSRMLS_CC);
 		if (mmc != NULL) {
 			mmc->id = zend_list_insert(mmc,le_memcache);
 		}
@@ -1406,7 +1409,10 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 connect_done:
 	
 	if (mmc == NULL) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d",Z_STRVAL_PP(host), real_port);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d (%s)",Z_STRVAL_PP(host), real_port, error_string ? error_string : "Unknown error");
+		if (error_string) {
+			efree(error_string);
+		}
 		RETURN_FALSE;
 	}
 
