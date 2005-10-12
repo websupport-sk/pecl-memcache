@@ -1281,7 +1281,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 {
 	zval **host, **port, **timeout, *mmc_object = getThis();
 	mmc_t *mmc = NULL;
-	int timeout_sec = MMC_DEFAULT_TIMEOUT, real_port, hash_key_len, errnum;
+	int timeout_sec = MMC_DEFAULT_TIMEOUT, real_port, hash_key_len, errnum = 0;
 	int ac = ZEND_NUM_ARGS();
 	char *hash_key = NULL, *version, *error_string = NULL;
 
@@ -1412,7 +1412,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 connect_done:
 	
 	if (mmc == NULL) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d, %s (%d)",Z_STRVAL_PP(host), real_port, error_string ? error_string : "Unknown error", errnum ? errnum : 0);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d, %s (%d)",Z_STRVAL_PP(host), real_port, error_string ? error_string : "Unknown error", errnum);
 		if (error_string) {
 			efree(error_string);
 		}
