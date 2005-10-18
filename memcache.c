@@ -342,6 +342,12 @@ static int mmc_get_connection(zval *id, mmc_t **mmc TSRMLS_DC) /* {{{ */
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "connection identifier not found");
 		return 0;
 	}
+
+	if (!(*mmc)->stream) {
+		/* found previously closed connection */
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "using previously closed connection");
+		return 0;
+	}
 	
 	return Z_LVAL_PP(connection);
 }
