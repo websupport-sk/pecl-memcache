@@ -22,7 +22,8 @@
 		<date>2005-10-12</date>
 		<state>stable</state>
 		<notes>
-			1) Fixed minor leak appeared when connect fails.
+			- Fixed minor leak appeared when connect fails.
+			- Fixed PECL bug #5626 (segfault when trying to use previously closed connection).
 		</notes>
 	</release>
 	<filelist>
