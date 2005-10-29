@@ -42,6 +42,7 @@ PHP_MINFO_FUNCTION(memcache);
 
 PHP_FUNCTION(memcache_connect);
 PHP_FUNCTION(memcache_pconnect);
+PHP_FUNCTION(memcache_add_server);
 PHP_FUNCTION(memcache_get_version);
 PHP_FUNCTION(memcache_add);
 PHP_FUNCTION(memcache_set);
@@ -50,6 +51,8 @@ PHP_FUNCTION(memcache_get);
 PHP_FUNCTION(memcache_delete);
 PHP_FUNCTION(memcache_debug);
 PHP_FUNCTION(memcache_get_stats);
+PHP_FUNCTION(memcache_get_extended_stats);
+PHP_FUNCTION(memcache_set_compress_threshold);
 PHP_FUNCTION(memcache_increment);
 PHP_FUNCTION(memcache_decrement);
 PHP_FUNCTION(memcache_close);
@@ -61,14 +64,37 @@ PHP_FUNCTION(memcache_flush);
 #define MMC_DEFAULT_TIMEOUT 1 /* seconds */
 #define MMC_KEY_MAX_SIZE 250 /* stoled from memcached sources =) */
 #define MMC_DEFAULT_PORT 11211
+#define MMC_DEFAULT_RETRY 15 		/* retry failed server after x seconds */
+#define MMC_DEFAULT_SAVINGS 0.2		/* minimum 20% savings for compression to be used */
+
+#define MMC_STATUS_DISCONNECTED 1
+#define MMC_STATUS_CONNECTED 2
+#define MMC_STATUS_UNKNOWN 3
+#define MMC_STATUS_FAILED 4
 
 typedef struct mmc {
-	int						id;
 	php_stream				*stream;
 	char					inbuf[MMC_BUF_SIZE];
+	smart_str				outbuf;
+	char					*host;
+	unsigned short			port;
 	long					timeout;
+	long					retry;
+	unsigned int			retry_interval;
 	int						persistent;
+	int						status;
 } mmc_t;
+
+typedef struct mmc_pool {
+	int						id;
+	mmc_t					**servers;
+	int						num_servers;
+	mmc_t					**buckets;
+	int						num_buckets;
+	mmc_t					**requests;
+	int						compress_threshold;
+	double					min_compress_savings;
+} mmc_pool_t;
 
 /* our globals */
 ZEND_BEGIN_MODULE_GLOBALS(memcache)
