@@ -145,11 +145,11 @@ static void _mmc_pool_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static void _mmc_pserver_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static mmc_pool_t *mmc_pool_new();
 static void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
-static mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int);
-static void mmc_server_free(mmc_t *);
-static void mmc_server_disconnect(mmc_t *);
-static void mmc_server_deactivate(mmc_t *);
-static int mmc_server_failure(mmc_t *);
+static mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int TSRMLS_DC);
+static void mmc_server_free(mmc_t * TSRMLS_DC);
+static void mmc_server_disconnect(mmc_t * TSRMLS_DC);
+static void mmc_server_deactivate(mmc_t * TSRMLS_DC);
+static int mmc_server_failure(mmc_t * TSRMLS_DC);
 static mmc_t *mmc_server_find(mmc_pool_t *, char *, int TSRMLS_DC);
 static unsigned int mmc_hash(char *, int);
 static int mmc_compress(char **, int *, char *, int TSRMLS_DC);
@@ -261,7 +261,7 @@ static void _mmc_pool_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 	int i;
 	for (i=0; i<pool->num_servers; i++) {
 		if (!pool->servers[i]->persistent) {
-			mmc_server_free(pool->servers[i]);
+			mmc_server_free(pool->servers[i] TSRMLS_CC);
 		}
 	}
 
@@ -280,11 +280,11 @@ static void _mmc_pool_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 
 static void _mmc_pserver_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
-	mmc_server_free((mmc_t *)rsrc->ptr);
+	mmc_server_free((mmc_t *)rsrc->ptr TSRMLS_CC);
 }
 /* }}} */
 
-static mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persistent, int timeout, int retry_interval) /* {{{ */
+static mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persistent, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 
@@ -317,7 +317,7 @@ static mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int 
 }
 /* }}} */
 
-static void mmc_server_free(mmc_t *mmc) /* {{{ */
+static void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	if (mmc->persistent) {
 		if (mmc->stream != NULL) {
@@ -492,7 +492,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 
 	/* close open stream */
 	if (mmc->stream != NULL) {
-		mmc_server_disconnect(mmc);
+		mmc_server_disconnect(mmc TSRMLS_CC);
 	}
 
 	tv.tv_sec = mmc->timeout;
@@ -539,7 +539,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 
 	if (!mmc->stream) {
 		MMC_DEBUG(("_mmc_open: can't open socket to host"));
-		mmc_server_deactivate(mmc);
+		mmc_server_deactivate(mmc TSRMLS_CC);
 
 		if (errstr) {
 			if (error_string) {
@@ -593,7 +593,7 @@ static int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *err
 				if (_mmc_open(mmc, error_string, errnum TSRMLS_CC) /*&& mmc_flush(mmc TSRMLS_CC) > 0*/) {
 					return 1;
 				}
-				mmc_server_deactivate(mmc);
+				mmc_server_deactivate(mmc TSRMLS_CC);
 			}
 			break;
 	}
@@ -601,7 +601,7 @@ static int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *err
 }
 /* }}} */
 
-static void mmc_server_disconnect(mmc_t *mmc) /* {{{ */
+static void mmc_server_disconnect(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	if (mmc->stream != NULL) {
 		if (mmc->persistent) {
@@ -616,9 +616,9 @@ static void mmc_server_disconnect(mmc_t *mmc) /* {{{ */
 }
 /* }}} */
 
-static void mmc_server_deactivate(mmc_t *mmc) /* {{{ */
+static void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
-	mmc_server_disconnect(mmc);
+	mmc_server_disconnect(mmc TSRMLS_CC);
 	mmc->status = MMC_STATUS_FAILED;
 	mmc->retry = (long)time(NULL) + mmc->retry_interval;
 }
@@ -628,7 +628,7 @@ static void mmc_server_deactivate(mmc_t *mmc) /* {{{ */
  * Indicate a server failure
  * @return	bool	True if the server was actually deactivated
  */
-static int mmc_server_failure(mmc_t *mmc) /* {{{ */
+static int mmc_server_failure(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	switch (mmc->status) {
 		case MMC_STATUS_DISCONNECTED:
@@ -639,7 +639,7 @@ static int mmc_server_failure(mmc_t *mmc) /* {{{ */
 			mmc->status = MMC_STATUS_DISCONNECTED;
 			return 0;
 	}
-	mmc_server_deactivate(mmc);
+	mmc_server_deactivate(mmc TSRMLS_CC);
 	return 1;
 }
 /* }}} */
@@ -653,10 +653,10 @@ static mmc_t *mmc_server_find(mmc_pool_t *pool, char *key, int key_len TSRMLS_DC
 		mmc = pool->buckets[hash % pool->num_buckets];
 
 		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL) && (i<20 || i<pool->num_buckets); i++) {
-			MMC_DEBUG(("mmc_server_find: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
+		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets); i++) {
 			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
 			int next_len = sprintf(next_key, "%d%s", i+1, key);
+			MMC_DEBUG(("mmc_server_find: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
 
 			hash += mmc_hash(next_key, next_len);
 			mmc = pool->buckets[hash % pool->num_buckets];
@@ -666,7 +666,7 @@ static mmc_t *mmc_server_find(mmc_pool_t *pool, char *key, int key_len TSRMLS_DC
 	}
 	else {
 		mmc = pool->servers[0];
-		mmc_open(mmc, 0, NULL, NULL);
+		mmc_open(mmc, 0, NULL, NULL TSRMLS_CC);
 	}
 
 	return mmc->status != MMC_STATUS_FAILED ? mmc : NULL;
@@ -677,7 +677,7 @@ static int mmc_close(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	MMC_DEBUG(("mmc_close: closing connection to server"));
 	if (!mmc->persistent) {
-		mmc_server_disconnect(mmc);
+		mmc_server_disconnect(mmc TSRMLS_CC);
 	}
 	return 1;
 }
@@ -904,7 +904,7 @@ static int mmc_exec_retrieval_cmd(mmc_pool_t *pool, zval *key, zval **return_val
 
 		/* send command and read value */
 		if ((result = mmc_sendcmd(mmc, request, request_len TSRMLS_CC)) > 0 &&
-			(result = mmc_read_value(mmc, &tmp_key, return_value)) >= 0) {
+			(result = mmc_read_value(mmc, &tmp_key, return_value TSRMLS_CC)) >= 0) {
 
 			/* not found */
 			if (result == 0) {
@@ -916,7 +916,7 @@ static int mmc_exec_retrieval_cmd(mmc_pool_t *pool, zval *key, zval **return_val
 			}
 		}
 
-		if (result < 0 && mmc_server_failure(mmc)) {
+		if (result < 0 && mmc_server_failure(mmc TSRMLS_CC)) {
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", mmc->host, mmc->port);
 		}
 	}
@@ -952,7 +952,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 
 			/* schedule key if first round or if missing from result */
 			if ((!i || !zend_hash_exists(Z_ARRVAL_PP(return_value), Z_STRVAL_PP(key), Z_STRLEN_PP(key))) &&
-				(mmc = mmc_server_find(pool, Z_STRVAL_PP(key), Z_STRLEN_PP(key))) != NULL) {
+				(mmc = mmc_server_find(pool, Z_STRVAL_PP(key), Z_STRLEN_PP(key) TSRMLS_CC)) != NULL) {
 				if (!(mmc->outbuf.len)) {
 					smart_str_appendl(&(mmc->outbuf), "get", sizeof("get")-1);
 					pool->requests[num_requests++] = mmc;
@@ -971,7 +971,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 			smart_str_0(&(pool->requests[j]->outbuf));
 
 			if ((result = mmc_sendcmd(pool->requests[j], pool->requests[j]->outbuf.c, pool->requests[j]->outbuf.len TSRMLS_CC)) < 0) {
-				if (mmc_server_failure(pool->requests[j])) {
+				if (mmc_server_failure(pool->requests[j] TSRMLS_CC)) {
 					php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->requests[j]->host, pool->requests[j]->port);
 				}
 				result_status = result;
@@ -981,13 +981,13 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 		/* third pass to read responses */
 		for (j=0; j<num_requests; j++) {
 			if (pool->requests[j]->status != MMC_STATUS_FAILED) {
-				for (value = NULL; (result = mmc_read_value(pool->requests[j], &result_key, &value)) > 0; value = NULL) {
+				for (value = NULL; (result = mmc_read_value(pool->requests[j], &result_key, &value TSRMLS_CC)) > 0; value = NULL) {
 					add_assoc_zval(*return_value, result_key, value);
 				}
 
 				/* check for server failure */
 				if (result < 0) {
-					if (mmc_server_failure(pool->requests[j])) {
+					if (mmc_server_failure(pool->requests[j] TSRMLS_CC)) {
 						php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->requests[j]->host, pool->requests[j]->port);
 					}
 					result_status = result;
@@ -1399,8 +1399,8 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 		data_len = value_len;
 	}
 
-	while (result < 0 && (mmc = mmc_server_find(pool, real_key, key_len)) != NULL) {
-		if ((result = mmc_exec_storage_cmd(mmc, command, command_len, real_key, key_len, real_flags, real_expire, data, data_len TSRMLS_CC)) < 0 && mmc_server_failure(mmc)) {
+	while (result < 0 && (mmc = mmc_server_find(pool, real_key, key_len TSRMLS_CC)) != NULL) {
+		if ((result = mmc_exec_storage_cmd(mmc, command, command_len, real_key, key_len, real_flags, real_expire, data, data_len TSRMLS_CC)) < 0 && mmc_server_failure(mmc TSRMLS_CC)) {
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", mmc->host, mmc->port);
 		}
 	}
@@ -1460,8 +1460,8 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 	convert_to_string(key);
 	MMC_PREPARE_KEY(Z_STRVAL_P(key), Z_STRLEN_P(key));
 
-	while (result < 0 && (mmc = mmc_server_find(pool, Z_STRVAL_P(key), Z_STRLEN_P(key))) != NULL) {
-		if ((result = mmc_incr_decr(mmc, cmd, Z_STRVAL_P(key), Z_STRLEN_P(key), real_value, &number TSRMLS_CC)) < 0 && mmc_server_failure(mmc)) {
+	while (result < 0 && (mmc = mmc_server_find(pool, Z_STRVAL_P(key), Z_STRLEN_P(key) TSRMLS_CC)) != NULL) {
+		if ((result = mmc_incr_decr(mmc, cmd, Z_STRVAL_P(key), Z_STRLEN_P(key), real_value, &number TSRMLS_CC)) < 0 && mmc_server_failure(mmc TSRMLS_CC)) {
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", mmc->host, mmc->port);
 		}
 	}
@@ -1514,10 +1514,10 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	}
 	else {
 		MMC_DEBUG(("php_mmc_connect: creating regular connection"));
-		mmc = mmc_server_new(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, 0, real_timeout, MMC_DEFAULT_RETRY);
+		mmc = mmc_server_new(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, 0, real_timeout, MMC_DEFAULT_RETRY TSRMLS_CC);
 	}
 
-	if (!mmc_open(mmc, 1, &error_string, &errnum)) {
+	if (!mmc_open(mmc, 1, &error_string, &errnum TSRMLS_CC)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d, %s (%d)", Z_STRVAL_PP(host), real_port, error_string ? error_string : "Unknown error", errnum);
 		if (error_string) {
 			efree(error_string);
@@ -1628,7 +1628,7 @@ PHP_FUNCTION(memcache_add_server)
 	}
 	else {
 		MMC_DEBUG(("memcache_add_server: initializing regular struct"));
-		mmc = mmc_server_new(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, 0, real_timeout, real_retry_interval);
+		mmc = mmc_server_new(Z_STRVAL_PP(host), Z_STRLEN_PP(host), real_port, 0, real_timeout, real_retry_interval TSRMLS_CC);
 	}
 
 	/* initialize pool if need be */
@@ -1670,13 +1670,13 @@ static mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeou
 		list_entry new_le;
 		MMC_DEBUG(("mmc_find_persistent: connection wasn't found in the hash"));
 
-		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval);
+		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval TSRMLS_CC);
 		new_le.type = le_pmemcache;
 		new_le.ptr  = mmc;
 
 		/* register new persistent connection */
 		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(list_entry), NULL) == FAILURE) {
-			mmc_server_free(mmc);
+			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		}
 	}
@@ -1685,13 +1685,13 @@ static mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeou
 		MMC_DEBUG(("mmc_find_persistent: something was wrong, reconnecting.."));
 		zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
 
-		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval);
+		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval TSRMLS_CC);
 		new_le.type = le_pmemcache;
 		new_le.ptr  = mmc;
 
 		/* register new persistent connection */
 		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(list_entry), NULL) == FAILURE) {
-			mmc_server_free(mmc);
+			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		}
 	}
@@ -1732,10 +1732,10 @@ PHP_FUNCTION(memcache_get_version)
 	}
 
 	for (i=0; i<pool->num_servers; i++) {
-		if (mmc_open(pool->servers[i], 1, NULL, NULL) && (version = mmc_get_version(pool->servers[i] TSRMLS_CC)) != NULL) {
+		if (mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) && (version = mmc_get_version(pool->servers[i] TSRMLS_CC)) != NULL) {
 			RETURN_STRING(version, 0);
 		}
-		else if (mmc_server_failure(pool->servers[i])) {
+		else if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 		}
 	}
@@ -1844,8 +1844,8 @@ PHP_FUNCTION(memcache_delete)
 	convert_to_string(key);
 	MMC_PREPARE_KEY(Z_STRVAL_P(key), Z_STRLEN_P(key));
 
-	while (result < 0 && (mmc = mmc_server_find(pool, Z_STRVAL_P(key), Z_STRLEN_P(key))) != NULL) {
-		if ((result = mmc_delete(mmc, Z_STRVAL_P(key), Z_STRLEN_P(key), real_time TSRMLS_CC)) < 0 && mmc_server_failure(mmc)) {
+	while (result < 0 && (mmc = mmc_server_find(pool, Z_STRVAL_P(key), Z_STRLEN_P(key) TSRMLS_CC)) != NULL) {
+		if ((result = mmc_delete(mmc, Z_STRVAL_P(key), Z_STRLEN_P(key), real_time TSRMLS_CC)) < 0 && mmc_server_failure(mmc TSRMLS_CC)) {
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", mmc->host, mmc->port);
 		}
 	}
@@ -1906,8 +1906,8 @@ PHP_FUNCTION(memcache_get_stats)
 	}
 
 	for (i=0; i<pool->num_servers; i++) {
-		if (!mmc_open(pool->servers[i], 1, NULL, NULL) || mmc_get_stats(pool->servers[i], &return_value TSRMLS_CC) < 0) {
-			if (mmc_server_failure(pool->servers[i])) {
+		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_get_stats(pool->servers[i], &return_value TSRMLS_CC) < 0) {
+			if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 			}
 			failures++;
@@ -1950,8 +1950,8 @@ PHP_FUNCTION(memcache_get_extended_stats)
 		hostname = emalloc(strlen(pool->servers[i]->host) + MAX_LENGTH_OF_LONG + 1 + 1);
 		hostname_len = sprintf(hostname, "%s:%d", pool->servers[i]->host, pool->servers[i]->port);
 
-		if (!mmc_open(pool->servers[i], 1, NULL, NULL) || mmc_get_stats(pool->servers[i], &stats TSRMLS_CC) < 0) {
-			if (mmc_server_failure(pool->servers[i])) {
+		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_get_stats(pool->servers[i], &stats TSRMLS_CC) < 0) {
+			if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 			}
 			ZVAL_FALSE(stats);
@@ -2044,7 +2044,7 @@ PHP_FUNCTION(memcache_close)
 
 	for (i=0; i<pool->num_servers; i++) {
 		if (mmc_close(pool->servers[i] TSRMLS_CC) < 0) {
-			if (mmc_server_failure(pool->servers[i])) {
+			if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 			}
 			failures++;
@@ -2078,8 +2078,8 @@ PHP_FUNCTION(memcache_flush)
 	}
 
 	for (i=0; i<pool->num_servers; i++) {
-		if (!mmc_open(pool->servers[i], 1, NULL, NULL) || mmc_flush(pool->servers[i] TSRMLS_CC) < 0) {
-			if (mmc_server_failure(pool->servers[i])) {
+		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_flush(pool->servers[i] TSRMLS_CC) < 0) {
+			if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 			}
 			failures++;
