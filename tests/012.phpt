@@ -17,6 +17,8 @@ $result2 = $memcache->replace('non_existing_test_key2', $var, false, 10);
 var_dump($result1);
 var_dump($result2);
 
+$memcache->delete('non_existing_test_key2');
+
 ?>
 --EXPECT--
 bool(true)

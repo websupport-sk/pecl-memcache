@@ -11,7 +11,7 @@ $var = new stdClass;
 $var->plain_attribute = 'value';
 $var->array_attribute = Array('test1', 'test2');
 
-$memcache->get('test_key', $var, false, 10);
+$memcache->get('test_key');
 
 $result = $memcache->get('test_key');
 
