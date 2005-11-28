@@ -3,13 +3,13 @@ Memcache class should be inheritable
 --FILE--
 <?php
 
-class Test extends Memcache {
+class test extends Memcache {
 	function foo() {
 		echo "foo\n";
 	}
 }
 
-$t = new Test;
+$t = new test;
 $t->connect("localhost");
 $t->foo();
 
@@ -19,7 +19,7 @@ echo "Done\n";
 ?>
 --EXPECTF--	
 foo
-object(Test)#%d (1) {
+object(test)(1) {
   ["connection"]=>
   resource(%d) of type (memcache connection)
 }

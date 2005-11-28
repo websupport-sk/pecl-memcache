@@ -24,7 +24,7 @@ var_dump($result);
 
 ?>
 --EXPECTF--
-object(stdClass)#%d (2) {
+object(stdClass)%s2) {
   ["plain_attribute"]=>
   string(5) "value"
   ["array_attribute"]=>
@@ -37,7 +37,7 @@ object(stdClass)#%d (2) {
 }
 array(2) {
   ["test_key"]=>
-  object(stdClass)#%d (2) {
+  object(stdClass)%s2) {
     ["plain_attribute"]=>
     string(5) "value"
     ["array_attribute"]=>
@@ -49,7 +49,7 @@ array(2) {
     }
   }
   ["test_key1"]=>
-  object(stdClass)#%d (2) {
+  object(stdClass)%s2) {
     ["plain_attribute"]=>
     string(5) "value"
     ["array_attribute"]=>

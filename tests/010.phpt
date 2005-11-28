@@ -19,7 +19,7 @@ var_dump($result);
 
 ?>
 --EXPECTF--
-object(stdClass)#%d (2) {
+object(stdClass)%s2) {
   ["plain_attribute"]=>
   string(5) "value"
   ["array_attribute"]=>
