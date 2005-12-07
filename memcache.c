@@ -382,26 +382,26 @@ static int mmc_compress(char **result_data, int *result_len, char *data, int dat
 	int   status, level = MEMCACHE_G(compression_level);
 
 	*result_len = data_len + (data_len / 1000) + 15 + 1; /* some magic from zlib.c */
-    *result_data = (char *) emalloc(*result_len);
+	*result_data = (char *) emalloc(*result_len);
 
 	if (!*result_data) {
-        return 0;
-    }
-
-    if (level >= 0) {
-        status = compress2(*result_data, (unsigned long *)result_len, data, data_len, level);
-    } else {
-        status = compress(*result_data, (unsigned long *)result_len, data, data_len);
-    }
-
-    if (status == Z_OK) {
-        *result_data = erealloc(*result_data, *result_len + 1);
-        (*result_data)[*result_len] = '\0';
-		return 1;
-    } else {
-        efree(*result_data);
 		return 0;
-    }
+	}
+
+	if (level >= 0) {
+		status = compress2(*result_data, (unsigned long *)result_len, data, data_len, level);
+	} else {
+		status = compress(*result_data, (unsigned long *)result_len, data, data_len);
+	}
+
+	if (status == Z_OK) {
+		*result_data = erealloc(*result_data, *result_len + 1);
+		(*result_data)[*result_len] = '\0';
+		return 1;
+	} else {
+		efree(*result_data);
+		return 0;
+	}
 }
 /* }}}*/
 
@@ -411,21 +411,21 @@ static int mmc_uncompress(char **result_data, long *result_len, char *data, int 
 	unsigned int factor=1, maxfactor=16;
 	char *tmp1=NULL;
 
-    do {
-        *result_len = (unsigned long)data_len * (1 << factor++);
-        *result_data = (char *) erealloc(tmp1, *result_len);
-        status = uncompress(*result_data, result_len, data, data_len);
-        tmp1 = *result_data;
-    } while ((status == Z_BUF_ERROR) && (factor < maxfactor));
+	do {
+		*result_len = (unsigned long)data_len * (1 << factor++);
+		*result_data = (char *) erealloc(tmp1, *result_len);
+		status = uncompress(*result_data, result_len, data, data_len);
+		tmp1 = *result_data;
+	} while ((status == Z_BUF_ERROR) && (factor < maxfactor));
 
-    if (status == Z_OK) {
-        *result_data = erealloc(*result_data, *result_len + 1);
-        (*result_data)[ *result_len ] = '\0';
+	if (status == Z_OK) {
+		*result_data = erealloc(*result_data, *result_len + 1);
+		(*result_data)[ *result_len ] = '\0';
 		return 1;
-    } else {
-        efree(*result_data);
+	} else {
+		efree(*result_data);
 		return 0;
-    }
+	}
 }
 /* }}}*/
 
@@ -556,7 +556,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	}
 
 	php_stream_auto_cleanup(mmc->stream);
-    php_stream_set_option(mmc->stream, PHP_STREAM_OPTION_READ_TIMEOUT, 0, &tv);
+	php_stream_set_option(mmc->stream, PHP_STREAM_OPTION_READ_TIMEOUT, 0, &tv);
 	php_stream_set_option(mmc->stream, PHP_STREAM_OPTION_WRITE_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
 
 	mmc->status = MMC_STATUS_CONNECTED;
@@ -745,7 +745,7 @@ static int mmc_str_left(char *haystack, char *needle, int haystack_len, int need
 static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC) /* {{{ */
 {
 	char *command;
-    int command_len;
+	int command_len;
 
 	if (!mmc || !cmd) {
 		return -1;
@@ -1297,8 +1297,8 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 	long flags = 0, expire = 0;
 	zval *var, *mmc_object = getThis();
 
-    php_serialize_data_t var_hash;
-    smart_str buf = {0};
+	php_serialize_data_t var_hash;
+	smart_str buf = {0};
 
 	if (mmc_object == NULL) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Osz|ll", &mmc_object, memcache_class_entry_ptr, &key, &key_len, &var, &flags, &expire) == FAILURE) {
