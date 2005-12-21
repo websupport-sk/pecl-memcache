@@ -16,14 +16,20 @@
 			<name>Antony Dovgal</name>
 			<email>tony2001@phpclub.net</email>
         </maintainer>
+        <maintainer>
+			<user>mikl</user>
+			<name>Mikael Johansson</name>
+			<email>mikael@synd.info</email>
+        </maintainer>
 	</maintainers>
 	<release>
-		<version>1.6</version>
-		<date>2005-10-12</date>
+		<version>2.0.0</version>
+		<date>2005-12-21</date>
 		<state>stable</state>
 		<notes>
-			- Fixed minor leak appeared when connect fails.
-			- Fixed PECL bug #5626 (segfault when trying to use previously closed connection).
+			- Multiple servers with loadbalancing and failover
+			- Automatic compress threshold setting
+			- New methods: addServer(), getExtendedStats(), setCompressThreshold()
 		</notes>
 	</release>
 	<filelist>
@@ -39,6 +45,15 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>1.6</version>
+			<date>2005-10-12</date>
+			<state>stable</state>
+			<notes>
+				- Fixed minor leak appeared when connect fails.
+				- Fixed PECL bug #5626 (segfault when trying to use previously closed connection).
+			</notes>
+		</release>
 		<release>
 			<version>1.5</version>
 			<date>2005-08-05</date>

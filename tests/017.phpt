@@ -21,7 +21,7 @@ echo "Done\n";
 ?>
 --EXPECTF--	
 foo
-object(test)%s(%d) {
+object(test)%s%d) {
   ["connection"]=>
   resource(%d) of type (memcache connection)
 }
