@@ -1,5 +1,7 @@
 --TEST--
 Memcache class should be inheritable
+--SKIPIF--
+<?php if(!extension_loaded("memcache")) print "skip"; ?>
 --FILE--
 <?php
 
