@@ -35,6 +35,8 @@ extern zend_module_entry memcache_module_entry;
 #include "TSRM.h"
 #endif
 
+#include "ext/standard/php_smart_str_public.h"
+
 PHP_MINIT_FUNCTION(memcache);
 PHP_MSHUTDOWN_FUNCTION(memcache);
 PHP_RINIT_FUNCTION(memcache);
