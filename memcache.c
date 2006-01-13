@@ -828,6 +828,11 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 		return 0;
 	}
 
+	/* return FALSE without failover */
+	if (mmc_str_left(mmc->inbuf, "SERVER_ERROR out of memory", response_buf_size, sizeof("SERVER_ERROR out of memory") - 1)) {
+		return 0;
+	}
+
 	MMC_DEBUG(("an error occured while trying to store the item on the server"));
 	return -1;
 }
