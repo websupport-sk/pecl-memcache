@@ -367,7 +367,7 @@ static void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* {
 		pool->buckets = erealloc(pool->buckets, sizeof(mmc_t *) * (pool->num_buckets + weight));
 	}
 	else {
-		pool->buckets = emalloc(sizeof(mmc_t *));
+		pool->buckets = emalloc(sizeof(mmc_t *) * (pool->num_buckets + weight));
 	}
 
 	for (i=0; i<weight; i++) {
