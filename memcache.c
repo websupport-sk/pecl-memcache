@@ -721,7 +721,7 @@ static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
 	}
 
 	if (mmc_str_left(mmc->inbuf,"VERSION ", len, sizeof("VERSION ") - 1)) {
-		version_str = estrndup(mmc->inbuf + sizeof("VERSION ") - 1, len - sizeof("VERSION ") - 1 - sizeof("\r\n") - 1);
+		version_str = estrndup(mmc->inbuf + sizeof("VERSION ") - 1, len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1) );
 		return version_str;
 	}
 
