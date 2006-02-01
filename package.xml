@@ -23,13 +23,15 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>2.0.0</version>
-		<date>2005-12-21</date>
+		<version>2.0.1</version>
+		<date>2006-02-01</date>
 		<state>stable</state>
 		<notes>
-			- Multiple servers with loadbalancing and failover
-			- Automatic compress threshold setting
-			- New methods: addServer(), getExtendedStats(), setCompressThreshold()
+			- Fixed PECL bug #6595 (segfault in addServer())
+			- Fixed PECL bug #6512 (buffer overrun in getVersion())
+			- Fixed PECL bug #6460 (lacking include of php_smart_str_public.h)
+			- Fixed PECL bug #6370 (incorrect failover on out-of-memory server errors)
+			- Improved zlib detection
 		</notes>
 	</release>
 	<filelist>
@@ -45,6 +47,16 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>2.0.0</version>
+			<date>2005-12-21</date>
+			<state>stable</state>
+			<notes>
+				- Multiple servers with loadbalancing and failover
+				- Automatic compress threshold setting
+				- New methods: addServer(), getExtendedStats(), setCompressThreshold()
+			</notes>
+		</release>
 		<release>
 			<version>1.6</version>
 			<date>2005-10-12</date>
