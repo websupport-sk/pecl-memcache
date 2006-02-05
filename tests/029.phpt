@@ -1,5 +1,5 @@
 --TEST--
-INI_BOOL("memcache.failover")
+INI_BOOL("memcache.allow_failover")
 --SKIPIF--
 <?php if(!extension_loaded("memcache")) print "skip"; ?>
 --FILE--
@@ -10,7 +10,7 @@ include 'connect.inc';
 $var1 = 'test1';
 $var2 = 'test2';
 
-ini_set('memcache.failover', 1);
+ini_set('memcache.allow_failover', 1);
 
 $memcache = new Memcache();
 $memcache->addServer($host, $port);
@@ -26,7 +26,7 @@ var_dump($result2);
 var_dump($result3);
 var_dump($result4);
 
-ini_set('memcache.failover', 0);
+ini_set('memcache.allow_failover', 0);
 
 $result5 = $memcache->get('load_test_key1');
 $result6 = $memcache->get('load_test_key2');

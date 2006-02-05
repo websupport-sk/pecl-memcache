@@ -120,7 +120,8 @@ ZEND_GET_MODULE(memcache)
 
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
-	PHP_INI_ENTRY("memcache.failover",  "1", PHP_INI_ALL, NULL)
+	PHP_INI_ENTRY("memcache.allow_failover", "1", PHP_INI_ALL, NULL)
+	PHP_INI_ENTRY("memcache.default_port", "11211", PHP_INI_ALL, NULL)
 PHP_INI_END()
 /* }}} */
 
@@ -187,7 +188,6 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int);
 static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p TSRMLS_DC)
 {
 	MEMCACHE_G(debug_mode)		  = 0;
-	MEMCACHE_G(default_port)	  = MMC_DEFAULT_PORT;
 	MEMCACHE_G(num_persistent)	  = 0;
 	MEMCACHE_G(compression_level) = Z_DEFAULT_COMPRESSION;
 }
@@ -661,7 +661,7 @@ static mmc_t *mmc_server_find(mmc_pool_t *pool, char *key, int key_len TSRMLS_DC
 		mmc = pool->buckets[hash % pool->num_buckets];
 
 		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets) && INI_BOOL("memcache.failover"); i++) {
+		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets) && INI_BOOL("memcache.allow_failover"); i++) {
 			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
 			int next_len = sprintf(next_key, "%d%s", i+1, key);
 			MMC_DEBUG(("mmc_server_find: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
@@ -1461,7 +1461,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	mmc_pool_t *pool;
 	int errnum = 0, host_len;
 	char *host, *error_string = NULL;
-	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT;
+	long port = INI_INT("memcache.default_port"), timeout = MMC_DEFAULT_TIMEOUT;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|ll", &host, &host_len, &port, &timeout) == FAILURE) {
 		return;
@@ -1528,7 +1528,7 @@ PHP_FUNCTION(memcache_add_server)
 	zval **connection, *mmc_object = getThis();
 	mmc_pool_t *pool;
 	mmc_t *mmc;
-	long port = MEMCACHE_G(default_port), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long port = INI_INT("memcache.default_port"), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool persistent = 1;
 	int resource_type, host_len;
 	char *host;
