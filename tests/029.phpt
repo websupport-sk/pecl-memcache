@@ -1,23 +1,44 @@
 --TEST--
-memcache->addServer() and memcache->close()
+INI_BOOL("memcache.failover")
 --SKIPIF--
 <?php if(!extension_loaded("memcache")) print "skip"; ?>
 --FILE--
 <?php
 
-// Test for bug #6595
-
 include 'connect.inc';
 
-$memcache2 = new Memcache();
+$var1 = 'test1';
+$var2 = 'test2';
 
-$result1 = $memcache2->addServer($host, $port, true, 50);
-$result2 = $memcache2->close();
+ini_set('memcache.failover', 1);
+
+$memcache = new Memcache();
+$memcache->addServer($host, $port);
+$memcache->addServer($nonExistingHost, $nonExistingPort);
+
+$result1 = $memcache->set('load_test_key1', $var1, false, 1);	// hashes to $host2
+$result2 = $memcache->set('load_test_key2', $var2, false, 1);	// hashes to $host1
+$result3 = $memcache->get('load_test_key1');
+$result4 = $memcache->get('load_test_key2');
 
 var_dump($result1);
 var_dump($result2);
+var_dump($result3);
+var_dump($result4);
+
+ini_set('memcache.failover', 0);
+
+$result5 = $memcache->get('load_test_key1');
+$result6 = $memcache->get('load_test_key2');
+
+var_dump($result5);
+var_dump($result6);
 
 ?>
 --EXPECTF--
 bool(true)
 bool(true)
+string(5) "test1"
+string(5) "test2"
+bool(false)
+string(5) "test2"

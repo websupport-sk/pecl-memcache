@@ -14,21 +14,21 @@ $memcache = new Memcache();
 $memcache->addServer($host, $port);
 $memcache->addServer($host2, $port2);
 
-$memcache1 = memcache_connect($host, $port, 1);
-$memcache2 = memcache_pconnect($host2, $port2, 1);
+$memcache1 = memcache_connect($host, $port);
+$memcache2 = memcache_pconnect($host2, $port2);
 
-$result1 = $memcache->set('load_test_key1', $var1, false, 1);
-$result2 = $memcache->set('load_test_key2', $var2, false, 1);
+$result1 = $memcache->set('load_test_key1', $var1, false, 1);	// hashes to $host2
+$result2 = $memcache->set('load_test_key2', $var2, false, 1);	// hashes to $host1
 $result3 = $memcache->get(array('load_test_key1','load_test_key2'));
 
 var_dump($result1);
 var_dump($result2);
 var_dump($result3);
 
-$result4 = $memcache1->get('load_test_key1');
+$result4 = $memcache1->get('load_test_key1');	// return false; key1 is at $host2 
 $result5 = $memcache1->get('load_test_key2');
-$result6 = $memcache2->get('load_test_key1');
-$result7 = $memcache2->get('load_test_key2');
+$result6 = $memcache2->get('load_test_key1');	
+$result7 = $memcache2->get('load_test_key2');	// return false; key2 is at $host1
 
 var_dump($result4);
 var_dump($result5);

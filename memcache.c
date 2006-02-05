@@ -118,6 +118,12 @@ zend_module_entry memcache_module_entry = {
 ZEND_GET_MODULE(memcache)
 #endif
 
+/* {{{ PHP_INI */
+PHP_INI_BEGIN()
+	PHP_INI_ENTRY("memcache.failover",  "1", PHP_INI_ALL, NULL)
+PHP_INI_END()
+/* }}} */
+
 /* {{{ macros */
 #define MMC_PREPARE_KEY(key, key_len) \
 	php_strtr(key, key_len, "\t\r\n ", "____", 4); \
@@ -205,6 +211,7 @@ PHP_MINIT_FUNCTION(memcache)
 #endif
 
 	REGISTER_LONG_CONSTANT("MEMCACHE_COMPRESSED",MMC_COMPRESSED, CONST_CS | CONST_PERSISTENT);
+	REGISTER_INI_ENTRIES();
 
 	return SUCCESS;
 }
@@ -214,6 +221,7 @@ PHP_MINIT_FUNCTION(memcache)
  */
 PHP_MSHUTDOWN_FUNCTION(memcache)
 {
+	UNREGISTER_INI_ENTRIES();
 	return SUCCESS;
 }
 /* }}} */
@@ -653,7 +661,7 @@ static mmc_t *mmc_server_find(mmc_pool_t *pool, char *key, int key_len TSRMLS_DC
 		mmc = pool->buckets[hash % pool->num_buckets];
 
 		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets); i++) {
+		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets) && INI_BOOL("memcache.failover"); i++) {
 			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
 			int next_len = sprintf(next_key, "%d%s", i+1, key);
 			MMC_DEBUG(("mmc_server_find: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
