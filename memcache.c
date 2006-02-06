@@ -597,7 +597,7 @@ static int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *err
 			/* retry failed server, possibly stale cache should be flushed if connect ok
 			 * TODO: use client callback on successful reconnect to allow user to specify behaviour
 			 */
-			if (mmc->retry <= (long)time(NULL)) {
+			if (mmc->retry_interval >= 0 && (long)time(NULL) >= mmc->failed + mmc->retry_interval) {
 				if (_mmc_open(mmc, error_string, errnum TSRMLS_CC) /*&& mmc_flush(mmc TSRMLS_CC) > 0*/) {
 					return 1;
 				}
@@ -628,7 +628,7 @@ static void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	mmc_server_disconnect(mmc TSRMLS_CC);
 	mmc->status = MMC_STATUS_FAILED;
-	mmc->retry = (long)time(NULL) + mmc->retry_interval;
+	mmc->failed = (long)time(NULL);
 }
 /* }}} */
 
