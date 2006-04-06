@@ -588,7 +588,9 @@ static int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *err
 				if ((version = mmc_get_version(mmc TSRMLS_CC)) == NULL && !_mmc_open(mmc, error_string, errnum TSRMLS_CC)) {
 					break;
 				}
-				efree(version);
+				if (version) {
+					efree(version);
+				}
 				mmc->status = MMC_STATUS_CONNECTED;
 			}
 			return 1;
