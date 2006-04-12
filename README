@@ -9,3 +9,6 @@ The memcached website is here:
 You will probably need libevent to install memcached:
 You can download it here: http://www.monkey.org/~provos/libevent/
 
+Maintainers:
+Mikael Johansson	mikael at synd dot info
+Antony Dovgal		tony2001 at phpclub dot net
