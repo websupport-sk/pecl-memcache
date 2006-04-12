@@ -6,8 +6,8 @@ PHP_ARG_ENABLE(memcache, whether to enable memcache support,
 [  --enable-memcache       Enable memcache support])
 
 if test -z "$PHP_ZLIB_DIR"; then
-PHP_ARG_WITH(zlib-dir, for the location of libz,
-[  --with-zlib-dir[=DIR]   memcache: Set the path to libz install prefix.], no, no)
+PHP_ARG_WITH(zlib-dir, for the location of ZLIB,
+[  --with-zlib-dir[=DIR]   memcache: Set the path to ZLIB install prefix.], no, no)
 fi
 
 if test "$PHP_MEMCACHE" != "no"; then
@@ -20,7 +20,7 @@ if test "$PHP_MEMCACHE" != "no"; then
       PHP_ZLIB_DIR="$PHP_ZLIB_DIR"
       PHP_ZLIB_INCDIR="$PHP_ZLIB_DIR/include"
 	else
-      AC_MSG_ERROR([Can't find zlib headers under "$PHP_ZLIB_DIR"])
+      AC_MSG_ERROR([Can't find ZLIB headers under "$PHP_ZLIB_DIR"])
     fi
   else
     for i in /usr/local /usr; do
