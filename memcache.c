@@ -122,6 +122,7 @@ ZEND_GET_MODULE(memcache)
 PHP_INI_BEGIN()
 	PHP_INI_ENTRY("memcache.allow_failover", "1", PHP_INI_ALL, NULL)
 	PHP_INI_ENTRY("memcache.default_port", "11211", PHP_INI_ALL, NULL)
+	PHP_INI_ENTRY("memcache.chunk_size", "8192", PHP_INI_ALL, NULL)
 PHP_INI_END()
 /* }}} */
 
@@ -566,6 +567,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	php_stream_auto_cleanup(mmc->stream);
 	php_stream_set_option(mmc->stream, PHP_STREAM_OPTION_READ_TIMEOUT, 0, &tv);
 	php_stream_set_option(mmc->stream, PHP_STREAM_OPTION_WRITE_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
+	php_stream_set_chunk_size(mmc->stream, INI_INT("memcache.chunk_size"));
 
 	mmc->status = MMC_STATUS_CONNECTED;
 	return 1;
