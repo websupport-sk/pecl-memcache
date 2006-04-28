@@ -104,6 +104,8 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long default_port;
 	long num_persistent;
 	long compression_level;
+	long allow_failover;
+	long chunk_size;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #ifdef ZTS

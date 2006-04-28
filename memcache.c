@@ -118,11 +118,26 @@ zend_module_entry memcache_module_entry = {
 ZEND_GET_MODULE(memcache)
 #endif
 
+static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
+{
+	char *endptr = NULL;
+	long int lval;
+
+	lval = strtol(new_value, &endptr, 10);
+	if (NULL != endptr && new_value + new_value_length != endptr || lval <= 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.chunk_size must be a positive integer ('%s' given)", new_value);
+		return FAILURE;
+	}
+
+	return OnUpdateInt(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
-	PHP_INI_ENTRY("memcache.allow_failover", "1", PHP_INI_ALL, NULL)
-	PHP_INI_ENTRY("memcache.default_port", "11211", PHP_INI_ALL, NULL)
-	PHP_INI_ENTRY("memcache.chunk_size", "8192", PHP_INI_ALL, NULL)
+    STD_PHP_INI_ENTRY("memcache.allow_failover", "1", PHP_INI_ALL, OnUpdateInt, allow_failover, zend_memcache_globals, memcache_globals)
+    STD_PHP_INI_ENTRY("memcache.default_port", "11211", PHP_INI_ALL, OnUpdateInt, default_port, zend_memcache_globals, memcache_globals)
+    STD_PHP_INI_ENTRY("memcache.chunk_size", "8192", PHP_INI_ALL, OnUpdateChunkSize, chunk_size, zend_memcache_globals, memcache_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -567,7 +582,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	php_stream_auto_cleanup(mmc->stream);
 	php_stream_set_option(mmc->stream, PHP_STREAM_OPTION_READ_TIMEOUT, 0, &tv);
 	php_stream_set_option(mmc->stream, PHP_STREAM_OPTION_WRITE_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
-	php_stream_set_chunk_size(mmc->stream, INI_INT("memcache.chunk_size"));
+	php_stream_set_chunk_size(mmc->stream, MEMCACHE_G(chunk_size));
 
 	mmc->status = MMC_STATUS_CONNECTED;
 	return 1;
@@ -665,7 +680,7 @@ static mmc_t *mmc_server_find(mmc_pool_t *pool, char *key, int key_len TSRMLS_DC
 		mmc = pool->buckets[hash % pool->num_buckets];
 
 		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets) && INI_BOOL("memcache.allow_failover"); i++) {
+		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets) && MEMCACHE_G(allow_failover); i++) {
 			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
 			int next_len = sprintf(next_key, "%d%s", i+1, key);
 			MMC_DEBUG(("mmc_server_find: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
@@ -1465,7 +1480,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	mmc_pool_t *pool;
 	int errnum = 0, host_len;
 	char *host, *error_string = NULL;
-	long port = INI_INT("memcache.default_port"), timeout = MMC_DEFAULT_TIMEOUT;
+	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|ll", &host, &host_len, &port, &timeout) == FAILURE) {
 		return;
@@ -1532,7 +1547,7 @@ PHP_FUNCTION(memcache_add_server)
 	zval **connection, *mmc_object = getThis();
 	mmc_pool_t *pool;
 	mmc_t *mmc;
-	long port = INI_INT("memcache.default_port"), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long port = MEMCACHE_G(default_port), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool persistent = 1;
 	int resource_type, host_len;
 	char *host;

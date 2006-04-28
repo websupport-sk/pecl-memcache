@@ -29,6 +29,7 @@
 		<notes>
 			- Added "memcache.default_port" ini directive (default 11211)
 			- Added "memcache.allow_failover" ini directive (default On)
+			- Added "memcache.chunk_size" ini directive (default 8192 bytes)
 			- Fixed PECL bug #7331 (NULL pointer freeing causes memcache to segfault)
 		</notes>
 	</release>

@@ -1,5 +1,5 @@
 --TEST--
-INI_BOOL("memcache.allow_failover")
+ini_set("memcache.allow_failover")
 --SKIPIF--
 <?php if(!extension_loaded("memcache")) print "skip"; ?>
 --FILE--
@@ -34,6 +34,10 @@ $result6 = $memcache->get('load_test_key2');
 var_dump($result5);
 var_dump($result6);
 
+$result7 = ini_set('memcache.allow_failover', "abc");
+
+var_dump($result7);
+
 ?>
 --EXPECTF--
 bool(true)
@@ -42,3 +46,4 @@ string(5) "test1"
 string(5) "test2"
 bool(false)
 string(5) "test2"
+string(1) "0"
