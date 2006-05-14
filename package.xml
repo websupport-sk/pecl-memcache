@@ -24,12 +24,13 @@
 	</maintainers>
 	<release>
 		<version>2.0.2</version>
-		<date>2006-??-??</date>
+		<date>2006-05-14</date>
 		<state>stable</state>
 		<notes>
 			- Added "memcache.default_port" ini directive (default 11211)
 			- Added "memcache.allow_failover" ini directive (default On)
 			- Added "memcache.chunk_size" ini directive (default 8192 bytes)
+			- Setting retry_interval parameter to -1 disables automatic reconnect
 			- Fixed PECL bug #7331 (NULL pointer freeing causes memcache to segfault)
 		</notes>
 	</release>

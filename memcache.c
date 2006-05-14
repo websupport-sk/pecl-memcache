@@ -108,7 +108,7 @@ zend_module_entry memcache_module_entry = {
 	PHP_RSHUTDOWN(memcache),	/* Replace with NULL if there's nothing to do at request end */
 	PHP_MINFO(memcache),
 #if ZEND_MODULE_API_NO >= 20010901
-	"2.0.1", 					/* Replace with version number for your extension */
+	NO_VERSION_YET, 			/* Replace with version number for your extension */
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
