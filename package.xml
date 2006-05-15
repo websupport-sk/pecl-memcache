@@ -23,15 +23,12 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>2.0.2</version>
-		<date>2006-05-14</date>
+		<version>2.0.3</version>
+		<date>2006-05-15</date>
 		<state>stable</state>
 		<notes>
-			- Added "memcache.default_port" ini directive (default 11211)
-			- Added "memcache.allow_failover" ini directive (default On)
-			- Added "memcache.chunk_size" ini directive (default 8192 bytes)
-			- Setting retry_interval parameter to -1 disables automatic reconnect
-			- Fixed PECL bug #7331 (NULL pointer freeing causes memcache to segfault)
+			- Display ini entries in phpinfo() output
+			- Fixed Zend2 compat
 		</notes>
 	</release>
 	<filelist>
@@ -47,6 +44,18 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>2.0.2</version>
+			<date>2006-05-14</date>
+			<state>stable</state>
+			<notes>
+				- Added "memcache.default_port" ini directive (default 11211)
+				- Added "memcache.allow_failover" ini directive (default On)
+				- Added "memcache.chunk_size" ini directive (default 8192 bytes)
+				- Setting retry_interval parameter to -1 disables automatic reconnect
+				- Fixed PECL bug #7331 (NULL pointer freeing causes memcache to segfault)
+			</notes>
+		</release>
 		<release>
 			<version>2.0.1</version>
 			<date>2006-02-01</date>
