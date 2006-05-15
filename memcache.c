@@ -43,6 +43,10 @@
 #include "php_network.h"
 #include "php_memcache.h"
 
+#ifndef ZEND_ENGINE_2
+#define OnUpdateLong OnUpdateInt
+#endif
+
 /* True global resources - no need for thread safety here */
 static int le_memcache_pool, le_pmemcache;
 static zend_class_entry *memcache_class_entry_ptr;
@@ -135,9 +139,9 @@ static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
-    STD_PHP_INI_ENTRY("memcache.allow_failover", "1", PHP_INI_ALL, OnUpdateInt, allow_failover, zend_memcache_globals, memcache_globals)
-    STD_PHP_INI_ENTRY("memcache.default_port", "11211", PHP_INI_ALL, OnUpdateInt, default_port, zend_memcache_globals, memcache_globals)
-    STD_PHP_INI_ENTRY("memcache.chunk_size", "8192", PHP_INI_ALL, OnUpdateChunkSize, chunk_size, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.allow_failover",	"1",		PHP_INI_ALL, OnUpdateLong,		allow_failover,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.default_port",		"11211",	PHP_INI_ALL, OnUpdateLong,		default_port,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.chunk_size",		"8192",		PHP_INI_ALL, OnUpdateChunkSize,	chunk_size,		zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -272,6 +276,8 @@ PHP_MINFO_FUNCTION(memcache)
 	php_info_print_table_row(2, "Active persistent connections", buf);
 	php_info_print_table_row(2, "Revision", "$Revision$");
 	php_info_print_table_end();
+
+	DISPLAY_INI_ENTRIES();
 }
 /* }}} */
 
