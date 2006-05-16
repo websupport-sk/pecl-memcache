@@ -108,8 +108,8 @@ zend_module_entry memcache_module_entry = {
 	memcache_functions,
 	PHP_MINIT(memcache),
 	PHP_MSHUTDOWN(memcache),
-	PHP_RINIT(memcache),		/* Replace with NULL if there's nothing to do at request start */
-	PHP_RSHUTDOWN(memcache),	/* Replace with NULL if there's nothing to do at request end */
+	PHP_RINIT(memcache),
+	NULL,
 	PHP_MINFO(memcache),
 #if ZEND_MODULE_API_NO >= 20010901
 	NO_VERSION_YET, 			/* Replace with version number for your extension */
@@ -251,14 +251,6 @@ PHP_MSHUTDOWN_FUNCTION(memcache)
 PHP_RINIT_FUNCTION(memcache)
 {
 	MEMCACHE_G(debug_mode) = 0;
-	return SUCCESS;
-}
-/* }}} */
-
-/* {{{ PHP_RSHUTDOWN_FUNCTION
- */
-PHP_RSHUTDOWN_FUNCTION(memcache)
-{
 	return SUCCESS;
 }
 /* }}} */
