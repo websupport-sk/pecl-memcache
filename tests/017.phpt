@@ -5,6 +5,8 @@ Memcache class should be inheritable
 --FILE--
 <?php
 
+include 'connect.inc';
+
 class test extends Memcache {
 	function foo() {
 		echo "foo\n";
@@ -12,7 +14,7 @@ class test extends Memcache {
 }
 
 $t = new test;
-$t->connect("localhost");
+$t->connect($host, $port);
 $t->foo();
 
 var_dump($t);
