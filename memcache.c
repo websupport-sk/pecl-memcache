@@ -133,7 +133,7 @@ static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 		return FAILURE;
 	}
 
-	return OnUpdateInt(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+	return OnUpdateLong(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
 }
 /* }}} */
 
@@ -1531,7 +1531,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
    ---------------- */
 
 /* {{{ proto object memcache_connect( string host [, int port [, int timeout ] ])
-   Connects to server and returns Memcache object */
+   Connects to server and returns a Memcache object */
 PHP_FUNCTION(memcache_connect)
 {
 	php_mmc_connect(INTERNAL_FUNCTION_PARAM_PASSTHRU, 0);
@@ -1539,7 +1539,7 @@ PHP_FUNCTION(memcache_connect)
 /* }}} */
 
 /* {{{ proto object memcache_pconnect( string host [, int port [, int timeout ] ])
-   Connects to server and returns Memcache object */
+   Connects to server and returns a Memcache object */
 PHP_FUNCTION(memcache_pconnect)
 {
 	php_mmc_connect(INTERNAL_FUNCTION_PARAM_PASSTHRU, 1);
