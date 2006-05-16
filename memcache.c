@@ -1883,7 +1883,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 			ZVAL_FALSE(stats);
 		}
 
-		add_assoc_zval(return_value, hostname, stats);
+		add_assoc_zval_ex(return_value, hostname, hostname_len, stats);
 		efree(hostname);
 	}
 }
