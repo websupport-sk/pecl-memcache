@@ -19,7 +19,7 @@ if test "$PHP_MEMCACHE" != "no"; then
     elif test -f "$PHP_ZLIB_DIR/include/zlib.h"; then
       PHP_ZLIB_DIR="$PHP_ZLIB_DIR"
       PHP_ZLIB_INCDIR="$PHP_ZLIB_DIR/include"
-	else
+    else
       AC_MSG_ERROR([Can't find ZLIB headers under "$PHP_ZLIB_DIR"])
     fi
   else

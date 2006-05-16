@@ -82,7 +82,7 @@ typedef struct mmc {
 	unsigned short			port;
 	long					timeout;
 	long					failed;
-	unsigned int			retry_interval;
+	long					retry_interval;
 	int						persistent;
 	int						status;
 } mmc_t;
