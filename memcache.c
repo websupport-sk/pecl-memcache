@@ -124,11 +124,10 @@ ZEND_GET_MODULE(memcache)
 
 static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 {
-	char *endptr = NULL;
 	long int lval;
 
-	lval = strtol(new_value, &endptr, 10);
-	if (NULL != endptr && new_value + new_value_length != endptr || lval <= 0) {
+	lval = strtol(new_value, NULL, 10);
+	if (lval <= 0) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.chunk_size must be a positive integer ('%s' given)", new_value);
 		return FAILURE;
 	}
@@ -179,7 +178,7 @@ static void mmc_server_deactivate(mmc_t * TSRMLS_DC);
 static int mmc_server_failure(mmc_t * TSRMLS_DC);
 static mmc_t *mmc_server_find(mmc_pool_t *, char *, int TSRMLS_DC);
 static unsigned int mmc_hash(char *, int);
-static int mmc_compress(char **, int *, char *, int TSRMLS_DC);
+static int mmc_compress(char **, unsigned long *, char *, int TSRMLS_DC);
 static int mmc_uncompress(char **, long *, char *, int);
 static int mmc_get_pool(zval *, mmc_pool_t ** TSRMLS_DC);
 static int mmc_open(mmc_t *, int, char **, int * TSRMLS_DC);
@@ -399,11 +398,11 @@ static void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* {
 }
 /* }}} */
 
-static int mmc_compress(char **result_data, int *result_len, char *data, int data_len TSRMLS_DC) /* {{{ */
+static int mmc_compress(char **result_data, unsigned long *result_len, char *data, int data_len TSRMLS_DC) /* {{{ */
 {
 	int   status, level = MEMCACHE_G(compression_level);
 
-	*result_len = data_len + (data_len / 1000) + 15 + 1; /* some magic from zlib.c */
+	*result_len = data_len + (data_len / 1000) + 25 + 1; /* some magic from zlib.c */
 	*result_data = (char *) emalloc(*result_len);
 
 	if (!*result_data) {
@@ -411,9 +410,9 @@ static int mmc_compress(char **result_data, int *result_len, char *data, int dat
 	}
 
 	if (level >= 0) {
-		status = compress2(*result_data, (unsigned long *)result_len, data, data_len, level);
+		status = compress2(*result_data, result_len, data, data_len, level);
 	} else {
-		status = compress(*result_data, (unsigned long *)result_len, data, data_len);
+		status = compress(*result_data, result_len, data, data_len);
 	}
 
 	if (status == Z_OK) {
@@ -421,6 +420,20 @@ static int mmc_compress(char **result_data, int *result_len, char *data, int dat
 		(*result_data)[*result_len] = '\0';
 		return 1;
 	} else {
+		switch (status) {
+			case Z_MEM_ERROR:
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "not enough memory to perform compression");
+				break;
+			case Z_BUF_ERROR:
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "not enough room in the output buffer to perform compression");
+				break;
+			case Z_STREAM_ERROR:
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid compression level");
+				break;
+			default:
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "unknown error during compression");
+				break;
+		}
 		efree(*result_data);
 		return 0;
 	}
@@ -1322,10 +1335,11 @@ static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *command, int comm
 {
 	mmc_t *mmc;
 	mmc_pool_t *pool;
-	int result = -1, value_len, data_len, key_len;
+	int result = -1, value_len, key_len;
 	char *value, *data, *key, *real_key;
 	long flags = 0, expire = 0;
 	zval *var, *mmc_object = getThis();
+	unsigned long data_len;
 
 	php_serialize_data_t var_hash;
 	smart_str buf = {0};
