@@ -1509,6 +1509,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 
 	if (!mmc_open(mmc, 1, &error_string, &errnum TSRMLS_CC)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%ld, %s (%d)", host, port, error_string ? error_string : "Unknown error", errnum);
+		mmc_server_free(mmc TSRMLS_CC);
 		if (error_string) {
 			efree(error_string);
 		}
