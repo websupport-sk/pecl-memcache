@@ -1,7 +1,7 @@
 --TEST--
 Memcache class should be inheritable
 --SKIPIF--
-<?php if(!extension_loaded("memcache")) print "skip"; ?>
+<?php include 'connect.inc'; ?>
 --FILE--
 <?php
 

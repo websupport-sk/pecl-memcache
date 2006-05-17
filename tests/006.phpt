@@ -1,7 +1,7 @@
 --TEST--
 memcache_increment() & memcache_decrement()
 --SKIPIF--
-<?php if(!extension_loaded("memcache")) print "skip"; ?>
+<?php include 'connect.inc'; ?>
 --FILE--
 <?php
 

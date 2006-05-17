@@ -1,7 +1,7 @@
 --TEST--
 ini_set("memcache.chunk_size")
 --SKIPIF--
-<?php if(!extension_loaded("memcache")) print "skip"; ?>
+<?php include 'connect.inc'; ?>
 --FILE--
 <?php
 

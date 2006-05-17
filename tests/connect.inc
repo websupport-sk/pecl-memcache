@@ -1,5 +1,9 @@
 <?php
 
+if (!extension_loaded("memcache")) {
+	die("skip");
+}
+
 /*
 * Please change host & port to match your configuration 
 */
@@ -14,7 +18,7 @@ $port = 11211;
 $nonExistingHost = "localhost";
 $nonExistingPort = 11213;
 
-$memcache = memcache_connect($host, $port);
+$memcache = @memcache_connect($host, $port);
 
 if (!$memcache) {
 	die('skip Connection to memcached failed');
