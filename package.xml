@@ -23,12 +23,14 @@
         </maintainer>
 	</maintainers>
 	<release>
-		<version>2.0.4</version>
-		<date>2006-05-16</date>
+		<version>2.1.0</version>
+		<date>2006-xx-xx</date>
 		<state>stable</state>
 		<notes>
-			- Redefined retry_interval as long to fix no-automatic-reconnect behaviour
-			- Fixed PECL bugs #7635, #7637 (OnUpdateInt: referenced symbol not found)
+			- Servers may be flagged up/down and the user may specify a error callback
+			- Individual server params and up/down status may be changed at runtime
+			- New methods: setServerParams(), getServerStatus()
+			- Fixed PECL bugs #7631, #8117 (errorous line feeds in config.m4)
 		</notes>
 	</release>
 	<filelist>
@@ -44,6 +46,15 @@
          </dir>
 	</filelist>
 	<changelog>
+		<release>
+			<version>2.0.4</version>
+			<date>2006-05-16</date>
+			<state>stable</state>
+			<notes>
+				- Redefined retry_interval as long to fix no-automatic-reconnect behaviour
+				- Fixed PECL bugs #7635, #7637 (OnUpdateInt: referenced symbol not found)
+			</notes>
+		</release>
 		<release>
 			<version>2.0.3</version>
 			<date>2006-05-15</date>

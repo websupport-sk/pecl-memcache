@@ -15,7 +15,12 @@ $memcache->addServer($host, $port);
 $memcache->addServer($host2, $port2);
 
 $memcache1 = memcache_connect($host, $port);
+$memcache1->set('load_test_key1', '');
+$memcache1->set('load_test_key2', '');
+
 $memcache2 = memcache_pconnect($host2, $port2);
+$memcache2->set('load_test_key1', '');
+$memcache2->set('load_test_key2', '');
 
 $result1 = $memcache->set('load_test_key1', $var1, false, 1);	// hashes to $host2
 $result2 = $memcache->set('load_test_key2', $var2, false, 1);	// hashes to $host1
@@ -45,7 +50,7 @@ array(2) {
   ["load_test_key2"]=>
   string(5) "test2"
 }
-bool(false)
+string(0) ""
 string(5) "test2"
 string(5) "test1"
-bool(false)
+string(0) ""
