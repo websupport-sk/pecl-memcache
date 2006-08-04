@@ -30,6 +30,7 @@
 			- Servers may be flagged up/down and the user may specify a error callback
 			- Individual server params and up/down status may be changed at runtime
 			- New methods: setServerParams(), getServerStatus()
+			- Statistics methods support fetching other kinds of stats (slabs, items, cachedump, ...)
 			- Fixed PECL bugs #7631, #8117 (errorous line feeds in config.m4)
 		</notes>
 	</release>

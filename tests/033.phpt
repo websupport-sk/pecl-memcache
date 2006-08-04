@@ -1,7 +1,7 @@
 --TEST--
 memcache->addServer() with server failure callback
 --SKIPIF--
-<?php if(!extension_loaded("memcache")) print "skip"; ?>
+<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
 --FILE--
 <?php
 

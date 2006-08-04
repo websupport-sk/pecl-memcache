@@ -199,11 +199,11 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval ** TSRMLS_DC)
 static int mmc_read_value(mmc_t *, char **, zval ** TSRMLS_DC);
 static int mmc_delete(mmc_t *, char *, int, int TSRMLS_DC);
 static int mmc_flush(mmc_t * TSRMLS_DC);
-static void php_mmc_store (INTERNAL_FUNCTION_PARAMETERS, char *, int);
-static int mmc_get_stats (mmc_t *, zval ** TSRMLS_DC);
-static int mmc_incr_decr (mmc_t *, int, char *, int, int, long * TSRMLS_DC);
-static void php_mmc_incr_decr (INTERNAL_FUNCTION_PARAMETERS, int);
-static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int);
+static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *, int);
+static int mmc_get_stats(mmc_t *, char *, int, int, zval * TSRMLS_DC);
+static int mmc_incr_decr(mmc_t *, int, char *, int, int, long * TSRMLS_DC);
+static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int);
+static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, int);
 /* }}} */
 
 /* {{{ php_memcache_init_globals()
@@ -1257,47 +1257,159 @@ static int mmc_flush(mmc_t *mmc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-static int mmc_get_stats (mmc_t *mmc, zval **stats TSRMLS_DC) /* {{{ */
+static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
 {
-	int response_buf_size, stats_tmp_len, space_len;
-	char *stats_tmp, *space_tmp = NULL;
-	char *key, *val;
+	char *space, *colon, *key, *val;
 
-	if ( mmc_sendcmd(mmc, "stats", sizeof("stats") - 1 TSRMLS_CC) < 0) {
+	if ((space = php_memnstr(start, " ", 1, end)) == NULL) {
+		return 0;
+	}
+
+	if ((colon = php_memnstr(start, ":", 1, end)) != NULL) {
+		zval *element, **elem;
+		key = estrndup(start, colon - start);
+
+		if (zend_hash_find(Z_ARRVAL_P(result), key, colon - start + 1, (void **)&elem) == FAILURE) {
+			MAKE_STD_ZVAL(element);
+			array_init(element);
+			add_assoc_zval_ex(result, key, colon - start + 1, element);
+		}
+		else {
+			element = *elem;
+		}
+
+		efree(key);
+		return mmc_stats_parse_stat(colon + 1, end, element);
+	}
+
+	key = estrndup(start, space - start);
+	val = estrndup(space + 1, end - (space + 1));
+	add_assoc_string(result, key, val, 1);
+	efree(key);
+	efree(val);
+
+	return 1;
+}
+/* }}} */
+
+static int mmc_stats_parse_item(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
+{
+	char *space, *value, *value_end, *key, *val;
+	zval *element;
+
+	if ((space = php_memnstr(start, " ", 1, end)) == NULL) {
+		return 0;
+	}
+
+	MAKE_STD_ZVAL(element);
+	array_init(element);
+
+	for (value = php_memnstr(space, "[", 1, end); value != NULL && value < end; value = php_memnstr(value + 1, ";", 1, end)) {
+		do {
+			value++;
+		} while (*value == ' ' && value < end);
+
+		if (value < end && (value_end = php_memnstr(value, " ", 1, end)) != NULL && value_end < end) {
+			key = estrndup(value_end + 1, 1);
+			val = estrndup(value, value_end - value);
+			add_assoc_string(element, key, val, 1);
+			efree(key);
+			efree(val);
+		}
+	}
+
+	add_assoc_zval_ex(result, start, (space + 1) - start, element);
+	return 1;
+}
+/* }}} */
+
+static int mmc_stats_parse_generic(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
+{
+	char *space, *key, *val;
+
+	if (*end == '\r') {
+		end--;
+	}
+
+	if (start < end) {
+		if ((space = php_memnstr(start, " ", 1, end)) != NULL) {
+			key = estrndup(start, space - start);
+			val = estrndup(space + 1, end - (space + 1));
+			add_assoc_string(result, key, val, 1);
+			efree(key);
+			efree(val);
+		}
+		else {
+			val = estrndup(start, end - start);
+			add_next_index_string(result, val, 1);
+			efree(val);
+		}
+	}
+
+	return 1;
+}
+/* }}} */
+
+static int mmc_get_stats(mmc_t *mmc, char *type, int slabid, int limit, zval *result TSRMLS_DC) /* {{{ */
+{
+	char *command;
+	int command_len, response_len;
+
+	if (slabid) {
+		command_len = spprintf(&command, 0, "stats %s %d %d", type, slabid, limit);
+	}
+	else if (type) {
+		command_len = spprintf(&command, 0, "stats %s", type);
+	}
+	else {
+		command_len = spprintf(&command, 0, "stats");
+	}
+
+	if (mmc_sendcmd(mmc, command, command_len TSRMLS_CC) < 0) {
+		efree(command);
 		return -1;
 	}
 
-	array_init(*stats);
+	efree(command);
+	array_init(result);
 
-	while ( (response_buf_size = mmc_readline(mmc TSRMLS_CC)) > 0 ) {
-		if (mmc_str_left(mmc->inbuf, "STAT", response_buf_size, sizeof("STAT") - 1)) {
-			stats_tmp_len = response_buf_size - (sizeof("STAT ") - 1) - (sizeof("\r\n") - 1);
-			stats_tmp = estrndup(mmc->inbuf + (sizeof("STAT ") - 1), stats_tmp_len);
-			space_tmp = php_memnstr(stats_tmp, " ", 1, stats_tmp + stats_tmp_len);
+	while ((response_len = mmc_readline(mmc TSRMLS_CC)) >= 0) {
+		if (mmc_str_left(mmc->inbuf, "ERROR", response_len, sizeof("ERROR") - 1) ||
+			mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_len, sizeof("CLIENT_ERROR") - 1) ||
+			mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_len, sizeof("SERVER_ERROR") - 1)) {
 
-			if (space_tmp) {
-				space_len = strlen(space_tmp);
-				key = estrndup(stats_tmp, stats_tmp_len - space_len);
-				val = estrndup(stats_tmp + (stats_tmp_len - space_len) + 1, space_len - 1);
-				add_assoc_string(*stats, key, val, 1);
+			zend_hash_destroy(Z_ARRVAL_P(result));
+			FREE_HASHTABLE(Z_ARRVAL_P(result));
 
-				efree(key);
-				efree(val);
-			}
-
-			efree(stats_tmp);
+			ZVAL_FALSE(result);
+			return 0;
 		}
-		else if (mmc_str_left(mmc->inbuf, "END", response_buf_size, sizeof("END") - 1)) {
-			/* END of stats*/
+		else if (mmc_str_left(mmc->inbuf, "RESET", response_len, sizeof("RESET") - 1)) {
+			zend_hash_destroy(Z_ARRVAL_P(result));
+			FREE_HASHTABLE(Z_ARRVAL_P(result));
+
+			ZVAL_TRUE(result);
+			return 1;
+		}
+		else if (mmc_str_left(mmc->inbuf, "ITEM ", response_len, sizeof("ITEM ") - 1)) {
+			if (!mmc_stats_parse_item(mmc->inbuf + (sizeof("ITEM ") - 1), mmc->inbuf + response_len - (sizeof("\r\n") - 1), result TSRMLS_CC)) {
+				return -1;
+			}
+		}
+		else if (mmc_str_left(mmc->inbuf, "STAT ", response_len, sizeof("STAT ") - 1)) {
+			if (!mmc_stats_parse_stat(mmc->inbuf + (sizeof("STAT ") - 1), mmc->inbuf + response_len - (sizeof("\r\n") - 1), result TSRMLS_CC)) {
+				return -1;
+			}
+		}
+		else if (mmc_str_left(mmc->inbuf, "END", response_len, sizeof("END") - 1)) {
 			break;
 		}
-		else {
-			/* unknown error */
+		else if (!mmc_stats_parse_generic(mmc->inbuf, mmc->inbuf + response_len - (sizeof("\n") - 1), result TSRMLS_CC)) {
 			return -1;
 		}
 	}
 
-	if (response_buf_size < 0) {
+	if (response_len < 0) {
 		return -1;
 	}
 
@@ -2002,7 +2114,7 @@ PHP_FUNCTION(memcache_debug)
 }
 /* }}} */
 
-/* {{{ proto array memcache_get_stats( object memcache )
+/* {{{ proto array memcache_get_stats( object memcache [, string type [, int slabid [, int limit ] ] ])
    Returns server's statistics */
 PHP_FUNCTION(memcache_get_stats)
 {
@@ -2010,8 +2122,17 @@ PHP_FUNCTION(memcache_get_stats)
 	int i, failures = 0;
 	zval *mmc_object = getThis();
 
+	char *type = NULL;
+	int type_len = 0;
+	long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
+
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O", &mmc_object, memcache_class_entry_ptr) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|sll", &mmc_object, memcache_class_entry_ptr, &type, &type_len, &slabid, &limit) == FAILURE) {
+			return;
+		}
+	}
+	else {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|sll", &type, &type_len, &slabid, &limit) == FAILURE) {
 			return;
 		}
 	}
@@ -2021,7 +2142,7 @@ PHP_FUNCTION(memcache_get_stats)
 	}
 
 	for (i=0; i<pool->num_servers; i++) {
-		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_get_stats(pool->servers[i], &return_value TSRMLS_CC) < 0) {
+		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_get_stats(pool->servers[i], type, slabid, limit, return_value TSRMLS_CC) < 0) {
 			if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 			}
@@ -2038,7 +2159,7 @@ PHP_FUNCTION(memcache_get_stats)
 }
 /* }}} */
 
-/* {{{ proto array memcache_get_extended_stats( object memcache )
+/* {{{ proto array memcache_get_extended_stats( object memcache [, string type [, int slabid [, int limit ] ] ])
    Returns statistics for each server in the pool */
 PHP_FUNCTION(memcache_get_extended_stats)
 {
@@ -2047,8 +2168,17 @@ PHP_FUNCTION(memcache_get_extended_stats)
 	int i, hostname_len;
 	zval *mmc_object = getThis(), *stats;
 
+	char *type = NULL;
+	int type_len = 0;
+	long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
+
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O", &mmc_object, memcache_class_entry_ptr) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|sll", &mmc_object, memcache_class_entry_ptr, &type, &type_len, &slabid, &limit) == FAILURE) {
+			return;
+		}
+	}
+	else {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|sll", &type, &type_len, &slabid, &limit) == FAILURE) {
 			return;
 		}
 	}
@@ -2064,7 +2194,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 		hostname = emalloc(strlen(pool->servers[i]->host) + MAX_LENGTH_OF_LONG + 1 + 1);
 		hostname_len = sprintf(hostname, "%s:%d", pool->servers[i]->host, pool->servers[i]->port);
 
-		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_get_stats(pool->servers[i], &stats TSRMLS_CC) < 0) {
+		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_get_stats(pool->servers[i], type, slabid, limit, stats TSRMLS_CC) < 0) {
 			if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 			}

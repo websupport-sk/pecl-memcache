@@ -65,10 +65,11 @@ PHP_FUNCTION(memcache_flush);
 #define MMC_BUF_SIZE 4096
 #define MMC_SERIALIZED 1
 #define MMC_COMPRESSED 2
-#define MMC_DEFAULT_TIMEOUT 1		/* seconds */
-#define MMC_KEY_MAX_SIZE 250		/* stoled from memcached sources =) */
-#define MMC_DEFAULT_RETRY 15 		/* retry failed server after x seconds */
-#define MMC_DEFAULT_SAVINGS 0.2		/* minimum 20% savings for compression to be used */
+#define MMC_DEFAULT_TIMEOUT 1				/* seconds */
+#define MMC_KEY_MAX_SIZE 250				/* stoled from memcached sources =) */
+#define MMC_DEFAULT_RETRY 15 				/* retry failed server after x seconds */
+#define MMC_DEFAULT_SAVINGS 0.2				/* minimum 20% savings for compression to be used */
+#define MMC_DEFAULT_CACHEDUMP_LIMIT	100		/* number of entries */
 
 #define MMC_STATUS_FAILED 0
 #define MMC_STATUS_DISCONNECTED 1
