@@ -1279,7 +1279,7 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC) 
 		}
 
 		efree(key);
-		return mmc_stats_parse_stat(colon + 1, end, element);
+		return mmc_stats_parse_stat(colon + 1, end, element TSRMLS_CC);
 	}
 
 	key = estrndup(start, space - start);
@@ -1393,11 +1393,15 @@ static int mmc_get_stats(mmc_t *mmc, char *type, int slabid, int limit, zval *re
 		}
 		else if (mmc_str_left(mmc->inbuf, "ITEM ", response_len, sizeof("ITEM ") - 1)) {
 			if (!mmc_stats_parse_item(mmc->inbuf + (sizeof("ITEM ") - 1), mmc->inbuf + response_len - (sizeof("\r\n") - 1), result TSRMLS_CC)) {
+				zend_hash_destroy(Z_ARRVAL_P(result));
+				FREE_HASHTABLE(Z_ARRVAL_P(result));
 				return -1;
 			}
 		}
 		else if (mmc_str_left(mmc->inbuf, "STAT ", response_len, sizeof("STAT ") - 1)) {
 			if (!mmc_stats_parse_stat(mmc->inbuf + (sizeof("STAT ") - 1), mmc->inbuf + response_len - (sizeof("\r\n") - 1), result TSRMLS_CC)) {
+				zend_hash_destroy(Z_ARRVAL_P(result));
+				FREE_HASHTABLE(Z_ARRVAL_P(result));
 				return -1;
 			}
 		}
@@ -1405,11 +1409,15 @@ static int mmc_get_stats(mmc_t *mmc, char *type, int slabid, int limit, zval *re
 			break;
 		}
 		else if (!mmc_stats_parse_generic(mmc->inbuf, mmc->inbuf + response_len - (sizeof("\n") - 1), result TSRMLS_CC)) {
+			zend_hash_destroy(Z_ARRVAL_P(result));
+			FREE_HASHTABLE(Z_ARRVAL_P(result));
 			return -1;
 		}
 	}
 
 	if (response_len < 0) {
+		zend_hash_destroy(Z_ARRVAL_P(result));
+		FREE_HASHTABLE(Z_ARRVAL_P(result));
 		return -1;
 	}
 
