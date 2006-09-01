@@ -51,13 +51,13 @@ string(3) "abc"
 Warning: memcache_set_compress_threshold() expects parameter 1 to be Memcache, array given in %s on line %d
 NULL
 
-Warning: memcache_set_compress_threshold(): threshold must be a positive integer in %s on line %d
+Warning: memcache_set_compress_threshold()%s: threshold must be a positive integer in %s on line %d
 bool(false)
 
-Warning: memcache_set_compress_threshold(): min_savings must be a float in the 0..1 range in %s on line %d
+Warning: memcache_set_compress_threshold()%s: min_savings must be a float in the 0..1 range in %s on line %d
 bool(false)
 
-Warning: memcache_set_compress_threshold(): threshold must be a positive integer in %s on line %d
+Warning: memcache_set_compress_threshold()%s: threshold must be a positive integer in %s on line %d
 bool(false)
 
 Warning: memcache_set_compress_threshold() expects parameter 1 to be Memcache, object given in %s on line %d

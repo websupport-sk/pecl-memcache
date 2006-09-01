@@ -11,7 +11,7 @@ $result = $memcache->set('test_key', 'abc');
 var_dump($result);
 
 $result = $memcache->getStats();
-var_dump(is_numeric($result['pid']));
+var_dump($result['pid']);
 
 $result = $memcache->getStats('abc');
 var_dump($result);
@@ -20,22 +20,23 @@ $result = $memcache->getStats('reset');
 var_dump($result);
 
 $result = $memcache->getStats('malloc');
-var_dump(is_numeric($result['arena_size']));
+var_dump($result['arena_size']);
 
 $result = $memcache->getStats('maps');
-var_dump(count($result) > 0);
+var_dump(key($result));
+var_dump(reset($result));
 
 $result = $memcache->getStats('cachedump', 6, 10);
-var_dump(count($result) > 0);
+var_dump($result[key($result)]['b']);
 
 $result = $memcache->getStats('slabs');
 var_dump($result['6']['chunk_size']);
 
 $result = $memcache->getStats('items');
-var_dump(isset($result['items']));
+var_dump($result['items']['6']['number']);
 
 $result = $memcache->getStats('sizes');
-var_dump(count($result) > 0);
+var_dump($result['64']);
 
 print "\n";
 
@@ -48,15 +49,16 @@ var_dump(isset($result["$host:$port"]['items']));
 ?>
 --EXPECTF--
 bool(true)
-bool(true)
+string(%d) "%d"
 bool(false)
 bool(true)
-bool(true)
-bool(true)
-bool(true)
 string(%d) "%d"
-bool(true)
-bool(true)
+string(%d) "%x-%x"
+string(%d) "%s %d %d:%d %d %s"
+string(%d) "%d"
+string(%d) "%d"
+string(%d) "%d"
+string(%d) "%d"
 
 bool(false)
 bool(true)
