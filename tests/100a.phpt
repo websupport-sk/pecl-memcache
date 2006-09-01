@@ -34,7 +34,7 @@ echo "Done\n";
 bool(true)
 bool(false)
 
-Notice: memcache_flush()%s: marked server '%s' as failed in %s on line %d
+Notice: memcache_flush()%s marked server '%s' as failed in %s on line %d
 bool(true)
 
 Warning: memcache_flush() expects parameter 1 to be Memcache, object given in %s on line %d

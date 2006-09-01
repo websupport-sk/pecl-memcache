@@ -193,10 +193,10 @@ static char * mmc_get_version(mmc_t * TSRMLS_DC);
 static int mmc_str_left(char *, char *, int, int);
 static int mmc_sendcmd(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_exec_storage_cmd(mmc_t *, char *, int, char *, int, int, int, char *, int TSRMLS_DC);
-static int mmc_parse_response(char *, char **, int, int *, int *);
+static int mmc_parse_response(char *, char **, int *, int, int *, int *);
 static int mmc_exec_retrieval_cmd(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
 static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
-static int mmc_read_value(mmc_t *, char **, zval ** TSRMLS_DC);
+static int mmc_read_value(mmc_t *, char **, int *, zval ** TSRMLS_DC);
 static int mmc_delete(mmc_t *, char *, int, int TSRMLS_DC);
 static int mmc_flush(mmc_t * TSRMLS_DC);
 static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *, int);
@@ -910,7 +910,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 }
 /* }}} */
 
-static int mmc_parse_response(char *response, char **item_name, int response_len, int *flags, int *value_len) /* {{{ */
+static int mmc_parse_response(char *response, char **key, int *key_len, int response_len, int *flags, int *value_len) /* {{{ */
 {
 	int i=0, n=0;
 	int spaces[3];
@@ -937,12 +937,14 @@ static int mmc_parse_response(char *response, char **item_name, int response_len
 		return -1;
 	}
 
-	if (item_name != NULL) {
-		int item_name_len = spaces[1] - spaces[0] - 1;
+	if (key != NULL) {
+		int len = spaces[1] - spaces[0] - 1;
 
-		*item_name = emalloc(item_name_len + 1);
-		memcpy(*item_name, response + spaces[0] + 1, item_name_len);
-		(*item_name)[item_name_len] = '\0';
+		*key = emalloc(len + 1);
+		*key_len = len;
+
+		memcpy(*key, response + spaces[0] + 1, len);
+		(*key)[len] = '\0';
 	}
 
 	*flags = atoi(response + spaces[1]);
@@ -981,7 +983,7 @@ static int mmc_exec_retrieval_cmd(mmc_pool_t *pool, zval *key, zval **return_val
 
 		/* send command and read value */
 		if ((result = mmc_sendcmd(mmc, request, request_len TSRMLS_CC)) > 0 &&
-			(result = mmc_read_value(mmc, NULL, return_value TSRMLS_CC)) >= 0) {
+			(result = mmc_read_value(mmc, NULL, NULL, return_value TSRMLS_CC)) >= 0) {
 
 			/* not found */
 			if (result == 0) {
@@ -1009,7 +1011,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 	HashPosition pos;
 	zval **key, *value;
 	char *result_key;
-	int	i = 0, j, num_requests, result, result_status;
+	int	i = 0, j, num_requests, result, result_status, result_key_len;
 
 	array_init(*return_value);
 
@@ -1058,8 +1060,8 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 		/* third pass to read responses */
 		for (j=0; j<num_requests; j++) {
 			if (pool->requests[j]->status != MMC_STATUS_FAILED) {
-				for (value = NULL; (result = mmc_read_value(pool->requests[j], &result_key, &value TSRMLS_CC)) > 0; value = NULL) {
-					add_assoc_zval(*return_value, result_key, value);
+				for (value = NULL; (result = mmc_read_value(pool->requests[j], &result_key, &result_key_len, &value TSRMLS_CC)) > 0; value = NULL) {
+					add_assoc_zval_ex(*return_value, result_key, result_key_len + 1, value);
 					efree(result_key);
 				}
 
@@ -1080,7 +1082,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 }
 /* }}} */
 
-static int mmc_read_value(mmc_t *mmc, char **key, zval **value TSRMLS_DC) /* {{{ */
+static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSRMLS_DC) /* {{{ */
 {
 	int response_len, flags, data_len, i, size;
 	char *data;
@@ -1096,7 +1098,7 @@ static int mmc_read_value(mmc_t *mmc, char **key, zval **value TSRMLS_DC) /* {{{
 		return 0;
 	}
 
-	if (mmc_parse_response(mmc->inbuf, key, response_len, &flags, &data_len) < 0) {
+	if (mmc_parse_response(mmc->inbuf, key, key_len, response_len, &flags, &data_len) < 0) {
 		return -1;
 	}
 
@@ -1257,31 +1259,41 @@ static int mmc_flush(mmc_t *mmc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
+/*
+ * STAT 6:chunk_size 64
+ */
 static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
 {
-	char *space, *colon, *key, *val;
+	char *space, *colon, *key;
+	long index = 0;
 
+	/* find space delimiting key and value */
 	if ((space = php_memnstr(start, " ", 1, end)) == NULL) {
 		return 0;
 	}
 
-	if ((colon = php_memnstr(start, ":", 1, end)) != NULL && colon < space) {
+	/* find colon delimiting subkeys */
+	if ((colon = php_memnstr(start, ":", 1, space - 1)) != NULL) {
 		zval *element, **elem;
 		key = estrndup(start, colon - start);
 
-		if (zend_hash_find(Z_ARRVAL_P(result), key, colon - start + 1, (void **)&elem) == FAILURE) {
+		/* find existing or create subkey array in result */
+		if ((is_numeric_string(key, colon - start, &index, NULL, 0) &&
+			zend_hash_index_find(Z_ARRVAL_P(result), index, (void **)&elem) != FAILURE) ||
+			zend_hash_find(Z_ARRVAL_P(result), key, colon - start + 1, (void **)&elem) != FAILURE) {
+			element = *elem;
+		}
+		else {
 			MAKE_STD_ZVAL(element);
 			array_init(element);
 			add_assoc_zval_ex(result, key, colon - start + 1, element);
-		}
-		else {
-			element = *elem;
 		}
 
 		efree(key);
 		return mmc_stats_parse_stat(colon + 1, end, element TSRMLS_CC);
 	}
 
+	/* no more subkeys, add value under last subkey */
 	key = estrndup(start, space - start);
 	add_assoc_stringl_ex(result, key, space - start + 1, space + 1, end - space, 1);
 	efree(key);
@@ -1290,11 +1302,15 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC) 
 }
 /* }}} */
 
+/*
+ * ITEM test_key [3 b; 1157099416 s]
+ */
 static int mmc_stats_parse_item(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
 {
-	char *space, *value, *value_end, *key, *val;
+	char *space, *value, *value_end, *key;
 	zval *element;
 
+	/* find space delimiting key and value */
 	if ((space = php_memnstr(start, " ", 1, end)) == NULL) {
 		return 0;
 	}
@@ -1302,18 +1318,18 @@ static int mmc_stats_parse_item(char *start, char *end, zval *result TSRMLS_DC) 
 	MAKE_STD_ZVAL(element);
 	array_init(element);
 
+	/* parse each contained value */
 	for (value = php_memnstr(space, "[", 1, end); value != NULL && value <= end; value = php_memnstr(value + 1, ";", 1, end)) {
 		do {
 			value++;
 		} while (*value == ' ' && value <= end);
 
 		if (value <= end && (value_end = php_memnstr(value, " ", 1, end)) != NULL && value_end <= end) {
-			key = estrndup(value_end + 1, 1);
-			add_assoc_stringl_ex(element, key, 2, value, value_end - value, 1);
-			efree(key);
+			add_next_index_stringl(element, value, value_end - value, 1);
 		}
 	}
 
+	/* add parsed values under key */
 	key = estrndup(start, space - start);
 	add_assoc_zval_ex(result, key, space - start + 1, element);
 	efree(key);
@@ -1324,8 +1340,9 @@ static int mmc_stats_parse_item(char *start, char *end, zval *result TSRMLS_DC) 
 
 static int mmc_stats_parse_generic(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
 {
-	char *space, *key, *val;
+	char *space, *key;
 
+	/* "stats maps" returns "\n" delimited lines, other commands uses "\r\n" */
 	if (*end == '\r') {
 		end--;
 	}
@@ -1788,12 +1805,12 @@ PHP_FUNCTION(memcache_add_server)
    Changes server parameters at runtime */
 PHP_FUNCTION(memcache_set_server_params)
 {
-	zval **connection, *mmc_object = getThis(), *failure_callback = NULL;
+	zval *mmc_object = getThis(), *failure_callback = NULL;
 	mmc_pool_t *pool;
 	mmc_t *mmc = NULL;
-	long port = INI_INT("memcache.default_port"), timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool status = 1;
-	int resource_type, host_len, i;
+	int host_len, i;
 	char *host, *failure_callback_name;
 
 	if (mmc_object) {
@@ -1864,11 +1881,11 @@ PHP_FUNCTION(memcache_set_server_params)
    Returns server status (0 if server is failed, otherwise non-zero) */
 PHP_FUNCTION(memcache_get_server_status)
 {
-	zval **connection, *mmc_object = getThis();
+	zval *mmc_object = getThis();
 	mmc_pool_t *pool;
 	mmc_t *mmc = NULL;
-	long port = INI_INT("memcache.default_port");
-	int resource_type, host_len, i;
+	long port = MEMCACHE_G(default_port);
+	int host_len, i;
 	char *host;
 
 	if (mmc_object) {

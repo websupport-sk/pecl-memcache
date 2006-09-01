@@ -22,15 +22,13 @@ var_dump($result);
 $result = $memcache->getStats('malloc');
 var_dump($result['arena_size']);
 
-$result = $memcache->getStats('maps');
-var_dump(key($result));
-var_dump(reset($result));
-
 $result = $memcache->getStats('cachedump', 6, 10);
-var_dump($result[key($result)]['b']);
+var_dump($result[key($result)][0]);
+var_dump($result[key($result)][1]);
 
 $result = $memcache->getStats('slabs');
 var_dump($result['6']['chunk_size']);
+var_dump($result['6']['free_chunks_end']);
 
 $result = $memcache->getStats('items');
 var_dump($result['items']['6']['number']);
@@ -53,8 +51,8 @@ string(%d) "%d"
 bool(false)
 bool(true)
 string(%d) "%d"
-string(%d) "%x-%x"
-string(%d) "%s %d %d:%d %d %s"
+string(%d) "%d"
+string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
