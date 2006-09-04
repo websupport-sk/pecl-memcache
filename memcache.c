@@ -375,6 +375,7 @@ static mmc_pool_t *mmc_pool_new() /* {{{ */
 	pool->num_buckets = 0;
 	pool->compress_threshold = 0;
 	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
+	pool->id = zend_list_insert(pool, le_memcache_pool);
 	return pool;
 }
 /* }}} */
@@ -515,7 +516,7 @@ static int mmc_get_pool(zval *id, mmc_pool_t **pool TSRMLS_DC) /* {{{ */
 	zval **connection;
 	int resource_type;
 
-	if (Z_TYPE_P(id) != IS_OBJECT || zend_hash_find(Z_OBJPROP_P(id), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
+	if (Z_TYPE_P(id) != IS_OBJECT || zend_hash_find(Z_OBJPROP_P(id), "connection", sizeof("connection"), (void **) &connection) == FAILURE) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "cannot find connection identifier");
 		return 0;
 	}
@@ -1279,8 +1280,8 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC) 
 
 		/* find existing or create subkey array in result */
 		if ((is_numeric_string(key, colon - start, &index, NULL, 0) &&
-			zend_hash_index_find(Z_ARRVAL_P(result), index, (void **)&elem) != FAILURE) ||
-			zend_hash_find(Z_ARRVAL_P(result), key, colon - start + 1, (void **)&elem) != FAILURE) {
+			zend_hash_index_find(Z_ARRVAL_P(result), index, (void **) &elem) != FAILURE) ||
+			zend_hash_find(Z_ARRVAL_P(result), key, colon - start + 1, (void **) &elem) != FAILURE) {
 			element = *elem;
 		}
 		else {
@@ -1653,10 +1654,10 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 
 static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{{ */
 {
-	zval *mmc_object = getThis();
+	zval **connection, *mmc_object = getThis();
 	mmc_t *mmc = NULL;
 	mmc_pool_t *pool;
-	int errnum = 0, host_len;
+	int resource_type, host_len, errnum = 0;
 	char *host, *error_string = NULL;
 	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT;
 
@@ -1684,17 +1685,26 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 		RETURN_FALSE;
 	}
 
-	/* initialize pool */
-	MMC_DEBUG(("php_mmc_connect: initializing server pool"));
-	pool = mmc_pool_new();
-	pool->id = zend_list_insert(pool, le_memcache_pool);
-	mmc_pool_add(pool, mmc, 1);
-
-	if (mmc_object == NULL) {
+	/* initialize pool and object if need be */
+	if (!mmc_object) {
+		pool = mmc_pool_new();
+		mmc_pool_add(pool, mmc, 1);
 		object_init_ex(return_value, memcache_class_entry_ptr);
 		add_property_resource(return_value, "connection", pool->id);
 	}
+	else if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **) &connection) != FAILURE) {
+		pool = (mmc_pool_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
+		if (!pool || resource_type != le_memcache_pool) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "connection identifier not found");
+			RETURN_FALSE;
+		}
+
+		mmc_pool_add(pool, mmc, 1);
+		RETURN_TRUE;
+	}
 	else {
+		pool = mmc_pool_new();
+		mmc_pool_add(pool, mmc, 1);
 		add_property_resource(mmc_object, "connection", pool->id);
 		RETURN_TRUE;
 	}
@@ -1778,17 +1788,11 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	/* initialize pool if need be */
-	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
-		MMC_DEBUG(("mmc_add_connection: initialized and appended server to empty pool"));
-
+	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **) &connection) == FAILURE) {
 		pool = mmc_pool_new();
-		pool->id = zend_list_insert(pool, le_memcache_pool);
-
 		add_property_resource(mmc_object, "connection", pool->id);
 	}
 	else {
-		MMC_DEBUG(("memcache_add_server: appended server to pool"));
-
 		pool = (mmc_pool_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
 		if (!pool || resource_type != le_memcache_pool) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "connection identifier not found");
