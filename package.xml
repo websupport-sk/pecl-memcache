@@ -31,7 +31,9 @@
 			- Individual server params and up/down status may be changed at runtime
 			- New methods: setServerParams(), getServerStatus()
 			- Statistics methods support fetching other kinds of stats (slabs, items, cachedump, ...)
-			- Fixed PECL bugs #7631, #8117 (errorous line feeds in config.m4)
+			- Fixed PECL bugs #7631, #8117 (erroneous line feeds in config.m4)
+			- Added memcache.max_failover_attempts ini directive, which can be used to configure max number of 
+			  servers to try when setting and getting data.
 		</notes>
 	</release>
 	<filelist>

@@ -140,9 +140,24 @@ static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdateFailoverAttempts) /* {{{ */
+{
+	long int lval;
+
+	lval = strtol(new_value, NULL, 10);
+	if (lval <= 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.max_failover_attempts must be a positive integer ('%s' given)", new_value);
+		return FAILURE;
+	}
+
+	return OnUpdateLong(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.allow_failover",	"1",		PHP_INI_ALL, OnUpdateLong,		allow_failover,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.max_failover_attempts",	"20",	PHP_INI_ALL, OnUpdateFailoverAttempts,		max_failover_attempts,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.default_port",		"11211",	PHP_INI_ALL, OnUpdateLong,		default_port,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.chunk_size",		"8192",		PHP_INI_ALL, OnUpdateChunkSize,	chunk_size,		zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
@@ -726,7 +741,7 @@ static mmc_t *mmc_server_find(mmc_pool_t *pool, char *key, int key_len TSRMLS_DC
 		mmc = pool->buckets[hash % pool->num_buckets];
 
 		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && (i<20 || i<pool->num_buckets) && MEMCACHE_G(allow_failover); i++) {
+		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && i<pool->num_buckets && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
 			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
 			int next_len = sprintf(next_key, "%d%s", i+1, key);
 			MMC_DEBUG(("mmc_server_find: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
@@ -1077,7 +1092,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 
 			smart_str_free(&(pool->requests[j]->outbuf));
 		}
-	} while (result_status < 0 && i++ < 20);
+	} while (result_status < 0 && i++ < MEMCACHE_G(max_failover_attempts));
 
 	return result_status;
 }

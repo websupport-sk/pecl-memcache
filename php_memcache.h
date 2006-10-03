@@ -109,6 +109,7 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long compression_level;
 	long allow_failover;
 	long chunk_size;
+	long max_failover_attempts;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #ifdef ZTS
