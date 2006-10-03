@@ -1092,7 +1092,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 
 			smart_str_free(&(pool->requests[j]->outbuf));
 		}
-	} while (result_status < 0 && i++ < MEMCACHE_G(max_failover_attempts));
+	} while (result_status < 0 && MEMCACHE_G(allow_failover) && i++ < MEMCACHE_G(max_failover_attempts));
 
 	return result_status;
 }
