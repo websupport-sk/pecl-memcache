@@ -24,7 +24,7 @@
 	</maintainers>
 	<release>
 		<version>2.1.0</version>
-		<date>2006-xx-xx</date>
+		<date>2006-10-09</date>
 		<state>stable</state>
 		<notes>
 			- Servers may be flagged up/down and the user may specify a error callback
