@@ -26,17 +26,22 @@ var_dump($result2);
 var_dump($result3);
 var_dump($result4);
 
+$result = $memcache->get(array('load_test_key1','load_test_key2'));
+var_dump($result);
+
 ini_set('memcache.allow_failover', 0);
 
-$result5 = $memcache->get('load_test_key1');
-$result6 = $memcache->get('load_test_key2');
+$result1 = $memcache->get('load_test_key1');
+$result2 = $memcache->get('load_test_key2');
 
-var_dump($result5);
-var_dump($result6);
+var_dump($result1);
+var_dump($result2);
 
-$result7 = ini_set('memcache.allow_failover', "abc");
+$result = $memcache->get(array('load_test_key1','load_test_key2'));
+var_dump($result);
 
-var_dump($result7);
+$result = ini_set('memcache.allow_failover', "abc");
+var_dump($result);
 
 ?>
 --EXPECTF--
@@ -44,6 +49,16 @@ bool(true)
 bool(true)
 string(5) "test1"
 string(5) "test2"
+array(2) {
+  ["load_test_key1"]=>
+  string(5) "test1"
+  ["load_test_key2"]=>
+  string(5) "test2"
+}
 bool(false)
 string(5) "test2"
+array(1) {
+  ["load_test_key2"]=>
+  string(5) "test2"
+}
 string(1) "0"

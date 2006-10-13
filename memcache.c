@@ -208,7 +208,7 @@ static char * mmc_get_version(mmc_t * TSRMLS_DC);
 static int mmc_str_left(char *, char *, int, int);
 static int mmc_sendcmd(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_exec_storage_cmd(mmc_t *, char *, int, char *, int, int, int, char *, int TSRMLS_DC);
-static int mmc_parse_response(char *, char **, int *, int, int *, int *);
+static int mmc_parse_response(char *, int, char **, int *, int *, int *);
 static int mmc_exec_retrieval_cmd(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
 static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
 static int mmc_read_value(mmc_t *, char **, int *, zval ** TSRMLS_DC);
@@ -429,7 +429,7 @@ static void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* {
 
 static int mmc_compress(char **result_data, unsigned long *result_len, char *data, int data_len TSRMLS_DC) /* {{{ */
 {
-	int   status, level = MEMCACHE_G(compression_level);
+	int status, level = MEMCACHE_G(compression_level);
 
 	*result_len = data_len + (data_len / 1000) + 25 + 1; /* some magic from zlib.c */
 	*result_data = (char *) emalloc(*result_len);
@@ -773,43 +773,43 @@ static int mmc_close(mmc_t *mmc TSRMLS_DC) /* {{{ */
 
 static int mmc_readline(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
-	char *buf;
+	char *response;
+	size_t response_len;
 
 	if (mmc->stream == NULL) {
 		MMC_DEBUG(("mmc_readline: socket is already closed"));
 		return -1;
 	}
 
-	buf = php_stream_gets(mmc->stream, mmc->inbuf, MMC_BUF_SIZE);
-	if (buf) {
+	response = php_stream_get_line(mmc->stream, mmc->inbuf, MMC_BUF_SIZE, &response_len);
+	if (response) {
 		MMC_DEBUG(("mmc_readline: read data:"));
 		MMC_DEBUG(("mmc_readline:---"));
-		MMC_DEBUG(("%s", buf));
+		MMC_DEBUG(("%s", response));
 		MMC_DEBUG(("mmc_readline:---"));
-		return strlen(buf);
+		return response_len;
 	}
-	else {
-		MMC_DEBUG(("mmc_readline: cannot read a line from the server"));
-		return -1;
-	}
+
+	MMC_DEBUG(("mmc_readline: cannot read a line from the server"));
+	return -1;
 }
 /* }}} */
 
 static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	char *version_str;
-	int len;
+	int response_len;
 
 	if (mmc_sendcmd(mmc, "version", sizeof("version") - 1 TSRMLS_CC) < 0) {
 		return NULL;
 	}
 
-	if ((len = mmc_readline(mmc TSRMLS_CC)) < 0) {
+	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0) {
 		return NULL;
 	}
 
-	if (mmc_str_left(mmc->inbuf,"VERSION ", len, sizeof("VERSION ") - 1)) {
-		version_str = estrndup(mmc->inbuf + sizeof("VERSION ") - 1, len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1) );
+	if (mmc_str_left(mmc->inbuf,"VERSION ", response_len, sizeof("VERSION ") - 1)) {
+		version_str = estrndup(mmc->inbuf + sizeof("VERSION ") - 1, response_len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1) );
 		return version_str;
 	}
 
@@ -858,14 +858,13 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC) /* {{{
 }
 /* }}}*/
 
-static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char *key, int key_len, int flags, int expire, char *data, int data_len TSRMLS_DC) /* {{{ */
+static int mmc_exec_storage_cmd(mmc_t *mmc, char *cmd, int cmd_len, char *key, int key_len, int flags, int expire, char *data, int data_len TSRMLS_DC) /* {{{ */
 {
-	char *real_command;
-	int size;
-	int response_buf_size;
+	char *command;
+	int command_len, response_len;
 
-	real_command = emalloc(
-							  command_len
+	command = emalloc(
+							  cmd_len
 							+ 1				/* space */
 							+ key_len
 							+ 1				/* space */
@@ -880,26 +879,26 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 							+ 1
 							);
 
-	size = sprintf(real_command, "%s %s %d %d %d\r\n", command, key, flags, expire, data_len);
+	command_len = sprintf(command, "%s %s %d %d %d\r\n", cmd, key, flags, expire, data_len);
 
-	memcpy(real_command + size, data, data_len);
-	memcpy(real_command + size + data_len, "\r\n", sizeof("\r\n") - 1);
-	size = size + data_len + sizeof("\r\n") - 1;
-	real_command[size] = '\0';
+	memcpy(command + command_len, data, data_len);
+	memcpy(command + command_len + data_len, "\r\n", sizeof("\r\n") - 1);
+	command_len += data_len + sizeof("\r\n") - 1;
+	command[command_len] = '\0';
 
-	MMC_DEBUG(("mmc_exec_storage_cmd: store cmd is '%s'", real_command));
+	MMC_DEBUG(("mmc_exec_storage_cmd: store cmd is '%s'", command));
 	MMC_DEBUG(("mmc_exec_storage_cmd: trying to store '%s', %d bytes", data, data_len));
 
 	/* send command & data */
-	if (php_stream_write(mmc->stream, real_command, size) != size) {
+	if (php_stream_write(mmc->stream, command, command_len) != command_len) {
 		MMC_DEBUG(("failed to send command and data to the server"));
-		efree(real_command);
+		efree(command);
 		return -1;
 	}
-	efree(real_command);
+	efree(command);
 
 	/* get server's response */
-	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) < 0) {
+	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0) {
 		MMC_DEBUG(("failed to read the server's response"));
 		return -1;
 	}
@@ -907,17 +906,17 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 	MMC_DEBUG(("mmc_exec_storage_cmd: response is '%s'", mmc->inbuf));
 
 	/* stored or not? */
-	if(mmc_str_left(mmc->inbuf,"STORED", response_buf_size, sizeof("STORED") - 1)) {
+	if(mmc_str_left(mmc->inbuf,"STORED", response_len, sizeof("STORED") - 1)) {
 		return 1;
 	}
 
 	/* not stored, return FALSE */
-	if(mmc_str_left(mmc->inbuf,"NOT_STORED", response_buf_size, sizeof("NOT_STORED") - 1)) {
+	if(mmc_str_left(mmc->inbuf,"NOT_STORED", response_len, sizeof("NOT_STORED") - 1)) {
 		return 0;
 	}
 
 	/* return FALSE without failover */
-	if (mmc_str_left(mmc->inbuf, "SERVER_ERROR out of memory", response_buf_size, sizeof("SERVER_ERROR out of memory") - 1)) {
+	if (mmc_str_left(mmc->inbuf, "SERVER_ERROR out of memory", response_len, sizeof("SERVER_ERROR out of memory") - 1)) {
 		return 0;
 	}
 
@@ -926,7 +925,7 @@ static int mmc_exec_storage_cmd(mmc_t *mmc, char *command, int command_len, char
 }
 /* }}} */
 
-static int mmc_parse_response(char *response, char **key, int *key_len, int response_len, int *flags, int *value_len) /* {{{ */
+static int mmc_parse_response(char *response, int response_len, char **key, int *key_len, int *flags, int *value_len) /* {{{ */
 {
 	int i=0, n=0;
 	int spaces[3];
@@ -937,13 +936,9 @@ static int mmc_parse_response(char *response, char **key, int *key_len, int resp
 
 	MMC_DEBUG(("mmc_parse_response: got response '%s'", response));
 
-	for (i = 0; i < response_len; i++) {
+	for (i=0, n=0; i < response_len && n < 3; i++) {
 		if (response[i] == ' ') {
-			spaces[n] = i;
-			n++;
-			if (n == 3) {
-				break;
-			}
+			spaces[n++] = i;
 		}
 	}
 
@@ -982,23 +977,21 @@ static int mmc_parse_response(char *response, char **key, int *key_len, int resp
 static int mmc_exec_retrieval_cmd(mmc_pool_t *pool, zval *key, zval **return_value TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
-	char *request;
-	int result = -1, request_len, response_len;
+	char *command;
+	int result = -1, command_len, response_len;
 
 	MMC_DEBUG(("mmc_exec_retrieval_cmd: key '%s'", Z_STRVAL_P(key)));
 
 	convert_to_string(key);
 	MMC_PREPARE_KEY(Z_STRVAL_P(key), Z_STRLEN_P(key));
 
-	/* get + ' ' + key + \0 */
-	request = emalloc(sizeof("get") + Z_STRLEN_P(key) + 1);
-	request_len = sprintf(request, "get %s", Z_STRVAL_P(key));
+	command_len = spprintf(&command, 0, "get %s", Z_STRVAL_P(key));
 
 	while (result < 0 && (mmc = mmc_server_find(pool, Z_STRVAL_P(key), Z_STRLEN_P(key) TSRMLS_CC)) != NULL) {
 		MMC_DEBUG(("mmc_exec_retrieval_cmd: found server '%s:%d' for key '%s'", mmc->host, mmc->port, Z_STRVAL_P(key)));
 
 		/* send command and read value */
-		if ((result = mmc_sendcmd(mmc, request, request_len TSRMLS_CC)) > 0 &&
+		if ((result = mmc_sendcmd(mmc, command, command_len TSRMLS_CC)) > 0 &&
 			(result = mmc_read_value(mmc, NULL, NULL, return_value TSRMLS_CC)) >= 0) {
 
 			/* not found */
@@ -1016,7 +1009,7 @@ static int mmc_exec_retrieval_cmd(mmc_pool_t *pool, zval *key, zval **return_val
 		}
 	}
 
-	efree(request);
+	efree(command);
 	return result;
 }
 /* }}} */
@@ -1114,7 +1107,7 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSR
 		return 0;
 	}
 
-	if (mmc_parse_response(mmc->inbuf, key, key_len, response_len, &flags, &data_len) < 0) {
+	if (mmc_parse_response(mmc->inbuf, response_len, key, key_len, &flags, &data_len) < 0) {
 		return -1;
 	}
 
@@ -1173,7 +1166,7 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSR
 		php_unserialize_data_t var_hash;
 		PHP_VAR_UNSERIALIZE_INIT(var_hash);
 
-		if (!php_var_unserialize(value, (const unsigned char **)&tmp, tmp + data_len, &var_hash TSRMLS_CC)) {
+		if (!php_var_unserialize(value, (const unsigned char **)&tmp, (const unsigned char *)(tmp + data_len), &var_hash TSRMLS_CC)) {
 			MMC_DEBUG(("Error at offset %d of %d bytes", tmp - data, data_len));
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 			if (key) {
@@ -1196,59 +1189,42 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSR
 
 static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC) /* {{{ */
 {
-	char *real_command;
-	int size, response_buf_size;
+	char *command;
+	int command_len, response_len;
 
-	real_command = emalloc(
-							  sizeof("delete") - 1
-							+ 1						/* space */
-							+ key_len
-							+ 1						/* space */
-							+ MAX_LENGTH_OF_LONG
-							+ 1
-							);
-
-	size = sprintf(real_command, "delete %s %d", key, time);
-
-	real_command [size] = '\0';
+	command_len = spprintf(&command, 0, "delete %s %d", key, time);
 
 	MMC_DEBUG(("mmc_delete: trying to delete '%s'", key));
 
-	/* drop it! =) */
-	if (mmc_sendcmd(mmc, real_command, size TSRMLS_CC) < 0) {
-		efree(real_command);
+	if (mmc_sendcmd(mmc, command, command_len TSRMLS_CC) < 0) {
+		efree(command);
 		return -1;
 	}
-	efree(real_command);
+	efree(command);
 
-	/* get server's response */
-	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) < 0){
+	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0){
 		MMC_DEBUG(("failed to read the server's response"));
 		return -1;
 	}
 
 	MMC_DEBUG(("mmc_delete: server's response is '%s'", mmc->inbuf));
 
-	/* ok? */
-	if(mmc_str_left(mmc->inbuf,"DELETED", response_buf_size, sizeof("DELETED") - 1)) {
+	if(mmc_str_left(mmc->inbuf,"DELETED", response_len, sizeof("DELETED") - 1)) {
 		return 1;
 	}
 
-	if(mmc_str_left(mmc->inbuf,"NOT_FOUND", response_buf_size, sizeof("NOT_FOUND") - 1)) {
-		/* return 0, if such wasn't found */
+	if(mmc_str_left(mmc->inbuf,"NOT_FOUND", response_len, sizeof("NOT_FOUND") - 1)) {
 		return 0;
 	}
 
 	MMC_DEBUG(("failed to delete item"));
-
-	/* hmm.. */
 	return -1;
 }
 /* }}} */
 
 static int mmc_flush(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
-	int response_buf_size;
+	int response_len;
 
 	MMC_DEBUG(("mmc_flush: flushing the cache"));
 
@@ -1257,20 +1233,17 @@ static int mmc_flush(mmc_t *mmc TSRMLS_DC) /* {{{ */
 	}
 
 	/* get server's response */
-	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) < 0){
+	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0){
 		return -1;
 	}
 
 	MMC_DEBUG(("mmc_flush: server's response is '%s'", mmc->inbuf));
 
-	/* ok? */
-	if(mmc_str_left(mmc->inbuf,"OK", response_buf_size, sizeof("OK") - 1)) {
+	if(mmc_str_left(mmc->inbuf, "OK", response_len, sizeof("OK") - 1)) {
 		return 1;
 	}
 
 	MMC_DEBUG(("failed to flush server's cache"));
-
-	/* hmm.. */
 	return -1;
 }
 /* }}} */
@@ -1455,59 +1428,45 @@ static int mmc_get_stats(mmc_t *mmc, char *type, int slabid, int limit, zval *re
 
 static int mmc_incr_decr (mmc_t *mmc, int cmd, char *key, int key_len, int value, long *number TSRMLS_DC) /* {{{ */
 {
-	char *command, *command_name;
-	int  cmd_len, response_buf_size;
-
-	/* 4 is for strlen("incr") or strlen("decr"), doesn't matter */
-	command = emalloc(4 + key_len + MAX_LENGTH_OF_LONG + 1);
+	char *command;
+	int  command_len, response_len;
 
 	if (cmd > 0) {
-		command_name = emalloc(sizeof("incr"));
-		sprintf(command_name, "incr");
-		cmd_len = sprintf(command, "incr %s %d", key, value);
+		command_len = spprintf(&command, 0, "incr %s %d", key, value);
 	}
 	else {
-		command_name = emalloc(sizeof("decr"));
-		sprintf(command_name, "decr");
-		cmd_len = sprintf(command, "decr %s %d", key, value);
+		command_len = spprintf(&command, 0, "decr %s %d", key, value);
 	}
 
-	if (mmc_sendcmd(mmc, command, cmd_len TSRMLS_CC) < 0) {
+	if (mmc_sendcmd(mmc, command, command_len TSRMLS_CC) < 0) {
 		efree(command);
-		efree(command_name);
 		return -1;
 	}
 	efree(command);
 
-	if ((response_buf_size = mmc_readline(mmc TSRMLS_CC)) < 0) {
+	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0) {
 		MMC_DEBUG(("failed to read the server's response"));
-		efree(command_name);
 		return -1;
 	}
 
 	MMC_DEBUG(("mmc_incr_decr: server's answer is: '%s'", mmc->inbuf));
-	if (mmc_str_left(mmc->inbuf, "NOT_FOUND", response_buf_size, sizeof("NOT_FOUND") - 1)) {
-		MMC_DEBUG(("failed to %sement variable - item with such key not found", command_name));
-		efree(command_name);
+	if (mmc_str_left(mmc->inbuf, "NOT_FOUND", response_len, sizeof("NOT_FOUND") - 1)) {
+		MMC_DEBUG(("failed to %sement variable - item with such key not found", cmd > 0 ? "incr" : "decr"));
 		return 0;
 	}
-	else if (mmc_str_left(mmc->inbuf, "ERROR", response_buf_size, sizeof("ERROR") - 1)) {
-		MMC_DEBUG(("failed to %sement variable - an error occured", command_name));
-		efree(command_name);
+	else if (mmc_str_left(mmc->inbuf, "ERROR", response_len, sizeof("ERROR") - 1)) {
+		MMC_DEBUG(("failed to %sement variable - an error occured", cmd > 0 ? "incr" : "decr"));
 		return -1;
 	}
-	else if (mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_buf_size, sizeof("CLIENT_ERROR") - 1)) {
-		MMC_DEBUG(("failed to %sement variable - client error occured", command_name));
-		efree(command_name);
+	else if (mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_len, sizeof("CLIENT_ERROR") - 1)) {
+		MMC_DEBUG(("failed to %sement variable - client error occured", cmd > 0 ? "incr" : "decr"));
 		return -1;
 	}
-	else if (mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_buf_size, sizeof("SERVER_ERROR") - 1)) {
-		MMC_DEBUG(("failed to %sement variable - server error occured", command_name));
-		efree(command_name);
+	else if (mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_len, sizeof("SERVER_ERROR") - 1)) {
+		MMC_DEBUG(("failed to %sement variable - server error occured", cmd > 0 ? "incr" : "decr"));
 		return -1;
 	}
 
-	efree(command_name);
 	*number = (long)atol(mmc->inbuf);
 	return 1;
 }
