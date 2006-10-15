@@ -8,13 +8,17 @@ memcache::connect() with unix domain socket
 include 'connect.inc';
 
 $memcache = new Memcache();
-$result = $memcache->connect($domainsocket, 0);
+$result = $memcache->addServer($domainsocket, 0);
 var_dump($result);
 
 $result1 = $memcache->set('test_key', 'abc');
 $result2 = $memcache->get('test_key');
 var_dump($result1);
 var_dump($result2);
+
+$memcache = new Memcache();
+$result = $memcache->connect($domainsocket, 0);
+var_dump($result);
 
 $memcache = memcache_connect($domainsocket, null);
 var_dump($result);
@@ -24,4 +28,5 @@ var_dump($result);
 bool(true)
 bool(true)
 string(3) "abc"
+bool(true)
 bool(true)
