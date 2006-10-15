@@ -561,12 +561,15 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	tv.tv_sec = mmc->timeout;
 	tv.tv_usec = 0;
 
-	hostname = emalloc(strlen(mmc->host) + MAX_LENGTH_OF_LONG + 1 + 1);
-	hostname_len = sprintf(hostname, "%s:%d", mmc->host, mmc->port);
+	if (mmc->port) {
+		hostname_len = spprintf(&hostname, 0, "%s:%d", mmc->host, mmc->port);
+	}
+	else {
+		hostname_len = spprintf(&hostname, 0, "%s", mmc->host);
+	}
 
 	if (mmc->persistent) {
-		hash_key = emalloc(sizeof("mmc_open___") - 1 + hostname_len + 1);
-		sprintf(hash_key, "mmc_open___%s", hostname);
+		spprintf(&hash_key, "mmc_open___%s", hostname);
 	}
 
 #if PHP_API_VERSION > 20020918
@@ -808,7 +811,7 @@ static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
 		return NULL;
 	}
 
-	if (mmc_str_left(mmc->inbuf,"VERSION ", response_len, sizeof("VERSION ") - 1)) {
+	if (mmc_str_left(mmc->inbuf, "VERSION ", response_len, sizeof("VERSION ") - 1)) {
 		version_str = estrndup(mmc->inbuf + sizeof("VERSION ") - 1, response_len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1) );
 		return version_str;
 	}
