@@ -213,7 +213,7 @@ static int mmc_exec_retrieval_cmd(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
 static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
 static int mmc_read_value(mmc_t *, char **, int *, zval ** TSRMLS_DC);
 static int mmc_delete(mmc_t *, char *, int, int TSRMLS_DC);
-static int mmc_flush(mmc_t * TSRMLS_DC);
+static int mmc_flush(mmc_t *, int TSRMLS_DC);
 static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *, int);
 static int mmc_get_stats(mmc_t *, char *, int, int, zval * TSRMLS_DC);
 static int mmc_incr_decr(mmc_t *, int, char *, int, int, long * TSRMLS_DC);
@@ -569,7 +569,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	}
 
 	if (mmc->persistent) {
-		spprintf(&hash_key, "mmc_open___%s", hostname);
+		spprintf(&hash_key, 0, "memcache:%s", hostname);
 	}
 
 #if PHP_API_VERSION > 20020918
@@ -660,7 +660,7 @@ static int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *err
 			 * TODO: use client callback on successful reconnect to allow user to specify behaviour
 			 */
 			if (mmc->retry_interval >= 0 && (long)time(NULL) >= mmc->failed + mmc->retry_interval) {
-				if (_mmc_open(mmc, error_string, errnum TSRMLS_CC) /*&& mmc_flush(mmc TSRMLS_CC) > 0*/) {
+				if (_mmc_open(mmc, error_string, errnum TSRMLS_CC) /*&& mmc_flush(mmc, 0 TSRMLS_CC) > 0*/) {
 					return 1;
 				}
 				mmc_server_deactivate(mmc TSRMLS_CC);
@@ -1225,15 +1225,25 @@ static int mmc_delete(mmc_t *mmc, char *key, int key_len, int time TSRMLS_DC) /*
 }
 /* }}} */
 
-static int mmc_flush(mmc_t *mmc TSRMLS_DC) /* {{{ */
+static int mmc_flush(mmc_t *mmc, int timestamp TSRMLS_DC) /* {{{ */
 {
-	int response_len;
+	char *command;
+	int command_len, response_len;
 
 	MMC_DEBUG(("mmc_flush: flushing the cache"));
 
-	if (mmc_sendcmd(mmc, "flush_all", sizeof("flush_all") - 1 TSRMLS_CC) < 0) {
+	if (timestamp) {
+		command_len = spprintf(&command, 0, "flush_all %d", timestamp);
+	}
+	else {
+		command_len = spprintf(&command, 0, "flush_all");
+	}
+
+	if (mmc_sendcmd(mmc, command, command_len TSRMLS_CC) < 0) {
+		efree(command);
 		return -1;
 	}
+	efree(command);
 
 	/* get server's response */
 	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0){
@@ -2303,16 +2313,22 @@ PHP_FUNCTION(memcache_close)
 }
 /* }}} */
 
-/* {{{ proto bool memcache_flush( object memcache )
-   Flushes cache */
+/* {{{ proto bool memcache_flush( object memcache [, int timestamp ] )
+   Flushes cache, optionally at the specified time */
 PHP_FUNCTION(memcache_flush)
 {
 	mmc_pool_t *pool;
 	int i, failures = 0;
 	zval *mmc_object = getThis();
+	long timestamp = 0;
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O", &mmc_object, memcache_class_entry_ptr) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|l", &mmc_object, memcache_class_entry_ptr, &timestamp) == FAILURE) {
+			return;
+		}
+	}
+	else {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|l", &timestamp) == FAILURE) {
 			return;
 		}
 	}
@@ -2322,7 +2338,7 @@ PHP_FUNCTION(memcache_flush)
 	}
 
 	for (i=0; i<pool->num_servers; i++) {
-		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_flush(pool->servers[i] TSRMLS_CC) < 0) {
+		if (!mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC) || mmc_flush(pool->servers[i], timestamp TSRMLS_CC) < 0) {
 			if (mmc_server_failure(pool->servers[i] TSRMLS_CC)) {
 				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", pool->servers[i]->host, pool->servers[i]->port);
 			}

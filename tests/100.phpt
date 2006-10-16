@@ -11,18 +11,49 @@ memcache->flush()
 
 include 'connect.inc';
 
+// Test flush in future
+$memcache = new Memcache();
+$memcache->addServer($host, $port);
+
+$result1 = $memcache->set('test_key', 'abc');
+$result2 = $memcache->get('test_key');
+var_dump($result1);
+var_dump($result2);
+
+$result = $memcache->flush(time()+3);
+var_dump($result);
+
+sleep(2);
+
+$result = $memcache->get('test_key');
+var_dump($result);
+
+sleep(2);
+
+$result = $memcache->get('test_key');
+var_dump($result);
+
+// Test partly failing flush
+$memcache = new Memcache();
+$memcache->addServer($host, $port);
 $memcache->addServer($nonExistingHost, $nonExistingPort);
 
-$result1 = @$memcache->flush();
-var_dump($result1);
+$result = @$memcache->flush();
+var_dump($result);
 
-$memcache2 = new Memcache();
-$memcache2->addServer($nonExistingHost, $nonExistingPort);
+// Test failing flush
+$memcache = new Memcache();
+$memcache->addServer($nonExistingHost, $nonExistingPort);
 
-$result2 = @$memcache2->flush();
-var_dump($result2);
+$result = @$memcache->flush();
+var_dump($result);
 
 ?>
 --EXPECT--
+bool(true)
+string(3) "abc"
+bool(true)
+string(3) "abc"
+bool(false)
 bool(true)
 bool(false)
