@@ -10,6 +10,12 @@ include 'connect.inc';
 $var = 'test';
 
 $memcache = new Memcache();
+$result1 = @$memcache->set('test_key', 'test');
+$result2 = @$memcache->get('test_key');
+
+var_dump($result1);
+var_dump($result2);
+
 $result1 = $memcache->addServer($host, $port, true, 1, 1, 15);
 $result2 = $memcache->connect($host2, $port2);
 
@@ -25,6 +31,8 @@ var_dump(count($result5));
 
 ?>
 --EXPECT--
+bool(false)
+bool(false)
 bool(true)
 bool(true)
 bool(true)

@@ -36,6 +36,7 @@ extern zend_module_entry memcache_module_entry;
 #endif
 
 #include "ext/standard/php_smart_str_public.h"
+#include "ext/session/php_session.h"
 
 PHP_MINIT_FUNCTION(memcache);
 PHP_MSHUTDOWN_FUNCTION(memcache);
@@ -91,7 +92,6 @@ typedef struct mmc {
 } mmc_t;
 
 typedef struct mmc_pool {
-	int						id;
 	mmc_t					**servers;
 	int						num_servers;
 	mmc_t					**buckets;
@@ -111,6 +111,26 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long chunk_size;
 	long max_failover_attempts;
 ZEND_END_MODULE_GLOBALS(memcache)
+
+/* internal functions */
+mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int TSRMLS_DC);
+mmc_t *mmc_find_persistent(char *, int, int, int, int TSRMLS_DC);
+int mmc_server_failure(mmc_t * TSRMLS_DC);
+
+mmc_pool_t *mmc_pool_new();
+void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
+void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
+mmc_t *mmc_pool_find(mmc_pool_t *, const char *, int TSRMLS_DC);
+int mmc_pool_store(mmc_pool_t *, const char *, int, const char *, int, int, int, const char *, int TSRMLS_DC);
+
+int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval ** TSRMLS_DC);
+int mmc_delete(mmc_t *, const char *, int, int TSRMLS_DC);
+
+/* session handler struct */
+extern ps_module ps_mod_memcache;
+#define ps_memcache_ptr &ps_mod_memcache
+
+PS_FUNCS(memcache);
 
 #ifdef ZTS
 #define MEMCACHE_G(v) TSRMG(memcache_globals_id, zend_memcache_globals *, v)

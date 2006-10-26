@@ -10,6 +10,15 @@ PHP_ARG_WITH(zlib-dir, for the location of ZLIB,
 [  --with-zlib-dir[=DIR]   memcache: Set the path to ZLIB install prefix.], no, no)
 fi
 
+if test -z "$PHP_DEBUG"; then
+  AC_ARG_ENABLE(debug,
+  [  --enable-debug          compile with debugging symbols],[
+    PHP_DEBUG=$enableval
+  ],[
+    PHP_DEBUG=no
+  ]) 
+fi
+
 if test "$PHP_MEMCACHE" != "no"; then
 
   if test "$PHP_ZLIB_DIR" != "no" && test "$PHP_ZLIB_DIR" != "yes"; then
@@ -44,6 +53,10 @@ if test "$PHP_MEMCACHE" != "no"; then
     PHP_ADD_INCLUDE($PHP_ZLIB_INCDIR)
   fi
 
+  if test "$PHP_DEBUG" = "yes"; then
+    CFLAGS="$CFLAGS -Wall"
+  fi
+
   AC_DEFINE(HAVE_MEMCACHE,1,[Whether you want memcache support])
-  PHP_NEW_EXTENSION(memcache, memcache.c, $ext_shared)
+  PHP_NEW_EXTENSION(memcache, memcache.c session.c, $ext_shared)
 fi
