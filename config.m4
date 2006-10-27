@@ -52,11 +52,20 @@ if test "$PHP_MEMCACHE" != "no"; then
     PHP_ADD_LIBRARY_WITH_PATH(z, $PHP_ZLIB_DIR/lib, MEMCACHE_SHARED_LIBADD)
     PHP_ADD_INCLUDE($PHP_ZLIB_INCDIR)
   fi
+  
+  dnl # optional session support
+  CPPFLAGS="$CPPFLAGS $INCLUDES"
+  AC_CHECK_HEADERS(php.h ext/session/php_session.h,,,
+  [[
+  #if HAVE_PHP_H
+  #include "php.h"
+  #endif
+  ]])
 
   if test "$PHP_DEBUG" = "yes"; then
     CFLAGS="$CFLAGS -Wall"
   fi
 
   AC_DEFINE(HAVE_MEMCACHE,1,[Whether you want memcache support])
-  PHP_NEW_EXTENSION(memcache, memcache.c session.c, $ext_shared)
+  PHP_NEW_EXTENSION(memcache, memcache.c memcache_session.c, $ext_shared)
 fi

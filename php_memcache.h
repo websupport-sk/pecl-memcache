@@ -36,7 +36,6 @@ extern zend_module_entry memcache_module_entry;
 #endif
 
 #include "ext/standard/php_smart_str_public.h"
-#include "ext/session/php_session.h"
 
 PHP_MINIT_FUNCTION(memcache);
 PHP_MSHUTDOWN_FUNCTION(memcache);
@@ -127,10 +126,14 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval ** TSRMLS_DC);
 int mmc_delete(mmc_t *, const char *, int, int TSRMLS_DC);
 
 /* session handler struct */
+#if HAVE_EXT_SESSION_PHP_SESSION_H
+#include "ext/session/php_session.h"
+
 extern ps_module ps_mod_memcache;
 #define ps_memcache_ptr &ps_mod_memcache
 
 PS_FUNCS(memcache);
+#endif
 
 #ifdef ZTS
 #define MEMCACHE_G(v) TSRMG(memcache_globals_id, zend_memcache_globals *, v)

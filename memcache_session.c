@@ -23,7 +23,7 @@
 #include "config.h"
 #endif
 
-#if HAVE_MEMCACHE
+#if HAVE_MEMCACHE && HAVE_EXT_SESSION_PHP_SESSION_H
 
 #include <ctype.h>
 #include "php.h"
@@ -214,7 +214,7 @@ PS_GC_FUNC(memcache)
 }
 /* }}} */
 
-#endif /* HAVE_MEMCACHE */
+#endif /* HAVE_MEMCACHE && HAVE_EXT_SESSION_PHP_SESSION_H */
 /*
  * Local variables:
  * tab-width: 4
