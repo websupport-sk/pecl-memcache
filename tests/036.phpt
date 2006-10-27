@@ -1,7 +1,7 @@
 --TEST--
 ini_set('session.save_handler')
 --SKIPIF--
-<?php include 'connect.inc'; ?>
+<?php include 'connect.inc'; if (!MEMCACHE_HAVE_SESSION) print 'skip'; ?>
 --FILE--
 <?php
 
