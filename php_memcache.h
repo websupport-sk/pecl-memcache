@@ -126,7 +126,7 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval ** TSRMLS_DC);
 int mmc_delete(mmc_t *, const char *, int, int TSRMLS_DC);
 
 /* session handler struct */
-#if HAVE_EXT_SESSION_PHP_SESSION_H
+#if HAVE_MEMCACHE_SESSION
 #include "ext/session/php_session.h"
 
 extern ps_module ps_mod_memcache;

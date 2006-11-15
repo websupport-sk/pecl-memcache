@@ -23,17 +23,16 @@
 #include "config.h"
 #endif
 
-#if HAVE_MEMCACHE && HAVE_EXT_SESSION_PHP_SESSION_H
-
 #include <ctype.h>
 #include "php.h"
 #include "php_ini.h"
 #include "php_variables.h"
 
 #include "SAPI.h"
-#include "ext/session/php_session.h"
 #include "ext/standard/url.h"
 #include "php_memcache.h"
+
+#if HAVE_MEMCACHE_SESSION
 
 ps_module ps_mod_memcache = {
 	PS_MOD(memcache)
@@ -214,7 +213,7 @@ PS_GC_FUNC(memcache)
 }
 /* }}} */
 
-#endif /* HAVE_MEMCACHE && HAVE_EXT_SESSION_PHP_SESSION_H */
+#endif /* HAVE_MEMCACHE_SESSION */
 /*
  * Local variables:
  * tab-width: 4

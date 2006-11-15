@@ -43,10 +43,6 @@
 #include "php_network.h"
 #include "php_memcache.h"
 
-#if HAVE_EXT_SESSION_PHP_SESSION_H
-#include "ext/session/php_session.h"
-#endif
-
 #ifndef ZEND_ENGINE_2
 #define OnUpdateLong OnUpdateInt
 #endif
@@ -249,7 +245,7 @@ PHP_MINIT_FUNCTION(memcache)
 	REGISTER_LONG_CONSTANT("MEMCACHE_COMPRESSED", MMC_COMPRESSED, CONST_CS | CONST_PERSISTENT);
 	REGISTER_INI_ENTRIES();
 
-#if HAVE_EXT_SESSION_PHP_SESSION_H
+#if HAVE_MEMCACHE_SESSION
 	REGISTER_LONG_CONSTANT("MEMCACHE_HAVE_SESSION", 1, CONST_CS | CONST_PERSISTENT);
 	php_session_register_module(ps_memcache_ptr);
 #else
