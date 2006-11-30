@@ -1059,8 +1059,8 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 	mmc_t *mmc;
 	HashPosition pos;
 	zval **key, *value;
-	char *result_key;
-	int	i = 0, j, num_requests, result, result_status, result_key_len;
+	char *result_key, *str_key;
+	int	i = 0, j, num_requests, result, result_status, result_key_len, key_len;
 
 	array_init(*return_value);
 
@@ -1071,26 +1071,39 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 
 		/* first pass to build requests for each server */
 		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(keys), (void **) &key, &pos) == SUCCESS) {
-			if (Z_TYPE_PP(key) != IS_STRING) {
-				SEPARATE_ZVAL(key);
-				convert_to_string(*key);
+			if (Z_TYPE_PP(key) == IS_STRING) {
+				key_len = Z_STRLEN_PP(key);
+				str_key = estrndup(Z_STRVAL_PP(key), key_len);
+			} else {
+				zval *tmp;
+
+				ALLOC_ZVAL(tmp);
+				*tmp = **key;
+				zval_copy_ctor(tmp);
+				INIT_PZVAL(tmp);
+				convert_to_string(tmp);
+
+				key_len = Z_STRLEN_P(tmp);
+				str_key = estrndup(Z_STRVAL_P(tmp), key_len);
+				zval_dtor(tmp);
+				FREE_ZVAL(tmp);
 			}
 
-			MMC_PREPARE_KEY(Z_STRVAL_PP(key), Z_STRLEN_PP(key));
+			MMC_PREPARE_KEY(str_key, Z_STRLEN_PP(key));
 
 			/* schedule key if first round or if missing from result */
-			if ((!i || !zend_hash_exists(Z_ARRVAL_PP(return_value), Z_STRVAL_PP(key), Z_STRLEN_PP(key))) &&
-				(mmc = mmc_pool_find(pool, Z_STRVAL_PP(key), Z_STRLEN_PP(key) TSRMLS_CC)) != NULL) {
+			if ((!i || !zend_hash_exists(Z_ARRVAL_PP(return_value), str_key, key_len)) &&
+				(mmc = mmc_pool_find(pool, str_key, key_len TSRMLS_CC)) != NULL) {
 				if (!(mmc->outbuf.len)) {
 					smart_str_appendl(&(mmc->outbuf), "get", sizeof("get")-1);
 					pool->requests[num_requests++] = mmc;
 				}
 
 				smart_str_appendl(&(mmc->outbuf), " ", 1);
-				smart_str_appendl(&(mmc->outbuf), Z_STRVAL_PP(key), Z_STRLEN_PP(key));
-				MMC_DEBUG(("mmc_exec_retrieval_cmd_multi: scheduled key '%s' for '%s:%d' request length '%d'", Z_STRVAL_PP(key), mmc->host, mmc->port, mmc->outbuf.len));
+				smart_str_appendl(&(mmc->outbuf), str_key, key_len);
+				MMC_DEBUG(("mmc_exec_retrieval_cmd_multi: scheduled key '%s' for '%s:%d' request length '%d'", str_key, mmc->host, mmc->port, mmc->outbuf.len));
 			}
-
+			efree(str_key);
 			zend_hash_move_forward_ex(Z_ARRVAL_P(keys), &pos);
 		}
 
@@ -1528,19 +1541,19 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 	zval *var, *mmc_object = getThis();
 
 	int result, value_len, key_len;
-	char *value, *key;
+	char *value, *key_tmp, *key;
 	long flags = 0, expire = 0;
 
 	php_serialize_data_t var_hash;
 	smart_str buf = {0};
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Osz|ll", &mmc_object, memcache_class_entry_ptr, &key, &key_len, &var, &flags, &expire) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Osz|ll", &mmc_object, memcache_class_entry_ptr, &key_tmp, &key_len, &var, &flags, &expire) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|ll", &key, &key_len, &var, &flags, &expire) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|ll", &key_tmp, &key_len, &var, &flags, &expire) == FAILURE) {
 			return;
 		}
 	}
@@ -1548,8 +1561,6 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
 		RETURN_FALSE;
 	}
-
-	MMC_PREPARE_KEY(key, key_len);
 
 	switch (Z_TYPE_P(var)) {
 		case IS_STRING:
@@ -1581,7 +1592,11 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 			break;
 	}
 
+	key = estrndup(key_tmp, key_len);
+	MMC_PREPARE_KEY(key, key_len);
+	
 	result = mmc_pool_store(pool, command, command_len, key, key_len, flags, expire, value, value_len TSRMLS_CC);
+	efree(key);
 
 	if (flags & MMC_SERIALIZED) {
 		smart_str_free(&buf);
@@ -2033,15 +2048,15 @@ PHP_FUNCTION(memcache_replace)
 PHP_FUNCTION(memcache_get)
 {
 	mmc_pool_t *pool;
-	zval *key, *mmc_object = getThis();
+	zval **key, *mmc_object = getThis();
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz", &mmc_object, memcache_class_entry_ptr, &key) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OZ", &mmc_object, memcache_class_entry_ptr, &key) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &key) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Z", &key) == FAILURE) {
 			return;
 		}
 	}
@@ -2050,16 +2065,17 @@ PHP_FUNCTION(memcache_get)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_P(key) != IS_ARRAY) {
-		convert_to_string(key);
-		MMC_PREPARE_KEY(Z_STRVAL_P(key), Z_STRLEN_P(key));
+	if (Z_TYPE_PP(key) != IS_ARRAY) {
+		SEPARATE_ZVAL(key);
+		convert_to_string_ex(key);
+		MMC_PREPARE_KEY(Z_STRVAL_PP(key), Z_STRLEN_PP(key));
 
-		if (mmc_exec_retrieval_cmd(pool, Z_STRVAL_P(key), Z_STRLEN_P(key), &return_value TSRMLS_CC) < 0) {
+		if (mmc_exec_retrieval_cmd(pool, Z_STRVAL_PP(key), Z_STRLEN_PP(key), &return_value TSRMLS_CC) < 0) {
 			RETURN_FALSE;
 		}
 	}
 	else {
-		if (mmc_exec_retrieval_cmd_multi(pool, key, &return_value TSRMLS_CC) < 0) {
+		if (mmc_exec_retrieval_cmd_multi(pool, *key, &return_value TSRMLS_CC) < 0) {
 			RETURN_FALSE;
 		}
 	}
