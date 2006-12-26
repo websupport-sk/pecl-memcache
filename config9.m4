@@ -52,7 +52,13 @@ if test "$PHP_MEMCACHE" != "no"; then
     AC_MSG_ERROR([memcache support requires ZLIB. Use --with-zlib-dir=<DIR> to specify prefix where ZLIB include and library are located])
   else
     AC_MSG_RESULT([$PHP_ZLIB_DIR])
-    PHP_ADD_LIBRARY_WITH_PATH(z, $PHP_ZLIB_DIR/lib, MEMCACHE_SHARED_LIBADD)
+    if test "z$PHP_LIBDIR" != "z"; then
+    dnl PHP5+
+      PHP_ADD_LIBRARY_WITH_PATH(z, $PHP_ZLIB_DIR/$PHP_LIBDIR, MEMCACHE_SHARED_LIBADD)
+    else 
+    dnl PHP4
+      PHP_ADD_LIBRARY_WITH_PATH(z, $PHP_ZLIB_DIR/lib, MEMCACHE_SHARED_LIBADD)
+    fi
     PHP_ADD_INCLUDE($PHP_ZLIB_INCDIR)
   fi
  
