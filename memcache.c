@@ -342,7 +342,7 @@ mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persist
 	mmc->status = MMC_STATUS_DISCONNECTED;
 	memset(&(mmc->outbuf), 0, sizeof(smart_str));
 
-	strncpy(mmc->host, host, host_len);
+	memcpy(mmc->host, host, host_len);
 	mmc->host[host_len] = '\0';
 	mmc->port = port;
 
