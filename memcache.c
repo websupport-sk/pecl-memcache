@@ -296,6 +296,7 @@ PHP_MINFO_FUNCTION(memcache)
    internal functions
    ------------------ */
 
+#if ZEND_DEBUG
 static void mmc_debug(const char *format, ...) /* {{{ */
 {
 	TSRMLS_FETCH();
@@ -312,6 +313,7 @@ static void mmc_debug(const char *format, ...) /* {{{ */
 	}
 }
 /* }}} */
+#endif
 
 static void _mmc_pool_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
