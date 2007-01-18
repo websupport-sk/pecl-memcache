@@ -278,7 +278,7 @@ PHP_RINIT_FUNCTION(memcache)
  */
 PHP_MINFO_FUNCTION(memcache)
 {
-	char buf[MAX_LENGTH_OF_LONG];
+	char buf[MAX_LENGTH_OF_LONG + 1];
 
 	sprintf(buf, "%ld", MEMCACHE_G(num_persistent));
 
