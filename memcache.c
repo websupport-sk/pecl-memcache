@@ -2050,15 +2050,15 @@ PHP_FUNCTION(memcache_replace)
 PHP_FUNCTION(memcache_get)
 {
 	mmc_pool_t *pool;
-	zval **key, *mmc_object = getThis();
+	zval *key, *mmc_object = getThis(), tmp_key;
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OZ", &mmc_object, memcache_class_entry_ptr, &key) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz", &mmc_object, memcache_class_entry_ptr, &key) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Z", &key) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &key) == FAILURE) {
 			return;
 		}
 	}
@@ -2067,20 +2067,25 @@ PHP_FUNCTION(memcache_get)
 		RETURN_FALSE;
 	}
 
-	if (Z_TYPE_PP(key) != IS_ARRAY) {
-		SEPARATE_ZVAL(key);
-		convert_to_string_ex(key);
-		MMC_PREPARE_KEY(Z_STRVAL_PP(key), Z_STRLEN_PP(key));
+	tmp_key = *key;
+	zval_copy_ctor(&tmp_key);
 
-		if (mmc_exec_retrieval_cmd(pool, Z_STRVAL_PP(key), Z_STRLEN_PP(key), &return_value TSRMLS_CC) < 0) {
-			RETURN_FALSE;
+	if (Z_TYPE(tmp_key) != IS_ARRAY) {
+		convert_to_string(&tmp_key);
+		MMC_PREPARE_KEY(Z_STRVAL(tmp_key), Z_STRLEN(tmp_key));
+
+		if (mmc_exec_retrieval_cmd(pool, Z_STRVAL(tmp_key), Z_STRLEN(tmp_key), &return_value TSRMLS_CC) < 0) {
+			zval_dtor(return_value);
+			RETVAL_FALSE;
 		}
 	}
 	else {
-		if (mmc_exec_retrieval_cmd_multi(pool, *key, &return_value TSRMLS_CC) < 0) {
-			RETURN_FALSE;
+		if (mmc_exec_retrieval_cmd_multi(pool, &tmp_key, &return_value TSRMLS_CC) < 0) {
+			zval_dtor(return_value);
+			RETVAL_FALSE;
 		}
 	}
+	zval_dtor(&tmp_key);
 }
 /* }}} */
 
