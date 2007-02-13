@@ -2077,6 +2077,12 @@ PHP_FUNCTION(memcache_get)
 
 	if (Z_TYPE(tmp_key) != IS_ARRAY) {
 		convert_to_string(&tmp_key);
+		
+		if (Z_STRLEN(tmp_key) == 0) {
+			/* return false right away, items with empty keys cannot exist */
+			RETURN_FALSE;
+		}
+
 		MMC_PREPARE_KEY(Z_STRVAL(tmp_key), Z_STRLEN(tmp_key));
 
 		if (mmc_exec_retrieval_cmd(pool, Z_STRVAL(tmp_key), Z_STRLEN(tmp_key), &return_value TSRMLS_CC) < 0) {
