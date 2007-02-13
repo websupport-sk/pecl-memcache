@@ -1560,6 +1560,11 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 		}
 	}
 
+	if (!key_len) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "key cannot be empty");
+		RETURN_FALSE;
+	}
+
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
 		RETURN_FALSE;
 	}
