@@ -353,6 +353,7 @@ mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persist
 		MEMCACHE_G(num_persistent)++;
 	}
 
+	mmc->in_free = 0;
 	mmc->timeout = timeout;
 	mmc->retry_interval = retry_interval;
 	mmc->failure_callback = NULL;
@@ -393,6 +394,12 @@ static void mmc_server_callback_ctor(zval **callback TSRMLS_DC) /* {{{ */
 
 static void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
+	if (mmc->in_free) {
+		php_error_docref(NULL TSRMLS_CC, E_ERROR, "recursive reference detected, bailing out");
+		return;
+	}
+	mmc->in_free = 1;
+
 	if (mmc->failure_callback != NULL) {
 		mmc_server_callback_dtor(&mmc->failure_callback TSRMLS_CC);
 	}
@@ -461,6 +468,7 @@ mmc_pool_t *mmc_pool_new() /* {{{ */
 	pool->num_servers = 0;
 	pool->num_buckets = 0;
 	pool->compress_threshold = 0;
+	pool->in_free = 0;
 	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
 	return pool;
 }
@@ -469,6 +477,13 @@ mmc_pool_t *mmc_pool_new() /* {{{ */
 void mmc_pool_free(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 {
 	int i;
+
+	if (pool->in_free) {
+		php_error_docref(NULL TSRMLS_CC, E_ERROR, "recursive reference detected, bailing out");
+		return;
+	}
+	pool->in_free = 1;
+
 	for (i=0; i<pool->num_servers; i++) {
 		if (!pool->servers[i]) {
 			continue;

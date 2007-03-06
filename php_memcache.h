@@ -88,6 +88,7 @@ typedef struct mmc {
 	int						persistent;
 	int						status;
 	zval					*failure_callback;
+	zend_bool				in_free;
 } mmc_t;
 
 typedef struct mmc_pool {
@@ -98,6 +99,7 @@ typedef struct mmc_pool {
 	mmc_t					**requests;
 	int						compress_threshold;
 	double					min_compress_savings;
+	zend_bool				in_free;
 } mmc_pool_t;
 
 /* our globals */
