@@ -361,11 +361,42 @@ mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persist
 }
 /* }}} */
 
+static void mmc_server_callback_dtor(zval **callback TSRMLS_DC) /* {{{ */
+{
+	zval **this_obj;
+	
+	if (!callback || !*callback) return;
+
+	if (Z_TYPE_PP(callback) == IS_ARRAY && 
+		zend_hash_index_find(Z_ARRVAL_PP(callback), 0, (void **)&this_obj) == SUCCESS &&
+		Z_TYPE_PP(this_obj) == IS_OBJECT) {
+		zval_ptr_dtor(this_obj);
+	}
+	zval_ptr_dtor(callback);
+}
+/* }}} */
+
+static void mmc_server_callback_ctor(zval **callback TSRMLS_DC) /* {{{ */
+{
+	zval **this_obj;
+	
+	if (!callback || !*callback) return;
+
+	if (Z_TYPE_PP(callback) == IS_ARRAY && 
+		zend_hash_index_find(Z_ARRVAL_PP(callback), 0, (void **)&this_obj) == SUCCESS &&
+		Z_TYPE_PP(this_obj) == IS_OBJECT) {
+		zval_add_ref(this_obj);
+	}
+	zval_add_ref(callback);
+}
+/* }}} */
+
 static void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	if (mmc->failure_callback != NULL) {
-		zval_ptr_dtor(&(mmc->failure_callback));
+		mmc_server_callback_dtor(&mmc->failure_callback TSRMLS_CC);
 	}
+	mmc->failure_callback = NULL;
 
 	if (mmc->persistent) {
 		free(mmc->host);
@@ -439,11 +470,14 @@ void mmc_pool_free(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 {
 	int i;
 	for (i=0; i<pool->num_servers; i++) {
-		if (!pool->servers[i]->persistent) {
-			mmc_server_free(pool->servers[i] TSRMLS_CC);
+		if (!pool->servers[i]) {
+			continue;
 		}
-		else if (pool->servers[i]->failure_callback != NULL) {
-			zval_ptr_dtor(&(pool->servers[i]->failure_callback));
+		if (pool->servers[i]->persistent == 0 && pool->servers[i]->host != NULL) {
+			mmc_server_free(pool->servers[i] TSRMLS_CC);
+			pool->servers[i] = NULL;
+		} else {
+			mmc_server_callback_dtor(&pool->servers[i]->failure_callback TSRMLS_CC);
 			pool->servers[i]->failure_callback = NULL;
 		}
 	}
@@ -1791,8 +1825,8 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		ZVAL_ADDREF(failure_callback);
 		mmc->failure_callback = failure_callback;
+		mmc_server_callback_ctor(&mmc->failure_callback TSRMLS_CC);
 	}
 
 	/* initialize pool if need be */
@@ -1874,12 +1908,12 @@ PHP_FUNCTION(memcache_set_server_params)
 
 	if (failure_callback != NULL) {
 		if (mmc->failure_callback != NULL) {
-			zval_ptr_dtor(&(mmc->failure_callback));
+			mmc_server_callback_dtor(&mmc->failure_callback TSRMLS_CC);
 		}
 
 		if (Z_TYPE_P(failure_callback) != IS_NULL) {
-			ZVAL_ADDREF(failure_callback);
 			mmc->failure_callback = failure_callback;
+			mmc_server_callback_ctor(&mmc->failure_callback TSRMLS_CC);
 		}
 		else {
 			mmc->failure_callback = NULL;
