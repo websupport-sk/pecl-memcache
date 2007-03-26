@@ -24,7 +24,7 @@ handy OO and procedural interfaces.
   <email>mikael@synd.info</email>
   <active>yes</active>
  </lead>
- <date>2007-02-28</date>
+ <date>2007-03-27</date>
  <version>
   <release>2.1.1</release>
   <api>2.1.1</api>
@@ -35,7 +35,7 @@ handy OO and procedural interfaces.
  </stability>
  <license uri="http://www.php.net/license">PHP License</license>
  <notes>
-- Added session support. You can use memcache as session storage.
+- Added experimental session storage support. You can use memcached as session storage.
 - Fixed PECL bug #9486 (empty keys should not be allowed in memcache_set/add())
 - Fixed PECL bug #9854 (get() changes the datatype of variable of given as key)
  </notes>
