@@ -26,8 +26,8 @@ handy OO and procedural interfaces.
  </lead>
  <date>2007-03-27</date>
  <version>
-  <release>2.1.1</release>
-  <api>2.1.1</api>
+  <release>2.1.2</release>
+  <api>2.1.2</api>
  </version>
  <stability>
   <release>stable</release>
@@ -35,17 +35,17 @@ handy OO and procedural interfaces.
  </stability>
  <license uri="http://www.php.net/license">PHP License</license>
  <notes>
-- Added experimental session storage support. You can use memcached as session storage.
-- Fixed PECL bug #9486 (empty keys should not be allowed in memcache_set/add())
-- Fixed PECL bug #9854 (get() changes the datatype of variable of given as key)
+- Added missing files to the package.
  </notes>
  <contents>
   <dir name="/">
    <file name="config.m4" role="src" />
+   <file name="config9.m4" role="src" />
    <file name="config.w32" role="src" />
    <file name="CREDITS" role="doc" />
    <file name="example.php" role="doc" />
    <file name="memcache.c" role="src" />
+   <file name="memcache_session.c" role="src" />
    <file name="memcache.dsp" role="src" />
    <file name="php_memcache.h" role="doc" />
    <file name="README" role="doc" />
@@ -64,6 +64,23 @@ handy OO and procedural interfaces.
  <providesextension>memcache</providesextension>
  <extsrcrelease />
  <changelog>
+  <release>
+   <date>2007-03-27</date>
+   <version>
+    <release>2.1.1</release>
+    <api>2.1.1</api>
+   </version>
+   <stability>
+    <release>stable</release>
+    <api>stable</api>
+   </stability>
+   <license uri="http://www.php.net/license">PHP License</license>
+   <notes>
+- Added experimental session storage support. You can use memcached as session storage.
+- Fixed PECL bug #9486 (empty keys should not be allowed in memcache_set/add())
+- Fixed PECL bug #9854 (get() changes the datatype of variable of given as key)
+   </notes>
+  </release>
   <release>
    <date>2006-10-09</date>
    <version>
