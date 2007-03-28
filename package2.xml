@@ -54,7 +54,7 @@ handy OO and procedural interfaces.
  <dependencies>
   <required>
    <php>
-    <min>4.0.0</min>
+    <min>4.3.11</min>
    </php>
    <pearinstaller>
     <min>1.4.0b1</min>
