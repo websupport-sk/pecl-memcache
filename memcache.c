@@ -1140,7 +1140,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 				FREE_ZVAL(tmp);
 			}
 
-			MMC_PREPARE_KEY(str_key, Z_STRLEN_PP(key));
+			MMC_PREPARE_KEY(str_key, key_len);
 
 			/* schedule key if first round or if missing from result */
 			if ((!i || !zend_hash_exists(Z_ARRVAL_PP(return_value), str_key, key_len)) &&
