@@ -49,7 +49,7 @@ PS_OPEN_FUNC(memcache)
 	zval *params, **param;
 	int i, j, path_len;
 
-	pool = mmc_pool_new();
+	pool = mmc_pool_new(TSRMLS_C);
 
 	for (i=0,j=0,path_len=strlen(save_path); i<path_len; i=j+1) {
 		/* find beginning of url */

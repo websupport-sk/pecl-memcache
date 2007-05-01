@@ -39,7 +39,6 @@
 #include "ext/standard/php_string.h"
 #include "ext/standard/php_var.h"
 #include "ext/standard/php_smart_str.h"
-#include "ext/standard/crc32.h"
 #include "php_network.h"
 #include "php_memcache.h"
 
@@ -154,35 +153,36 @@ static PHP_INI_MH(OnUpdateFailoverAttempts) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
+{
+	if (!strcasecmp(new_value, "standard")) {
+		MEMCACHE_G(hash_strategy) = MMC_STANDARD_HASH;
+	}
+	else if (!strcasecmp(new_value, "consistent")) {
+		MEMCACHE_G(hash_strategy) = MMC_CONSISTENT_HASH;
+	}
+	else {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_strategy must be in set {standard, consistent} ('%s' given)", new_value);
+		return FAILURE;
+	}
+
+	return SUCCESS;
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.allow_failover",	"1",		PHP_INI_ALL, OnUpdateLong,		allow_failover,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.max_failover_attempts",	"20",	PHP_INI_ALL, OnUpdateFailoverAttempts,		max_failover_attempts,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.default_port",		"11211",	PHP_INI_ALL, OnUpdateLong,		default_port,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.chunk_size",		"8192",		PHP_INI_ALL, OnUpdateChunkSize,	chunk_size,		zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.hash_strategy",		"standard",	PHP_INI_ALL, OnUpdateHashStrategy,	hash_strategy,	zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
 /* }}} */
 
 /* {{{ macros */
 #define MMC_PREPARE_KEY(key, key_len) \
 	php_strtr(key, key_len, "\t\r\n ", "____", 4); \
-
-#if ZEND_DEBUG
-
-#define MMC_DEBUG(info) \
-{\
-	mmc_debug info; \
-}\
-
-#else
-
-#define MMC_DEBUG(info) \
-{\
-}\
-
-#endif
-
-
 /* }}} */
 
 /* {{{ internal function protos */
@@ -194,11 +194,9 @@ static void mmc_server_disconnect(mmc_t * TSRMLS_DC);
 static void mmc_server_deactivate(mmc_t * TSRMLS_DC);
 static int mmc_server_store(mmc_t *, const char *, int TSRMLS_DC);
 
-static unsigned int mmc_hash(const char *, int);
 static int mmc_compress(char **, unsigned long *, const char *, int TSRMLS_DC);
 static int mmc_uncompress(char **, unsigned long *, const char *, int);
 static int mmc_get_pool(zval *, mmc_pool_t ** TSRMLS_DC);
-static int mmc_open(mmc_t *, int, char **, int * TSRMLS_DC);
 static int mmc_close(mmc_t * TSRMLS_DC);
 static int mmc_readline(mmc_t * TSRMLS_DC);
 static char * mmc_get_version(mmc_t * TSRMLS_DC);
@@ -215,6 +213,11 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int);
 static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, int);
 /* }}} */
 
+/* {{{ hash strategies */
+extern mmc_hash_t mmc_standard_hash;
+extern mmc_hash_t mmc_consistent_hash;
+/* }}} */
+
 /* {{{ php_memcache_init_globals()
 */
 static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p TSRMLS_DC)
@@ -222,6 +225,7 @@ static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p 
 	MEMCACHE_G(debug_mode)		  = 0;
 	MEMCACHE_G(num_persistent)	  = 0;
 	MEMCACHE_G(compression_level) = Z_DEFAULT_COMPRESSION;
+	MEMCACHE_G(hash_strategy)	  = MMC_STANDARD_HASH;
 }
 /* }}} */
 
@@ -297,7 +301,7 @@ PHP_MINFO_FUNCTION(memcache)
    ------------------ */
 
 #if ZEND_DEBUG
-static void mmc_debug(const char *format, ...) /* {{{ */
+void mmc_debug(const char *format, ...) /* {{{ */
 {
 	TSRMLS_FETCH();
 
@@ -462,14 +466,23 @@ static int mmc_server_store(mmc_t *mmc, const char *request, int request_len TSR
 }
 /* }}} */
 
-mmc_pool_t *mmc_pool_new() /* {{{ */
+mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 {
 	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
 	pool->num_servers = 0;
-	pool->num_buckets = 0;
 	pool->compress_threshold = 0;
 	pool->in_free = 0;
 	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
+
+	switch (MEMCACHE_G(hash_strategy)) {
+		case MMC_CONSISTENT_HASH:
+			pool->hash = &mmc_consistent_hash;
+			break;
+		default:
+			pool->hash = &mmc_standard_hash;
+	}
+	pool->hash_state = pool->hash->create_state();
+
 	return pool;
 }
 /* }}} */
@@ -502,18 +515,13 @@ void mmc_pool_free(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 		efree(pool->requests);
 	}
 
-	if (pool->num_buckets) {
-		efree(pool->buckets);
-	}
-
+	pool->hash->free_state(pool->hash_state);
 	efree(pool);
 }
 /* }}} */
 
 void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* {{{ */
 {
-	int i;
-
 	/* add server and a preallocated request pointer */
 	if (pool->num_servers) {
 		pool->servers = erealloc(pool->servers, sizeof(mmc_t *) * (pool->num_servers + 1));
@@ -527,47 +535,7 @@ void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* {{{ */
 	pool->servers[pool->num_servers] = mmc;
 	pool->num_servers++;
 
-	/* add weight number of buckets for this server */
-	if (pool->num_buckets) {
-		pool->buckets = erealloc(pool->buckets, sizeof(mmc_t *) * (pool->num_buckets + weight));
-	}
-	else {
-		pool->buckets = emalloc(sizeof(mmc_t *) * (pool->num_buckets + weight));
-	}
-
-	for (i=0; i<weight; i++) {
-		pool->buckets[pool->num_buckets + i] = mmc;
-	}
-	pool->num_buckets += weight;
-}
-/* }}} */
-
-mmc_t *mmc_pool_find(mmc_pool_t *pool, const char *key, int key_len TSRMLS_DC) /* {{{ */
-{
-	mmc_t *mmc;
-
-	if (pool->num_servers > 1) {
-		unsigned int hash = mmc_hash(key, key_len), i;
-		mmc = pool->buckets[hash % pool->num_buckets];
-
-		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
-			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
-			int next_len = sprintf(next_key, "%d%s", i+1, key);
-			MMC_DEBUG(("mmc_pool_find: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
-
-			hash += mmc_hash(next_key, next_len);
-			mmc = pool->buckets[hash % pool->num_buckets];
-
-			efree(next_key);
-		}
-	}
-	else {
-		mmc = pool->servers[0];
-		mmc_open(mmc, 0, NULL, NULL TSRMLS_CC);
-	}
-
-	return mmc->status != MMC_STATUS_FAILED ? mmc : NULL;
+	pool->hash->add_server(pool->hash_state, mmc, weight);
 }
 /* }}} */
 
@@ -720,22 +688,6 @@ static int mmc_uncompress(char **result, unsigned long *result_len, const char *
 }
 /* }}}*/
 
-/**
- * New style crc32 hash, compatible with other clients
- */
-static unsigned int mmc_hash(const char *key, int key_len) { /* {{{ */
-	unsigned int crc = ~0;
-	int i;
-
-	for (i=0; i<key_len; i++) {
-		CRC32(crc, key[i]);
-	}
-
-	crc = (~crc >> 16) & 0x7fff;
-  	return crc ? crc : 1;
-}
-/* }}} */
-
 static int mmc_get_pool(zval *id, mmc_pool_t **pool TSRMLS_DC) /* {{{ */
 {
 	zval **connection;
@@ -842,7 +794,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 }
 /* }}} */
 
-static int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *errnum TSRMLS_DC) /* {{{ */
+int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *errnum TSRMLS_DC) /* {{{ */
 {
 	switch (mmc->status) {
 		case MMC_STATUS_DISCONNECTED:
@@ -1740,7 +1692,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 
 	/* initialize pool and object if need be */
 	if (!mmc_object) {
-		pool = mmc_pool_new();
+		pool = mmc_pool_new(TSRMLS_C);
 		mmc_pool_add(pool, mmc, 1);
 
 		object_init_ex(return_value, memcache_class_entry_ptr);
@@ -1758,7 +1710,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 		RETURN_TRUE;
 	}
 	else {
-		pool = mmc_pool_new();
+		pool = mmc_pool_new(TSRMLS_C);
 		mmc_pool_add(pool, mmc, 1);
 
 		list_id = zend_list_insert(pool, le_memcache_pool);
@@ -1844,7 +1796,7 @@ PHP_FUNCTION(memcache_add_server)
 
 	/* initialize pool if need be */
 	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **) &connection) == FAILURE) {
-		pool = mmc_pool_new();
+		pool = mmc_pool_new(TSRMLS_C);
 		list_id = zend_list_insert(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_id);
 	}

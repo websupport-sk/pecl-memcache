@@ -76,6 +76,12 @@ PHP_FUNCTION(memcache_flush);
 #define MMC_STATUS_UNKNOWN 2
 #define MMC_STATUS_CONNECTED 3
 
+#define MMC_STANDARD_HASH 1
+#define MMC_CONSISTENT_HASH 2
+
+#define MMC_CONSISTENT_POINTS 100			/* points per server */
+#define MMC_CONSISTENT_BUCKETS 1024			/* number of precomputed buckets, should be power of 2 */
+
 typedef struct mmc {
 	php_stream				*stream;
 	char					inbuf[MMC_BUF_SIZE];
@@ -91,15 +97,31 @@ typedef struct mmc {
 	zend_bool				in_free;
 } mmc_t;
 
+/* hashing strategy */
+typedef void * (*mmc_hash_create_state)();
+typedef void * (*mmc_hash_free_state)(void *);
+typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
+typedef void (*mmc_hash_add_server)(void *, mmc_t *, unsigned int);
+
+#define mmc_pool_find(pool, key, key_len) \
+	pool->hash->find_server(pool->hash_state, key, key_len)
+
+typedef struct mmc_hash {
+	mmc_hash_create_state	create_state;
+	mmc_hash_free_state		free_state;
+	mmc_hash_find_server	find_server;
+	mmc_hash_add_server		add_server;
+} mmc_hash_t;
+
 typedef struct mmc_pool {
 	mmc_t					**servers;
 	int						num_servers;
-	mmc_t					**buckets;
-	int						num_buckets;
 	mmc_t					**requests;
 	int						compress_threshold;
 	double					min_compress_savings;
 	zend_bool				in_free;
+	mmc_hash_t				*hash;
+	void					*hash_state;
 } mmc_pool_t;
 
 /* our globals */
@@ -111,6 +133,7 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long allow_failover;
 	long chunk_size;
 	long max_failover_attempts;
+	long hash_strategy;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 /* internal functions */
@@ -118,12 +141,11 @@ mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int TSRMLS_DC);
 mmc_t *mmc_find_persistent(char *, int, int, int, int TSRMLS_DC);
 int mmc_server_failure(mmc_t * TSRMLS_DC);
 
-mmc_pool_t *mmc_pool_new();
+mmc_pool_t *mmc_pool_new(TSRMLS_D);
 void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
 void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
-mmc_t *mmc_pool_find(mmc_pool_t *, const char *, int TSRMLS_DC);
 int mmc_pool_store(mmc_pool_t *, const char *, int, const char *, int, int, int, const char *, int TSRMLS_DC);
-
+int mmc_open(mmc_t *, int, char **, int * TSRMLS_DC);
 int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval ** TSRMLS_DC);
 int mmc_delete(mmc_t *, const char *, int, int TSRMLS_DC);
 
@@ -136,6 +158,25 @@ extern ps_module ps_mod_memcache;
 
 PS_FUNCS(memcache);
 #endif
+
+/* {{{ macros */
+#if ZEND_DEBUG
+
+void mmc_debug(const char *format, ...);
+
+#define MMC_DEBUG(info) \
+{\
+	mmc_debug info; \
+}\
+
+#else
+
+#define MMC_DEBUG(info) \
+{\
+}\
+
+#endif
+/* }}} */
 
 #ifdef ZTS
 #define MEMCACHE_G(v) TSRMG(memcache_globals_id, zend_memcache_globals *, v)

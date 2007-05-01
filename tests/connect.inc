@@ -27,6 +27,22 @@ $port = 11211;
 $nonExistingHost = "localhost";
 $nonExistingPort = 11213;
 
+switch (strtolower(ini_get('memcache.hash_strategy'))) {
+	case 'consistent':
+		// with preloaded buckets
+		$balanceKey1 = 'key1_abc';
+		$balanceKey2 = 'key2_abcde';
+		
+		// without preloaded buckets
+		//$balanceKey1 = 'key1_abcde';
+		//$balanceKey2 = 'key2_abcdefg';
+		break;
+
+	default:
+		$balanceKey1 = 'load_test_key1';	// Must hash to host1
+		$balanceKey2 = 'load_test_key2';	// Must hash to host2
+}
+
 $memcache = @memcache_connect($host, $port);
 
 if (!$memcache) {
