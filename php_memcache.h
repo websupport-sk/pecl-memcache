@@ -99,7 +99,7 @@ typedef struct mmc {
 
 /* hashing strategy */
 typedef void * (*mmc_hash_create_state)();
-typedef void * (*mmc_hash_free_state)(void *);
+typedef void (*mmc_hash_free_state)(void *);
 typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
 typedef void (*mmc_hash_add_server)(void *, mmc_t *, unsigned int);
 

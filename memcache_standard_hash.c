@@ -43,7 +43,7 @@ void *mmc_standard_create_state() /* {{{ */
 }
 /* }}} */
 
-void *mmc_standard_free_state(void *s) /* {{{ */
+void mmc_standard_free_state(void *s) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
 	if (state != NULL) {

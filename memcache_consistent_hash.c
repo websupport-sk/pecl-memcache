@@ -52,7 +52,7 @@ void *mmc_consistent_create_state() /* {{{ */
 }
 /* }}} */
 
-void *mmc_consistent_free_state(void *s) /* {{{ */
+void mmc_consistent_free_state(void *s) /* {{{ */
 {
 	mmc_consistent_state_t *state = s;
 	if (state != NULL) {
