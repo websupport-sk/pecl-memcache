@@ -143,6 +143,10 @@ PS_FUNCS(memcache);
 #define MEMCACHE_G(v) (memcache_globals.v)
 #endif
 
+#ifndef ZSTR
+#define ZSTR
+#endif
+
 #endif	/* PHP_MEMCACHE_H */
 
 /*

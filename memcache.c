@@ -942,7 +942,7 @@ static int mmc_readline(mmc_t *mmc TSRMLS_DC) /* {{{ */
 		return -1;
 	}
 
-	response = php_stream_get_line(mmc->stream, mmc->inbuf, MMC_BUF_SIZE, &response_len);
+	response = php_stream_get_line(mmc->stream, ZSTR(mmc->inbuf), MMC_BUF_SIZE, &response_len);
 	if (response) {
 		MMC_DEBUG(("mmc_readline: read data:"));
 		MMC_DEBUG(("mmc_readline:---"));
@@ -1798,7 +1798,7 @@ PHP_FUNCTION(memcache_add_server)
 	long port = MEMCACHE_G(default_port), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool persistent = 1, status = 1;
 	int resource_type, host_len, list_id;
-	char *host, *failure_callback_name;
+	char *host;
 
 	if (mmc_object) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lblllbz", &host, &host_len, &port, &persistent, &weight, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
@@ -1817,12 +1817,10 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!zend_is_callable(failure_callback, 0, &failure_callback_name)) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid failure callback '%s' passed", failure_callback_name);
-			efree(failure_callback_name);
+		if (!zend_is_callable(failure_callback, 0, NULL)) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid failure callback passed");
 			RETURN_FALSE;
 		}
-		efree(failure_callback_name);
 	}
 
 	/* lazy initialization of server struct */
@@ -1873,7 +1871,7 @@ PHP_FUNCTION(memcache_set_server_params)
 	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool status = 1;
 	int host_len, i;
-	char *host, *failure_callback_name;
+	char *host;
 
 	if (mmc_object) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lllbz", &host, &host_len, &port, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
@@ -1903,12 +1901,10 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!zend_is_callable(failure_callback, 0, &failure_callback_name)) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid failure callback '%s' passed", failure_callback_name);
-			efree(failure_callback_name);
+		if (!zend_is_callable(failure_callback, 0, NULL)) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid failure callback passed");
 			RETURN_FALSE;
 		}
-		efree(failure_callback_name);
 	}
 
 	mmc->timeout = timeout;
@@ -1984,7 +1980,7 @@ PHP_FUNCTION(memcache_get_server_status)
 mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
-	list_entry *le;
+	zend_rsrc_list_entry *le;
 	char *hash_key;
 	int hash_key_len;
 
@@ -1993,7 +1989,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 	hash_key_len = sprintf(hash_key, "mmc_connect___%s:%d", host, port);
 
 	if (zend_hash_find(&EG(persistent_list), hash_key, hash_key_len+1, (void **) &le) == FAILURE) {
-		list_entry new_le;
+		zend_rsrc_list_entry new_le;
 		MMC_DEBUG(("mmc_find_persistent: connection wasn't found in the hash"));
 
 		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval TSRMLS_CC);
@@ -2001,7 +1997,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 		new_le.ptr  = mmc;
 
 		/* register new persistent connection */
-		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(list_entry), NULL) == FAILURE) {
+		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(zend_rsrc_list_entry), NULL) == FAILURE) {
 			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		} else {
@@ -2009,7 +2005,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 		}
 	}
 	else if (le->type != le_pmemcache || le->ptr == NULL) {
-		list_entry new_le;
+		zend_rsrc_list_entry new_le;
 		MMC_DEBUG(("mmc_find_persistent: something was wrong, reconnecting.."));
 		zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
 
@@ -2018,7 +2014,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 		new_le.ptr  = mmc;
 
 		/* register new persistent connection */
-		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(list_entry), NULL) == FAILURE) {
+		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(zend_rsrc_list_entry), NULL) == FAILURE) {
 			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		}

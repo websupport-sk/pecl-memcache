@@ -23,7 +23,7 @@ var_dump($result2);
 $result = $memcache->flush(time()+3);
 var_dump($result);
 
-sleep(2);
+sleep(1);
 
 $result = $memcache->get('test_key');
 var_dump($result);
