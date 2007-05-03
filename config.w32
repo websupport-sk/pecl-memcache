@@ -5,8 +5,9 @@ ARG_ENABLE("memcache", "memcache support", "no");
 
 if (PHP_MEMCACHE != "no") {
 	if (!PHP_ZLIB_SHARED || CHECK_LIB("zlib.lib", "memcache", PHP_MEMCACHE)) {
-		EXTENSION("memcache", "memcache.c");
+		EXTENSION("memcache", "memcache.c memcache_standard_hash.c memcache_consistent_hash.c memcache_session.c");
 		AC_DEFINE('HAVE_MEMCACHE', 1, 'Have memcache support');
+		ADD_FLAG("CFLAGS_MEMCACHE", "/D HAVE_MEMCACHE_SESSION=1");
 	} else {
 		WARNING("memcache not enabled; libraries and headers not found");
 	}
