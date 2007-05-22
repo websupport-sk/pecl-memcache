@@ -149,7 +149,7 @@ static size_t mmc_stream_read_wrapper(mmc_stream_t *io, char *buf, size_t count 
 
 static char *mmc_stream_readline_wrapper(mmc_stream_t *io, char *buf, size_t maxlen, size_t *retlen TSRMLS_DC)  /* {{{ */
 {
-	return php_stream_get_line(io->stream, buf, maxlen, retlen);
+	return php_stream_get_line(io->stream, ZSTR(buf), maxlen, retlen);
 }
 /* }}} */
 

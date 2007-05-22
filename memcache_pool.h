@@ -34,6 +34,10 @@
 
 #ifndef ZSTR
 #define ZSTR
+#define ZSTR_VAL(v) v
+#define zstr char *
+#else
+#define ZSTR_VAL(v) (v).s
 #endif
 
 #define MMC_SERIALIZED 1

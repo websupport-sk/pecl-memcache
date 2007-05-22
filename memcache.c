@@ -343,7 +343,8 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 	RETVAL_NULL();
 
 	if (Z_TYPE_P(keys) == IS_ARRAY) {
-		char *key, keytmp[MAX_LENGTH_OF_LONG + 1];
+		zstr key;
+		char keytmp[MAX_LENGTH_OF_LONG + 1];
 		unsigned int key_len;
 		unsigned long index;
 		int key_type;
@@ -363,7 +364,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 
 				case HASH_KEY_IS_LONG:
 					key_len = sprintf(keytmp, "%lu", index);
-					key = keytmp;
+					key = ZSTR(keytmp);
 					break;
 
 				default:
@@ -382,7 +383,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 			}
 			
 			/* assemble command */
-			if (mmc_prepare_store(pool, request, cmd, cmd_len, key, key_len, flags, exptime, *arrval TSRMLS_CC) != MMC_OK) {
+			if (mmc_prepare_store(pool, request, cmd, cmd_len, ZSTR_VAL(key), key_len, flags, exptime, *arrval TSRMLS_CC) != MMC_OK) {
 				mmc_pool_release(pool, request);
 				continue;
 			}
