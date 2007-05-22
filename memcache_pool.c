@@ -143,13 +143,13 @@ static char *mmc_stream_readline_buffered(mmc_stream_t *io, char *buf, size_t ma
 
 static size_t mmc_stream_read_wrapper(mmc_stream_t *io, char *buf, size_t count TSRMLS_DC)  /* {{{ */
 {
-	return php_stream_read(io->stream, buf, count TSRMLS_CC);
+	return php_stream_read(io->stream, buf, count);
 }
 /* }}} */
 
 static char *mmc_stream_readline_wrapper(mmc_stream_t *io, char *buf, size_t maxlen, size_t *retlen TSRMLS_DC)  /* {{{ */
 {
-	return php_stream_get_line(io->stream, buf, maxlen, retlen TSRMLS_CC);
+	return php_stream_get_line(io->stream, buf, maxlen, retlen);
 }
 /* }}} */
 
@@ -216,7 +216,7 @@ static int mmc_request_read_udp(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 	
 	/* attempt to read datagram + sentinel-byte */
 	mmc_buffer_alloc(&(request->io->buffer), MMC_MAX_UDP_LEN + 1);
-	bytes = php_stream_read(request->io->stream, request->io->buffer.value.c + request->io->buffer.value.len, MMC_MAX_UDP_LEN + 1 TSRMLS_CC); 
+	bytes = php_stream_read(request->io->stream, request->io->buffer.value.c + request->io->buffer.value.len, MMC_MAX_UDP_LEN + 1);
 	
 	if (bytes < sizeof(mmc_udp_header_t)) {
 		return mmc_server_failure(mmc, request->io, "failed reading complete UDP header from stream", 0 TSRMLS_CC);
@@ -468,7 +468,7 @@ static int mmc_server_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /
 	read the value body into the buffer {{{ */
 {
 	request->readbuf.idx += 
-		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, request->value.bytes + 2 - request->readbuf.idx);
+		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, request->value.bytes + 2 - request->readbuf.idx TSRMLS_CC);
 
 	/* done reading? */
 	if (request->readbuf.idx >= request->value.bytes + 2) {
@@ -999,7 +999,7 @@ int mmc_pool_failover_handler(mmc_pool_t *pool, mmc_request_t *request, void *pa
 	uses request->key to reschedule request to other server {{{ */
 {
 	if (!MEMCACHE_G(allow_failover) || request->failures++ >= MEMCACHE_G(max_failover_attempts)) {
-		mmc_pool_release(pool, request TSRMLS_CC);
+		mmc_pool_release(pool, request);
 		return MMC_REQUEST_FAILURE;
 	}
 	return mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC);
@@ -1009,7 +1009,7 @@ int mmc_pool_failover_handler(mmc_pool_t *pool, mmc_request_t *request, void *pa
 static int mmc_pool_failover_handler_null(mmc_pool_t *pool, mmc_request_t *request, void *param TSRMLS_DC) /* 
 	always returns failure {{{ */
 {
-	mmc_pool_release(pool, request TSRMLS_CC);
+	mmc_pool_release(pool, request);
 	return MMC_REQUEST_FAILURE;
 }
 /* }}}*/
@@ -1333,7 +1333,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /*
 
 					case MMC_REQUEST_DONE:
 						/* release completed request */
-						mmc_pool_release(pool, mmc->readreq TSRMLS_CC);
+						mmc_pool_release(pool, mmc->readreq);
 
 						/* shift next request into read slot */
 						mmc->readreq = mmc_queue_pop(&(mmc->readqueue));

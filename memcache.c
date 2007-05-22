@@ -383,7 +383,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 			
 			/* assemble command */
 			if (mmc_prepare_store(pool, request, cmd, cmd_len, key, key_len, flags, exptime, *arrval TSRMLS_CC) != MMC_OK) {
-				mmc_pool_release(pool, request TSRMLS_CC);
+				mmc_pool_release(pool, request);
 				continue;
 			}
 			
@@ -403,7 +403,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 
 		/* assemble command */
 		if (mmc_prepare_store(pool, request, cmd, cmd_len, Z_STRVAL_P(keys), Z_STRLEN_P(keys), flags, exptime, value TSRMLS_CC) != MMC_OK) {
-			mmc_pool_release(pool, request TSRMLS_CC);
+			mmc_pool_release(pool, request);
 			RETURN_FALSE;
 		}
 		
@@ -526,7 +526,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 			}
 
 			if (mmc_prepare_key(*key, request->key, &(request->key_len)) != MMC_OK) {
-				mmc_pool_release(pool, request TSRMLS_CC);
+				mmc_pool_release(pool, request);
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
 				continue;
 			}
@@ -537,7 +537,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 
 			if (value > 0) {
 				smart_str_appendl(&(request->sendbuf.value), " ", 1);
-				smart_str_append_unsigned(&(request->sendbuf), value);
+				smart_str_append_unsigned(&(request->sendbuf.value), value);
 			}
 
 			smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
@@ -564,7 +564,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 			value_handler, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
 
 		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {
-			mmc_pool_release(pool, request TSRMLS_CC);
+			mmc_pool_release(pool, request);
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
 			RETURN_FALSE;
 		}
@@ -575,7 +575,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 		
 		if (value > 0) {
 			smart_str_appendl(&(request->sendbuf.value), " ", 1);
-			smart_str_append_unsigned(&(request->sendbuf), value);
+			smart_str_append_unsigned(&(request->sendbuf.value), value);
 		}
 
 		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
@@ -1222,12 +1222,12 @@ static int mmc_value_failover_handler(mmc_pool_t *pool, mmc_request_t *request, 
 	HashPosition pos;
 
 	if (!MEMCACHE_G(allow_failover) || request->failures++ >= MEMCACHE_G(max_failover_attempts)) {
-		mmc_pool_release(pool, request TSRMLS_CC);
+		mmc_pool_release(pool, request);
 		return MMC_REQUEST_FAILURE;
 	}
 	
 	failures = request->failures;
-	mmc_pool_release(pool, request TSRMLS_CC);
+	mmc_pool_release(pool, request);
 	
 	zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(keys), &pos);
 	
@@ -1309,7 +1309,7 @@ PHP_FUNCTION(memcache_get)
 			mmc_value_handler_single, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
 
 		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {
-			mmc_pool_release(pool, request TSRMLS_CC);
+			mmc_pool_release(pool, request);
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
 			return;
 		}

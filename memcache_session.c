@@ -164,7 +164,7 @@ PS_READ_FUNC(memcache)
 			mmc_value_handler_single, &result, mmc_pool_failover_handler, NULL TSRMLS_CC);
 
 		if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
-			mmc_pool_release(pool, request TSRMLS_CC);
+			mmc_pool_release(pool, request);
 			return FAILURE;
 		}
 
@@ -212,7 +212,7 @@ PS_WRITE_FUNC(memcache)
 
 		/* assemble command */
 		if (mmc_prepare_store(pool, request, "set", sizeof("set")-1, key, strlen(key), 0, INI_INT("session.gc_maxlifetime"), &value TSRMLS_CC) != MMC_OK) {
-			mmc_pool_release(pool, request TSRMLS_CC);
+			mmc_pool_release(pool, request);
 			return FAILURE;
 		}
 		
@@ -263,7 +263,7 @@ PS_DESTROY_FUNC(memcache)
 		ZVAL_FALSE(&result);
 
 		if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
-			mmc_pool_release(pool, request TSRMLS_CC);
+			mmc_pool_release(pool, request);
 			return FAILURE;
 		}
 
