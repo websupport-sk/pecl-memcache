@@ -44,9 +44,9 @@ string(4) "test"
 bool(true)
 bool(true)
 
-Warning: memcache_close() expects parameter 1 to be Memcache, object given in %s on line %d
+Warning: memcache_close() expects parameter 1 to be MemcachePool, object given in %s on line %d
 NULL
 
-Warning: memcache_close() expects parameter 1 to be Memcache, string given in %s on line %d
+Warning: memcache_close() expects parameter 1 to be MemcachePool, string given in %s on line %d
 NULL
 Done

@@ -29,10 +29,11 @@
 #include "php_variables.h"
 
 #include "SAPI.h"
+#include "ext/standard/php_smart_str.h"
 #include "ext/standard/url.h"
 #include "php_memcache.h"
 
-#if HAVE_MEMCACHE_SESSION
+ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
 ps_module ps_mod_memcache = {
 	PS_MOD(memcache)
@@ -53,16 +54,18 @@ PS_OPEN_FUNC(memcache)
 
 	for (i=0,j=0,path_len=strlen(save_path); i<path_len; i=j+1) {
 		/* find beginning of url */
-		while (i<path_len && (isspace(save_path[i]) || save_path[i] == ','))
+		while (i<path_len && (isspace(save_path[i]) || save_path[i] == ',')) {
 			i++;
+		}
 
 		/* find end of url */
 		j = i;
-		while (j<path_len && !isspace(save_path[j]) && save_path[j] != ',')
+		while (j<path_len && !isspace(save_path[j]) && save_path[j] != ',') {
 			 j++;
+		}
 
 		if (i < j) {
-			int persistent = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+			int persistent = 0, udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 			url = php_url_parse_ex(save_path+i, j-i);
 
 			/* parse parameters */
@@ -75,6 +78,11 @@ PS_OPEN_FUNC(memcache)
 				if (zend_hash_find(Z_ARRVAL_P(params), "persistent", sizeof("persistent"), (void **) &param) != FAILURE) {
 					convert_to_boolean_ex(param);
 					persistent = Z_BVAL_PP(param);
+				}
+
+				if (zend_hash_find(Z_ARRVAL_P(params), "udp_port", sizeof("udp_port"), (void **) &param) != FAILURE) {
+					convert_to_long_ex(param);
+					udp_port = Z_LVAL_PP(param);
 				}
 
 				if (zend_hash_find(Z_ARRVAL_P(params), "weight", sizeof("weight"), (void **) &param) != FAILURE) {
@@ -103,10 +111,10 @@ PS_OPEN_FUNC(memcache)
 			}
 
 			if (persistent) {
-				mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, timeout, retry_interval TSRMLS_CC);
+				mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval TSRMLS_CC);
 			}
 			else {
-				mmc = mmc_server_new(url->host, strlen(url->host), url->port, 0, timeout, retry_interval TSRMLS_CC);
+				mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval TSRMLS_CC);
 			}
 
 			mmc_pool_add(pool, mmc, 1);
@@ -145,21 +153,40 @@ PS_CLOSE_FUNC(memcache)
 PS_READ_FUNC(memcache)
 {
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
-	zval *result;
 
-	if (pool) {
-		MAKE_STD_ZVAL(result);
-		ZVAL_NULL(result);
+	if (pool != NULL) {
+		zval result;
+		mmc_request_t *request;
+		ZVAL_FALSE(&result);
 
-		if (mmc_exec_retrieval_cmd(pool, key, strlen(key), &result TSRMLS_CC) <= 0 || Z_TYPE_P(result) != IS_STRING) {
-			zval_ptr_dtor(&result);
+		/* allocate request */
+		request = mmc_pool_request(pool, MMC_PROTO_UDP, mmc_request_parse_value, 
+			mmc_value_handler_single, &result, mmc_pool_failover_handler, NULL TSRMLS_CC);
+
+		if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
+			mmc_pool_release(pool, request TSRMLS_CC);
 			return FAILURE;
 		}
 
-		*val = Z_STRVAL_P(result);
-		*vallen = Z_STRLEN_P(result);
-		FREE_ZVAL(result);
-		return SUCCESS;
+		smart_str_appendl(&(request->sendbuf.value), "get ", sizeof("get ")-1);
+		smart_str_appendl(&(request->sendbuf.value), request->key, request->key_len);
+		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+
+		/* schedule request */
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+			return FAILURE;
+		}
+	
+		/* execute request */
+		mmc_pool_run(pool TSRMLS_CC);
+		
+		if (Z_TYPE(result) == IS_STRING) {
+			*val = Z_STRVAL(result);
+			*vallen = Z_STRLEN(result);
+			return SUCCESS;
+		}
+
+		zval_dtor(&result);
 	}
 
 	return FAILURE;
@@ -171,12 +198,52 @@ PS_READ_FUNC(memcache)
 PS_WRITE_FUNC(memcache)
 {
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
+	
+	if (pool != NULL) {
+		zval result, value;
+		mmc_request_t *request;
 
-	if (pool && mmc_pool_store(pool, "set", sizeof("set")-1, key, strlen(key), 0, INI_INT("session.gc_maxlifetime"), val, vallen TSRMLS_CC)) {
-		return SUCCESS;
+		/* allocate request */
+		request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_request_parse_line, 
+			mmc_stored_handler, &result, mmc_pool_failover_handler, NULL TSRMLS_CC);
+		
+		ZVAL_NULL(&result);
+		ZVAL_STRINGL(&value, (char *)val, vallen, 0);
+
+		/* assemble command */
+		if (mmc_prepare_store(pool, request, "set", sizeof("set")-1, key, strlen(key), 0, INI_INT("session.gc_maxlifetime"), &value TSRMLS_CC) != MMC_OK) {
+			mmc_pool_release(pool, request TSRMLS_CC);
+			return FAILURE;
+		}
+		
+		/* schedule request */
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+			return FAILURE;
+		}
+
+		/* execute request */
+		mmc_pool_run(pool TSRMLS_CC);
+
+		if (Z_BVAL(result)) {
+			return SUCCESS;
+		}
 	}
-
+	
 	return FAILURE;
+}
+/* }}} */
+
+static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, void *value, unsigned int value_len, void *param TSRMLS_DC) /* 
+	parses a DELETED response line, param is a zval pointer to store result into {{{ */
+{
+	if (mmc_str_left((char *)value, "DELETED", value_len, sizeof("DELETED")-1) ||
+		mmc_str_left((char *)value, "NOT_FOUND", value_len, sizeof("NOT_FOUND")-1)) 
+	{
+		ZVAL_TRUE((zval *)param);
+		return MMC_REQUEST_DONE;
+	}
+	
+	return mmc_server_failure(mmc, request->io, "invalid delete response line", 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -185,18 +252,35 @@ PS_WRITE_FUNC(memcache)
 PS_DESTROY_FUNC(memcache)
 {
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
-	mmc_t *mmc;
 
-	int result = -1;
+	if (pool != NULL) {
+		zval result;
+		mmc_request_t *request;
+		
+		/* allocate request */
+		request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_request_parse_line, 
+			mmc_deleted_handler, &result, mmc_pool_failover_handler, NULL TSRMLS_CC);
+		ZVAL_FALSE(&result);
 
-	if (pool) {
-		while (result < 0 && (mmc = mmc_pool_find(pool, key, strlen(key) TSRMLS_CC)) != NULL) {
-			if ((result = mmc_delete(mmc, key, strlen(key), 0 TSRMLS_CC)) < 0 && mmc_server_failure(mmc TSRMLS_CC)) {
-				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", mmc->host, mmc->port);
-			}
+		if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
+			mmc_pool_release(pool, request TSRMLS_CC);
+			return FAILURE;
 		}
 
-		if (result >= 0) {
+		smart_str_appendl(&(request->sendbuf.value), "delete", sizeof("delete")-1);
+		smart_str_appendl(&(request->sendbuf.value), " ", 1);
+		smart_str_appendl(&(request->sendbuf.value), request->key, request->key_len);
+		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+
+		/* schedule request */
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+			return FAILURE;
+		}
+	
+		/* execute request */
+		mmc_pool_run(pool TSRMLS_CC);
+
+		if (Z_BVAL(result)) {
 			return SUCCESS;
 		}
 	}
@@ -213,7 +297,6 @@ PS_GC_FUNC(memcache)
 }
 /* }}} */
 
-#endif /* HAVE_MEMCACHE_SESSION */
 /*
  * Local variables:
  * tab-width: 4

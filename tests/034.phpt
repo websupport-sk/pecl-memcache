@@ -49,6 +49,8 @@ var_dump(isset($result["$host:$port"]['items']));
 --EXPECTF--
 bool(true)
 string(%d) "%d"
+
+Warning: %s: invalid stats type %s
 bool(false)
 bool(true)
 string(%d) "%d"
@@ -59,5 +61,7 @@ string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
 
-bool(false)
+
+Warning: %s: invalid stats type %s
+NULL
 bool(true)

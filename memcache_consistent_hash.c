@@ -101,7 +101,6 @@ static mmc_t *mmc_consistent_find(mmc_consistent_state_t *state, unsigned int po
 
 		/* best guess with random distribution, distance between lowpoint and point scaled down to lo-hi interval */
 		mid = lo + (hi - lo) * (point - state->points[lo].point) / (state->points[hi].point - state->points[lo].point);
-		MMC_DEBUG(("mmc_consistent_find: lo %d, hi %d, mid %d, point %u, midpoint %u", lo, hi, mid, point, state->points[mid].point));
 
 		/* perfect match */
 		if (point <= state->points[mid].point && point > (mid ? state->points[mid-1].point : 0)) {
@@ -135,35 +134,15 @@ static void mmc_consistent_pupulate_buckets(mmc_consistent_state_t *state) /* {{
 mmc_t *mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
 {
 	mmc_consistent_state_t *state = s;
-	mmc_t *mmc;
 
 	if (state->num_servers > 1) {
-		unsigned int i, hash = mmc_hash(key, key_len);
-
 		if (!state->buckets_populated) {
 			mmc_consistent_pupulate_buckets(state);
 		}
-
-		mmc = state->buckets[hash % MMC_CONSISTENT_BUCKETS];
-
-		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
-			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
-			int next_len = sprintf(next_key, "%d%s", i+1, key);
-			MMC_DEBUG(("mmc_consistent_find_server: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
-
-			hash += mmc_hash(next_key, next_len);
-			mmc = state->buckets[hash % MMC_CONSISTENT_BUCKETS];
-
-			efree(next_key);
-		}
-	}
-	else {
-		mmc = state->points[0].server;
-		mmc_open(mmc, 0, NULL, NULL TSRMLS_CC);
+		return state->buckets[mmc_hash(key, key_len) % MMC_CONSISTENT_BUCKETS];
 	}
 
-	return mmc->status != MMC_STATUS_FAILED ? mmc : NULL;
+	return state->points[0].server;
 }
 /* }}} */
 
@@ -182,10 +161,9 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 	}
 
 	for (i=0; i<points; i++) {
-		key_len = spprintf(&key, 0, "%s:%d-%d", mmc->host, mmc->port, i);
+		key_len = spprintf(&key, 0, "%s:%d-%d", mmc->host, mmc->tcp.port, i);
 		state->points[state->num_points + i].server = mmc;
 		state->points[state->num_points + i].point = mmc_hash(key, key_len);
-		MMC_DEBUG(("mmc_consistent_add_server: key %s, point %lu", key, state->points[state->num_points + i].point));
 		efree(key);
 	}
 

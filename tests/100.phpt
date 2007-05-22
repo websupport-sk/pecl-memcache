@@ -55,5 +55,5 @@ string(3) "abc"
 bool(true)
 string(3) "abc"
 bool(false)
-bool(true)
+bool(false)
 bool(false)

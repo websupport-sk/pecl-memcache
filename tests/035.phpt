@@ -1,7 +1,7 @@
 --TEST--
 memcache::connect() with unix domain socket
 --SKIPIF--
-<?php include 'connect.inc'; if (version_compare(phpversion(), '5.0.0', '<')) die('skip requires PHP >= 5.0.0'); if (!isset($domainsocket)) die('skip $domainsocket not set'); ?>
+<?php include 'connect.inc'; if (!isset($domainsocket)) die('skip $domainsocket not set'); ?>
 --FILE--
 <?php
 

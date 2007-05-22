@@ -26,10 +26,10 @@ var_dump($result2["$nonExistingHost:$nonExistingPort"]);
 
 ?>
 --EXPECTF--
-Warning: memcache_get_extended_stats() expects parameter 1 to be Memcache, array given in %s on line %d
+Warning: memcache_get_extended_stats() expects parameter 1 to be MemcachePool, array given in %s on line %d
 NULL
 
-Warning: memcache_get_extended_stats() expects parameter 1 to be Memcache, object given in %s on line %d
+Warning: memcache_get_extended_stats() expects parameter 1 to be MemcachePool, object given in %s on line %d
 NULL
 string(%d) "%d"
 int(3)

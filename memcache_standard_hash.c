@@ -72,30 +72,12 @@ static unsigned int mmc_hash(const char *key, int key_len) /* {{{ */
 mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
-	mmc_t *mmc;
 
 	if (state->num_servers > 1) {
-		unsigned int hash = mmc_hash(key, key_len), i;
-		mmc = state->buckets[hash % state->num_buckets];
-
-		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
-			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
-			int next_len = sprintf(next_key, "%d%s", i+1, key);
-			MMC_DEBUG(("mmc_standard_find_server: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
-
-			hash += mmc_hash(next_key, next_len);
-			mmc = state->buckets[hash % state->num_buckets];
-
-			efree(next_key);
-		}
-	}
-	else {
-		mmc = state->buckets[0];
-		mmc_open(mmc, 0, NULL, NULL TSRMLS_CC);
+		return state->buckets[mmc_hash(key, key_len) % state->num_buckets];
 	}
 
-	return mmc->status != MMC_STATUS_FAILED ? mmc : NULL;
+	return state->buckets[0];
 }
 /* }}} */
 

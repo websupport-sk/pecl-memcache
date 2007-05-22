@@ -11,16 +11,19 @@ memcache_flush()
 
 include 'connect.inc';
 
+$result = @memcache_flush($memcache);
+var_dump($result);
+
 memcache_add_server($memcache, $nonExistingHost, $nonExistingPort);
 
-$result1 = @memcache_flush($memcache);
-var_dump($result1);
+$result = @memcache_flush($memcache);
+var_dump($result);
 
 $memcache2 = new Memcache();
 $memcache2->addServer($nonExistingHost, $nonExistingPort);
 
-$result2 = @memcache_flush($memcache2);
-var_dump($result2);
+$result = @memcache_flush($memcache2);
+var_dump($result);
 
 memcache_close($memcache);
 var_dump(memcache_flush($memcache));
@@ -33,13 +36,12 @@ echo "Done\n";
 --EXPECTF--
 bool(true)
 bool(false)
+bool(false)
+bool(false)
 
-Notice: memcache_flush()%s marked server '%s' as failed in %s on line %d
-bool(true)
-
-Warning: memcache_flush() expects parameter 1 to be Memcache, object given in %s on line %d
+Warning: memcache_flush() expects parameter 1 to be MemcachePool, object given in %s on line %d
 NULL
 
-Warning: memcache_flush() expects parameter 1 to be Memcache, string given in %s on line %d
+Warning: memcache_flush() expects parameter 1 to be MemcachePool, string given in %s on line %d
 NULL
 Done
