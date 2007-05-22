@@ -62,17 +62,20 @@ if test "$PHP_MEMCACHE" != "no"; then
     PHP_ADD_INCLUDE($PHP_ZLIB_INCDIR)
   fi
  
-
   if test "$PHP_MEMCACHE_SESSION" != "no"; then 
 	AC_MSG_CHECKING([for session includes])
+    session_inc_path=""
+
     if test -f $abs_srcdir/include/php/ext/session/php_session.h; then
       session_inc_path=$abs_srcdir/include/php
     elif test -f $abs_srcdir/ext/session/php_session.h; then
       session_inc_path=$abs_srcdir
-    elif test -f $prefix/include/php/ext/session/php_session.h; then
-      session_inc_path=$prefix/include/php
     else
-      session_inc_path=""
+      for i in php4 php5 php6 php; do
+        if test -f $prefix/include/$i/ext/session/php_session.h; then
+          session_inc_path=$prefix/include/$i
+        fi
+      done
     fi
 
     if test "$session_inc_path" = ""; then
