@@ -458,7 +458,8 @@ static int mmc_server_store(mmc_t *mmc, const char *request, int request_len TSR
 	}
 
 	/* return FALSE without failover */
-	if (mmc_str_left(mmc->inbuf, "SERVER_ERROR out of memory", response_len, sizeof("SERVER_ERROR out of memory") - 1)) {
+	if (mmc_str_left(mmc->inbuf, "SERVER_ERROR out of memory", response_len, sizeof("SERVER_ERROR out of memory") - 1) ||
+		mmc_str_left(mmc->inbuf, "SERVER_ERROR object too large", response_len, sizeof("SERVER_ERROR object too large")-1)) {
 		return 0;
 	}
 
