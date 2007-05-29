@@ -176,7 +176,7 @@ struct mmc {
 	mmc_stream_t		udp;					/* auxiliary udp connection */
 	mmc_request_t		*sendreq;				/* currently sending request, NULL if none */
 	mmc_request_t		*readreq;				/* currently reading request, NULL if none */
-	mmc_request_t		*building;				/* request currently being built, NULL if none */
+	mmc_request_t		*buildreq;				/* request currently being built, NULL if none */
 	mmc_queue_t			sendqueue;				/* mmc_queue_t<mmc_request_t *>, requests waiting to be sent */
 	mmc_queue_t			readqueue;				/* mmc_queue_t<mmc_request_t *>, requests waiting to be read */
 	char				*host;

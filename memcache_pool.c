@@ -105,6 +105,20 @@ static inline void mmc_queue_free(mmc_queue_t *queue) {
 	memset(queue, 0, sizeof(*queue));
 }
 
+static inline void mmc_queue_remove(mmc_queue_t *queue, void *ptr) { 
+	void *item;
+	mmc_queue_t original = *queue;
+	mmc_queue_release(queue);
+	
+	while ((item = mmc_queue_pop(&original)) != NULL) {
+		if (item != ptr) {
+			mmc_queue_push(queue, item);
+		}
+	}
+	
+	mmc_queue_free(&original);
+}
+
 static size_t mmc_stream_read_buffered(mmc_stream_t *io, char *buf, size_t count TSRMLS_DC) /* 
 	attempts to reads count bytes from the stream buffer {{{ */
 {
@@ -235,12 +249,17 @@ static int mmc_request_read_udp(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 	
 	/* detect dropped packets and reschedule for tcp delivery */
 	if (request->udp.reqid != ntohs(header->reqid) || request->udp.seqid != ntohs(header->seqid)) {
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "udp packet loss, retrying with tcp %d != %d, %d != %d",
-				(int)request->udp.reqid, (int)ntohs(header->reqid),
-				(int)request->udp.seqid, (int)ntohs(header->seqid));
-		mmc_server_disconnect(mmc, request->io TSRMLS_CC);
+		/* ensure that no more udp requests are scheduled for a while */
 		request->io->status = MMC_STATUS_FAILED;
 		request->io->failed = (long)time(NULL);
+		
+		/* discard packets for previous requests */
+		if (ntohs(header->reqid) < request->udp.reqid) {
+			return MMC_REQUEST_MORE;
+		}
+		
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "udp packet loss, expected %d:%d got %d:%d",
+			(int)request->udp.reqid, (int)request->udp.seqid, (int)ntohs(header->reqid), (int)ntohs(header->seqid));
 		return MMC_REQUEST_RETRY;
 	}
 	
@@ -602,27 +621,11 @@ static void mmc_server_deactivate(mmc_pool_t *pool, mmc_t *mmc TSRMLS_DC) /*
 	mmc->tcp.failed = (long)time(NULL);
 	mmc->udp.failed = mmc->tcp.failed;
 	
-	/* remove server from pool send/read lists */
-	if (mmc->sendreq != NULL || mmc->readreq != NULL) {
-		mmc_t *server;
-		mmc_queue_t *sending = pool->sending, *reading = pool->reading;
-		mmc_pool_switch(pool);
-		
-		while ((server = mmc_queue_pop(sending)) != NULL) {
-			if (server != mmc) {
-				mmc_queue_push(pool->sending, server);
-			}
-		}
-
-		while ((server = mmc_queue_pop(reading)) != NULL) {
-			if (server != mmc) {
-				mmc_queue_push(pool->reading, server);
-			}
-		}
-	}
+	mmc_queue_remove(pool->sending, mmc);
+	mmc_queue_remove(pool->reading, mmc);
 	
 	/* failover queued requests, sendque can be ignored since 
-	 * readreq + readque will always contain all active requests */
+	 * readque + readreq + buildreq will always contain all active requests */
 	mmc_queue_reset(&(mmc->sendqueue));
 	mmc->sendreq = NULL;
 
@@ -634,9 +637,9 @@ static void mmc_server_deactivate(mmc_pool_t *pool, mmc_t *mmc TSRMLS_DC) /*
 		mmc->readreq = NULL;
 	}
 	
-	if (mmc->building != NULL) {
-		mmc_queue_push(&readqueue, mmc->building);
-		mmc->building = NULL;
+	if (mmc->buildreq != NULL) {
+		mmc_queue_push(&readqueue, mmc->buildreq);
+		mmc->buildreq = NULL;
 	}
 
 	/* delegate to failover handlers */
@@ -648,23 +651,34 @@ static void mmc_server_deactivate(mmc_pool_t *pool, mmc_t *mmc TSRMLS_DC) /*
 
 	if (mmc->failure_callback != NULL) {
 		zval *retval;
-		zval **params[2];
-		zval *host, *port;
-
-		params[0] = &host;
-		params[1] = &port;
+		zval *host, *tcp_port, *udp_port, *error, *errnum;
+		zval **params[5] = {&host, &tcp_port, &udp_port, &error, &errnum};
 
 		MAKE_STD_ZVAL(host);
-		MAKE_STD_ZVAL(port);
+		MAKE_STD_ZVAL(tcp_port); MAKE_STD_ZVAL(udp_port);
+		MAKE_STD_ZVAL(error); MAKE_STD_ZVAL(errnum);
 
 		ZVAL_STRING(host, mmc->host, 1);
-		ZVAL_LONG(port, mmc->tcp.port);
+		ZVAL_LONG(tcp_port, mmc->tcp.port); ZVAL_LONG(udp_port, mmc->udp.port);
+		
+		if (mmc->error != NULL) {
+			ZVAL_STRING(error, mmc->error, 1);
+		}
+		else {
+			ZVAL_NULL(error);
+		}
+		ZVAL_LONG(errnum, mmc->errnum);
 
-		call_user_function_ex(EG(function_table), NULL, mmc->failure_callback, &retval, 2, params, 0, NULL TSRMLS_CC);
+		call_user_function_ex(EG(function_table), NULL, mmc->failure_callback, &retval, 5, params, 0, NULL TSRMLS_CC);
 
 		zval_ptr_dtor(&host);
-		zval_ptr_dtor(&port);
+		zval_ptr_dtor(&tcp_port); zval_ptr_dtor(&udp_port);
+		zval_ptr_dtor(&error); zval_ptr_dtor(&errnum);
 		zval_ptr_dtor(&retval);
+	}
+	else {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "server %s (tcp %d, udp %d) failed: %s (%d)", 
+			mmc->host, mmc->tcp.port, mmc->udp.port, mmc->error, mmc->errnum);
 	}
 }
 /* }}} */
@@ -683,8 +697,6 @@ int mmc_server_failure(mmc_t *mmc, mmc_stream_t *io, const char *error, int errn
 	}
 	
 	mmc_server_seterror(mmc, error, errnum);
-	php_error_docref(NULL TSRMLS_CC, E_NOTICE, "server %s:%d failed: %s (%d)", mmc->host, io->port, error, errnum);
-	
 	return MMC_REQUEST_FAILURE;
 }
 /* }}} */
@@ -868,7 +880,7 @@ void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 
 	mmc->sendreq = NULL;
 	mmc->readreq = NULL;
-	mmc->building = NULL;
+	mmc->buildreq = NULL;
 	
 	mmc_queue_free(&(mmc->sendqueue));
 	mmc_queue_free(&(mmc->readqueue));
@@ -1159,32 +1171,32 @@ int mmc_pool_schedule_get(
 		return MMC_REQUEST_FAILURE;
 	}
 	
-	if (mmc->building == NULL) {
+	if (mmc->buildreq == NULL) {
 		mmc_queue_push(&(pool->pending), mmc);
 		
-		mmc->building = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
+		mmc->buildreq = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
 			value_handler, value_handler_param, failover_handler, failover_handler_param TSRMLS_CC);
-		mmc->building->failures = failures;
+		mmc->buildreq->failures = failures;
 
-		smart_str_appendl(&(mmc->building->sendbuf.value), "get", sizeof("get")-1);
+		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "get", sizeof("get")-1);
 	}
-	else if (protocol == MMC_PROTO_UDP && mmc->building->sendbuf.value.len + key_len + 3 > MMC_MAX_UDP_LEN) {
+	else if (protocol == MMC_PROTO_UDP && mmc->buildreq->sendbuf.value.len + key_len + 3 > MMC_MAX_UDP_LEN) {
 		/* datagram if full, schedule for delivery */
-		smart_str_appendl(&(mmc->building->sendbuf.value), "\r\n", sizeof("\r\n")-1);
-		mmc_pool_schedule(pool, mmc, mmc->building TSRMLS_CC);
+		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+		mmc_pool_schedule(pool, mmc, mmc->buildreq TSRMLS_CC);
 
 		/* begin sending requests immediatly */
 		mmc_pool_select(pool, 0 TSRMLS_CC);
 		
-		mmc->building = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
+		mmc->buildreq = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
 			value_handler, value_handler_param, failover_handler, failover_handler_param TSRMLS_CC);
-		mmc->building->failures = failures;
+		mmc->buildreq->failures = failures;
 
-		smart_str_appendl(&(mmc->building->sendbuf.value), "get", sizeof("get")-1);
+		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "get", sizeof("get")-1);
 	}
 
-	smart_str_appendl(&(mmc->building->sendbuf.value), " ", 1);
-	smart_str_appendl(&(mmc->building->sendbuf.value), key, key_len);
+	smart_str_appendl(&(mmc->buildreq->sendbuf.value), " ", 1);
+	smart_str_appendl(&(mmc->buildreq->sendbuf.value), key, key_len);
 
 	return MMC_OK;
 }
@@ -1222,7 +1234,41 @@ static void mmc_pool_switch(mmc_pool_t *pool) {
 	mmc_queue_reset(pool->reading);
 }
 
-void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /* 
+static void mmc_select_failure(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, int result TSRMLS_DC) /* {{{ */
+{
+	if (result == 0) {
+		/* timeout expired, non-responsive server */
+		if (mmc_server_failure(mmc, request->io, "network timeout", 0 TSRMLS_CC) != MMC_REQUEST_RETRY) {
+			mmc_server_deactivate(pool, mmc TSRMLS_CC);
+		}
+	}
+	else {
+		/* hard failure, deactivate connection */
+		mmc_server_seterror(mmc, "select() error", errno);
+		mmc_server_deactivate(pool, mmc TSRMLS_CC);
+	}
+}
+/* }}} */
+
+static void mmc_select_retry(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
+	removes request from send/read queues and calls failover {{{ */
+{
+	mmc_queue_remove(&(mmc->sendqueue), request);
+	mmc_queue_remove(&(mmc->readqueue), request);
+
+	if (mmc->sendreq == request) {
+		mmc_pool_slot_send(pool, mmc, mmc_queue_pop(&(mmc->sendqueue)), 1 TSRMLS_CC);
+	}
+	
+	if (mmc->readreq == request) {
+		mmc->readreq = mmc_queue_pop(&(mmc->readqueue));
+	}
+
+	request->failover_handler(pool, request, request->failover_handler_param TSRMLS_CC);
+}
+/* }}} */
+
+void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /* 
 	runs one select() round on all scheduled requests {{{ */
 {
 	struct timeval tv;
@@ -1255,8 +1301,17 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /*
 		FD_SET(mmc->readreq->io->fd, &rfds);
 	}
 
-	select(nfds + 1, &rfds, &wfds, NULL, &tv);
-
+	result = select(nfds + 1, &rfds, &wfds, NULL, &tv);
+	
+	if (result <= 0) {
+		for (i=0; i<mmc_queue_len(sending); i++) {
+			mmc_select_failure(pool, mmc_queue_item(sending, i), ((mmc_t *)mmc_queue_item(sending, i))->sendreq, result TSRMLS_CC);
+		}
+		for (i=0; i<mmc_queue_len(reading); i++) {
+			mmc_select_failure(pool, mmc_queue_item(reading, i), ((mmc_t *)mmc_queue_item(reading, i))->readreq, result TSRMLS_CC);
+		}
+	}
+	
 	/* until stream buffer is empty */
 	for (i=0; i<mmc_queue_len(sending); i++) {
 		mmc = mmc_queue_item(sending, i);
@@ -1271,15 +1326,13 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /*
 						/* clear out readbit for this round */
 						FD_CLR(mmc->sendreq->io->fd, &rfds);
 
+						/* take server offline and failover requests */
 						mmc_server_deactivate(pool, mmc TSRMLS_CC);
 						break;
 						
 					case MMC_REQUEST_RETRY:
-						/* clear out readbit for this round */
-						FD_CLR(mmc->sendreq->io->fd, &rfds);
-
 						/* allow request to reschedule itself */
-						mmc->sendreq->failover_handler(pool, mmc->sendreq, mmc->sendreq->failover_handler_param TSRMLS_CC);
+						mmc_select_retry(pool, mmc, mmc->sendreq TSRMLS_CC);
 						break;
 						
 					case MMC_REQUEST_DONE:
@@ -1291,7 +1344,6 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /*
 						break;
 
 					default:
-						/* must not be reached */
 						php_error_docref(NULL TSRMLS_CC, E_ERROR, "invalid return value, bailing out");
 				}
 			} while (mmc->sendreq != NULL && (result == MMC_REQUEST_DONE || result == MMC_REQUEST_AGAIN));
@@ -1312,9 +1364,33 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /*
 
 		if (FD_ISSET(mmc->readreq->io->fd, &rfds)) {
 			/* fill read buffer if needed */
-			if (mmc->readreq->read != NULL && mmc->readreq->read(mmc, mmc->readreq TSRMLS_CC) != MMC_OK) {
-				mmc->readreq->failover_handler(pool, mmc->readreq, mmc->readreq->failover_handler_param TSRMLS_CC);
-				continue;
+			if (mmc->readreq->read != NULL) {
+				result = mmc->readreq->read(mmc, mmc->readreq TSRMLS_CC);
+				
+				if (result != MMC_OK) {
+					switch (result) {
+						case MMC_REQUEST_FAILURE:
+							/* take server offline and failover requests */
+							mmc_server_deactivate(pool, mmc TSRMLS_CC);
+							break;
+	
+						case MMC_REQUEST_RETRY:
+							/* allow request to reschedule itself */
+							mmc_select_retry(pool, mmc, mmc->readreq TSRMLS_CC);
+							break;
+
+						case MMC_REQUEST_MORE:
+							/* add server to read queue once more */
+							mmc_queue_push(pool->reading, mmc);
+							break;
+						
+						default:
+							php_error_docref(NULL TSRMLS_CC, E_ERROR, "invalid return value, bailing out");
+					}
+					
+					/* skip to next request */
+					continue;
+				}
 			}
 
 			do {
@@ -1323,12 +1399,13 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /*
 				
 				switch (result) {
 					case MMC_REQUEST_FAILURE:
+						/* take server offline and failover requests */
 						mmc_server_deactivate(pool, mmc TSRMLS_CC);
 						break;
 					
 					case MMC_REQUEST_RETRY:
 						/* allow request to reschedule itself */
-						mmc->readreq->failover_handler(pool, mmc->readreq, mmc->readreq->failover_handler_param TSRMLS_CC);
+						mmc_select_retry(pool, mmc, mmc->readreq TSRMLS_CC);
 						break;
 
 					case MMC_REQUEST_DONE:
@@ -1347,7 +1424,6 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC)  /*
 						break;
 						
 					default:
-						/* must not be reached */
 						php_error_docref(NULL TSRMLS_CC, E_ERROR, "invalid return value, bailing out");
 				}
 			} while (mmc->readreq != NULL && (result == MMC_REQUEST_DONE || result == MMC_REQUEST_AGAIN));
@@ -1370,9 +1446,9 @@ void mmc_pool_run(mmc_pool_t *pool TSRMLS_DC)  /*
 {
 	mmc_t *mmc;
 	while ((mmc = mmc_queue_pop(&(pool->pending))) != NULL) {
-		smart_str_appendl(&(mmc->building->sendbuf.value), "\r\n", sizeof("\r\n")-1);
-		mmc_pool_schedule(pool, mmc, mmc->building TSRMLS_CC);
-		mmc->building = NULL;
+		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+		mmc_pool_schedule(pool, mmc, mmc->buildreq TSRMLS_CC);
+		mmc->buildreq = NULL;
 	}
 
 	while (mmc_queue_len(pool->reading) || mmc_queue_len(pool->sending)) {
