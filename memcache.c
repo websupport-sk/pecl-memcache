@@ -1162,7 +1162,7 @@ PHP_FUNCTION(memcache_get_version)
 }
 /* }}} */
 
-/* {{{ proto bool memcache_add( object memcache, string key, mixed var [, int flag [, int exptime ] ] )
+/* {{{ proto bool memcache_add(object memcache, mixed key [, mixed var [, int flag [, int exptime ] ] ])
    Adds new item. Item with such key should not exist. */
 PHP_FUNCTION(memcache_add)
 {
@@ -1170,7 +1170,7 @@ PHP_FUNCTION(memcache_add)
 }
 /* }}} */
 
-/* {{{ proto bool memcache_set( object memcache, string key, mixed var [, int flag [, int exptime ] ] )
+/* {{{ proto bool memcache_set(object memcache, mixed key [, mixed var [, int flag [, int exptime ] ] ])
    Sets the value of an item. Item may exist or not */
 PHP_FUNCTION(memcache_set)
 {
@@ -1178,7 +1178,7 @@ PHP_FUNCTION(memcache_set)
 }
 /* }}} */
 
-/* {{{ proto bool memcache_replace( object memcache, string key, mixed var [, int flag [, int exptime ] ] )
+/* {{{ proto bool memcache_replace(object memcache, mixed key [, mixed var [, int flag [, int exptime ] ] )
    Replaces existing item. Returns false if item doesn't exist */
 PHP_FUNCTION(memcache_replace)
 {
@@ -1546,7 +1546,7 @@ PHP_FUNCTION(memcache_set_compress_threshold)
 }
 /* }}} */
 
-/* {{{ proto bool memcache_delete( object memcache, string key [, int exptime ])
+/* {{{ proto bool memcache_delete(object memcache, mixed key [, int exptime ])
    Deletes existing item */
 PHP_FUNCTION(memcache_delete)
 {
@@ -1554,7 +1554,7 @@ PHP_FUNCTION(memcache_delete)
 }
 /* }}} */
 
-/* {{{ proto int memcache_increment( object memcache, string key [, int value ] )
+/* {{{ proto mixed memcache_increment(object memcache, mixed key [, int value ])
    Increments existing variable */
 PHP_FUNCTION(memcache_increment)
 {
@@ -1562,7 +1562,7 @@ PHP_FUNCTION(memcache_increment)
 }
 /* }}} */
 
-/* {{{ proto int memcache_decrement( object memcache, string key [, int value ] )
+/* {{{ proto mixed memcache_decrement(object memcache, mixed key [, int value ])
    Decrements existing variable */
 PHP_FUNCTION(memcache_decrement)
 {

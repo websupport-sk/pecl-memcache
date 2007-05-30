@@ -569,8 +569,8 @@ mmc_t *mmc_server_new(
 	
 	mmc->tcp.retry_interval = retry_interval;
 	mmc->tcp.chunk_size = MEMCACHE_G(chunk_size);
-	mmc->udp.retry_interval = retry_interval * 40;
-	mmc->udp.chunk_size = MEMCACHE_G(chunk_size); /*MMC_MAX_UDP_LEN;*/
+	mmc->udp.retry_interval = retry_interval;
+	mmc->udp.chunk_size = MEMCACHE_G(chunk_size); /* = MMC_MAX_UDP_LEN;*/
 
 	return mmc;
 }
@@ -734,7 +734,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 
 	io->stream = php_stream_xport_create(
 		host, host_len,
-		ENFORCE_SAFE_MODE | REPORT_ERRORS, 
+		ENFORCE_SAFE_MODE | (mmc->persistent ? STREAM_OPEN_PERSISTENT : 0), 
 		STREAM_XPORT_CLIENT | STREAM_XPORT_CONNECT,
 		hash_key, &tv, NULL, &errstr, &errnum);
 
