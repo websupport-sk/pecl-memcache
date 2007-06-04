@@ -38,6 +38,7 @@ handy OO and procedural interfaces.
 - Added support for consistent hash strategy
 - New INI directive "memcache.hash_strategy" = {standard, consistent}
 - PHP6 support
+- Fixed PECL bug #11221 (Double free when returning cached object with __sleep)
  </notes>
  <contents>
   <dir name="/">

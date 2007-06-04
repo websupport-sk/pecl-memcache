@@ -1585,19 +1585,30 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 			value_len = Z_STRLEN_P(var);
 			break;
 
-		default:
+		default: {
+			zval var_copy, *var_copy_ptr;
+
+			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
+			var_copy = *var;
+			zval_copy_ctor(&var_copy);
+
+			var_copy_ptr = &var_copy;
+
 			PHP_VAR_SERIALIZE_INIT(var_hash);
-			php_var_serialize(&buf, &var, &var_hash TSRMLS_CC);
+			php_var_serialize(&buf, &var_copy_ptr, &var_hash TSRMLS_CC);
 			PHP_VAR_SERIALIZE_DESTROY(var_hash);
 
 			if (!buf.c) {
-				/* you're trying to save null or something went really wrong */
+				/* something went really wrong */
+				zval_dtor(&var_copy);
 				RETURN_FALSE;
 			}
 
 			value = buf.c;
 			value_len = buf.len;
 			flags |= MMC_SERIALIZED;
+			zval_dtor(&var_copy);
+		}
 			break;
 	}
 
