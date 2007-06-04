@@ -98,7 +98,7 @@ if test "$PHP_MEMCACHE" != "no"; then
   else 
     AC_MSG_RESULT([disabled])
     AC_DEFINE(HAVE_MEMCACHE,1,[Whether you want memcache support])
-    PHP_NEW_EXTENSION(memcache, memcache.c, $ext_shared)
+    PHP_NEW_EXTENSION(memcache, memcache.c memcache_standard_hash.c memcache_consistent_hash.c, $ext_shared)
   fi
 
 dnl this is needed to build the extension with phpize and -Wall
