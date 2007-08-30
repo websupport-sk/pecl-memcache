@@ -33,12 +33,14 @@ typedef struct mmc_standard_state {
 	int						num_servers;
 	mmc_t					**buckets;
 	int						num_buckets;
+	mmc_hash_function		hash;
 } mmc_standard_state_t;
 
-void *mmc_standard_create_state() /* {{{ */
+void *mmc_standard_create_state(mmc_hash_function hash) /* {{{ */
 {
 	mmc_standard_state_t *state = emalloc(sizeof(mmc_standard_state_t));
 	memset(state, 0, sizeof(mmc_standard_state_t));
+	state->hash = hash;
 	return state;
 }
 /* }}} */
@@ -55,26 +57,12 @@ void mmc_standard_free_state(void *s) /* {{{ */
 }
 /* }}} */
 
-static unsigned int mmc_hash(const char *key, int key_len) /* {{{ */
-{
-	unsigned int crc = ~0;
-	int i;
-
-	for (i=0; i<key_len; i++) {
-		CRC32(crc, key[i]);
-	}
-
-	crc = (~crc >> 16) & 0x7fff;
-  	return crc ? crc : 1;
-}
-/* }}} */
-
 mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
 
 	if (state->num_servers > 1) {
-		return state->buckets[mmc_hash(key, key_len) % state->num_buckets];
+		return state->buckets[state->hash(key, key_len) % state->num_buckets];
 	}
 
 	return state->buckets[0];

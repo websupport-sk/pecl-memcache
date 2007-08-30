@@ -28,6 +28,7 @@
 
 #include "php.h"
 #include "php_network.h"
+#include "ext/standard/crc32.h"
 #include "ext/standard/php_var.h"
 #include "ext/standard/php_string.h"
 #include "ext/standard/php_smart_str.h"
@@ -118,6 +119,36 @@ static inline void mmc_queue_remove(mmc_queue_t *queue, void *ptr) {
 	
 	mmc_queue_free(&original);
 }
+
+static unsigned int mmc_hash_crc32(const char *key, int key_len) /* 
+	new style crc32 hash, compatible with other clients {{{ */
+{
+	unsigned int crc = ~0;
+	int i;
+
+	for (i=0; i<key_len; i++) {
+		CRC32(crc, key[i]);
+	}
+
+	crc = (~crc >> 16) & 0x7fff;
+  	return crc ? crc : 1;
+}
+/* }}} */
+
+static unsigned int mmc_hash_fnv1a(const char *key, int key_len) /* 
+	FNV-1a hash {{{ */
+{
+	unsigned int hval = FNV_32_INIT;
+	int i;
+
+	for (i=0; i<key_len; i++) {
+		hval ^= (unsigned int)key[i];
+		hval *= FNV_32_PRIME;
+    }
+
+    return hval;
+}
+/* }}} */
 
 static size_t mmc_stream_read_buffered(mmc_stream_t *io, char *buf, size_t count TSRMLS_DC) /* 
 	attempts to reads count bytes from the stream buffer {{{ */
@@ -922,6 +953,7 @@ void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 
 mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 {
+	mmc_hash_function hash;
 	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
 	memset(pool, 0, sizeof(*pool));
 
@@ -932,8 +964,16 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 		default:
 			pool->hash = &mmc_standard_hash;
 	}
+
+	switch (MEMCACHE_G(hash_function)) {
+		case MMC_HASH_FNV1A:
+			hash = &mmc_hash_fnv1a;
+			break;
+		default:
+			hash = &mmc_hash_crc32;
+	}
 	
-	pool->hash_state = pool->hash->create_state();
+	pool->hash_state = pool->hash->create_state(hash);
 	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
 	
 	pool->sending = &(pool->_sending1);

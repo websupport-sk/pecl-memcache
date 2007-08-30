@@ -69,6 +69,8 @@
 
 #define MMC_STANDARD_HASH 1
 #define MMC_CONSISTENT_HASH 2
+#define MMC_HASH_CRC32 1					/* CRC32 hash function */
+#define MMC_HASH_FNV1A 2					/* FNV-1a hash function */
 
 #define MMC_CONSISTENT_POINTS 160			/* points per server */
 #define MMC_CONSISTENT_BUCKETS 1024			/* number of precomputed buckets, should be power of 2 */
@@ -190,7 +192,8 @@ struct mmc {
 };
 
 /* hashing strategy */
-typedef void * (*mmc_hash_create_state)();
+typedef unsigned int (*mmc_hash_function)(const char *, int);
+typedef void * (*mmc_hash_create_state)(mmc_hash_function);
 typedef void (*mmc_hash_free_state)(void *);
 typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
 typedef void (*mmc_hash_add_server)(void *, mmc_t *, unsigned int);
@@ -204,6 +207,10 @@ typedef struct mmc_hash {
 
 extern mmc_hash_t mmc_standard_hash;
 extern mmc_hash_t mmc_consistent_hash;
+
+/* 32 bit magic FNV-1a prime and init */
+#define FNV_32_PRIME 0x01000193
+#define FNV_32_INIT 0x811c9dc5 
 
 /* server pool */
 struct mmc_pool {
@@ -269,6 +276,7 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long default_port;
 	long chunk_size;
 	long hash_strategy;
+	long hash_function;
 	long allow_failover;
 	long max_failover_attempts;
 ZEND_END_MODULE_GLOBALS(memcache)

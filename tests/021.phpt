@@ -22,7 +22,7 @@ $result4 = $memcache->get(array($balanceKey1, $balanceKey2));
 var_dump($result1);
 var_dump($result2);
 var_dump($result3);
-var_dump(array_values($result4));
+var_dump(is_array($result4) ? array_values($result4) : $result4);
 
 $memcache = new Memcache();
 $memcache->addServer($nonExistingHost, $nonExistingPort);

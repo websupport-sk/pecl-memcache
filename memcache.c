@@ -172,6 +172,23 @@ static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdateHashFunction) /* {{{ */
+{
+	if (!strcasecmp(new_value, "crc32")) {
+		MEMCACHE_G(hash_strategy) = MMC_HASH_CRC32;
+	}
+	else if (!strcasecmp(new_value, "fnv")) {
+		MEMCACHE_G(hash_strategy) = MMC_HASH_FNV1A;
+	}
+	else {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_function must be in set {crc32, fnv} ('%s' given)", new_value);
+		return FAILURE;
+	}
+
+	return SUCCESS;
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.allow_failover",	"1",		PHP_INI_ALL, OnUpdateLong,		allow_failover,	zend_memcache_globals,	memcache_globals)
@@ -179,6 +196,7 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.default_port",		"11211",	PHP_INI_ALL, OnUpdateLong,		default_port,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.chunk_size",		"8192",		PHP_INI_ALL, OnUpdateChunkSize,	chunk_size,		zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.hash_strategy",		"standard",	PHP_INI_ALL, OnUpdateHashStrategy,	hash_strategy,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.hash_function",		"crc32",	PHP_INI_ALL, OnUpdateHashFunction,	hash_function,	zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
 /* }}} */
 

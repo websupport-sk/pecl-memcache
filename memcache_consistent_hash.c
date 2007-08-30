@@ -26,7 +26,6 @@
 #include <stdlib.h>
 
 #include "php.h"
-#include "ext/standard/crc32.h"
 #include "php_memcache.h"
 
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
@@ -42,12 +41,14 @@ typedef struct mmc_consistent_state {
 	int						num_points;
 	mmc_t					*buckets[MMC_CONSISTENT_BUCKETS];
 	int						buckets_populated;
+	mmc_hash_function		hash;
 } mmc_consistent_state_t;
 
-void *mmc_consistent_create_state() /* {{{ */
+void *mmc_consistent_create_state(mmc_hash_function hash) /* {{{ */
 {
 	mmc_consistent_state_t *state = emalloc(sizeof(mmc_consistent_state_t));
 	memset(state, 0, sizeof(mmc_consistent_state_t));
+	state->hash = hash;
 	return state;
 }
 /* }}} */
@@ -61,19 +62,6 @@ void mmc_consistent_free_state(void *s) /* {{{ */
 		}
 		efree(state);
 	}
-}
-/* }}} */
-
-static unsigned int mmc_hash(const char *key, int key_len) /* {{{ */
-{
-	unsigned int crc = ~0;
-	int i;
-
-	for (i=0; i<key_len; i++) {
-		CRC32(crc, key[i]);
-	}
-
-  	return ~crc;
 }
 /* }}} */
 
@@ -139,7 +127,7 @@ mmc_t *mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_D
 		if (!state->buckets_populated) {
 			mmc_consistent_pupulate_buckets(state);
 		}
-		return state->buckets[mmc_hash(key, key_len) % MMC_CONSISTENT_BUCKETS];
+		return state->buckets[state->hash(key, key_len) % MMC_CONSISTENT_BUCKETS];
 	}
 
 	return state->points[0].server;
@@ -163,7 +151,7 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 	for (i=0; i<points; i++) {
 		key_len = spprintf(&key, 0, "%s:%d-%d", mmc->host, mmc->tcp.port, i);
 		state->points[state->num_points + i].server = mmc;
-		state->points[state->num_points + i].point = mmc_hash(key, key_len);
+		state->points[state->num_points + i].point = state->hash(key, key_len);
 		efree(key);
 	}
 
