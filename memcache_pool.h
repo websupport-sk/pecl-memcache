@@ -70,7 +70,7 @@
 #define MMC_STANDARD_HASH 1
 #define MMC_CONSISTENT_HASH 2
 
-#define MMC_CONSISTENT_POINTS 100			/* points per server */
+#define MMC_CONSISTENT_POINTS 160			/* points per server */
 #define MMC_CONSISTENT_BUCKETS 1024			/* number of precomputed buckets, should be power of 2 */
 
 /* io buffer */

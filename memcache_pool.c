@@ -329,8 +329,6 @@ int mmc_prepare_store(
 {
 	char *data = NULL;
 	unsigned int data_len, data_free = 0;
-	smart_str buf = {0};
-	php_serialize_data_t var_hash;
 
 	if (mmc_prepare_key_ex(key, key_len, request->key, &(request->key_len)) != MMC_OK) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
@@ -353,25 +351,35 @@ int mmc_prepare_store(
 			flags &= ~MMC_SERIALIZED;
 			break;
 
-		default:
-			PHP_VAR_SERIALIZE_INIT(var_hash);
+		default: {
+			php_serialize_data_t value_hash;
+			zval value_copy, *value_copy_ptr;
+			smart_str buf = {0};
 			
+			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
+			value_copy = *value;
+			zval_copy_ctor(&value_copy);
+			value_copy_ptr = &value_copy;
+
 			/* TODO: serialize straight into buffer (voids auto-compression) */
-			php_var_serialize(&buf, &value, &var_hash TSRMLS_CC);
+			PHP_VAR_SERIALIZE_INIT(value_hash);
+			php_var_serialize(&buf, &value_copy_ptr, &value_hash TSRMLS_CC);
+			PHP_VAR_SERIALIZE_DESTROY(value_hash);
 
 			/* you're trying to save null or something went really wrong */
 			if (buf.c == NULL) {
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "failed to serialize value");
+				zval_dtor(&value_copy);
 				return MMC_REQUEST_FAILURE;
 			}
 
 			data = buf.c;
 			data_len = buf.len;
 			data_free = 1;
-
-			PHP_VAR_SERIALIZE_DESTROY(var_hash);
 			flags |= MMC_SERIALIZED;
-			break;
+			
+			zval_dtor(&value_copy);
+		}
 	}
 	
 	/* autocompress large values */
