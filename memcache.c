@@ -175,10 +175,10 @@ static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
 static PHP_INI_MH(OnUpdateHashFunction) /* {{{ */
 {
 	if (!strcasecmp(new_value, "crc32")) {
-		MEMCACHE_G(hash_strategy) = MMC_HASH_CRC32;
+		MEMCACHE_G(hash_function) = MMC_HASH_CRC32;
 	}
 	else if (!strcasecmp(new_value, "fnv")) {
-		MEMCACHE_G(hash_strategy) = MMC_HASH_FNV1A;
+		MEMCACHE_G(hash_function) = MMC_HASH_FNV1A;
 	}
 	else {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_function must be in set {crc32, fnv} ('%s' given)", new_value);
@@ -215,6 +215,7 @@ static void _mmc_server_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p TSRMLS_DC)
 {
 	MEMCACHE_G(hash_strategy)	  = MMC_STANDARD_HASH;
+	MEMCACHE_G(hash_function)	  = MMC_HASH_CRC32;
 }
 /* }}} */
 

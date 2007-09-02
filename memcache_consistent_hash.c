@@ -141,12 +141,7 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 	char *key;
 
 	/* add weight * MMC_CONSISTENT_POINTS number of points for this server */
-	if (state->num_points) {
-		state->points = erealloc(state->points, sizeof(mmc_consistent_point_t) * (state->num_points + points));
-	}
-	else {
-		state->points = emalloc(sizeof(mmc_consistent_point_t) * (points));
-	}
+	state->points = erealloc(state->points, sizeof(mmc_consistent_point_t) * (state->num_points + points));
 
 	for (i=0; i<points; i++) {
 		key_len = spprintf(&key, 0, "%s:%d-%d", mmc->host, mmc->tcp.port, i);

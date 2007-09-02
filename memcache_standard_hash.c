@@ -24,7 +24,6 @@
 #endif
 
 #include "php.h"
-#include "ext/standard/crc32.h"
 #include "php_memcache.h"
 
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
@@ -62,7 +61,9 @@ mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC)
 	mmc_standard_state_t *state = s;
 
 	if (state->num_servers > 1) {
-		return state->buckets[state->hash(key, key_len) % state->num_buckets];
+		/* "new-style" hash */
+		unsigned int hash = (state->hash(key, key_len) >> 16) & 0x7fff; 
+		return state->buckets[(hash ? hash : 1) % state->num_buckets];
 	}
 
 	return state->buckets[0];

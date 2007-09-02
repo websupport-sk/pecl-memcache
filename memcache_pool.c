@@ -121,7 +121,7 @@ static inline void mmc_queue_remove(mmc_queue_t *queue, void *ptr) {
 }
 
 static unsigned int mmc_hash_crc32(const char *key, int key_len) /* 
-	new style crc32 hash, compatible with other clients {{{ */
+	CRC32 hash {{{ */
 {
 	unsigned int crc = ~0;
 	int i;
@@ -130,8 +130,7 @@ static unsigned int mmc_hash_crc32(const char *key, int key_len) /*
 		CRC32(crc, key[i]);
 	}
 
-	crc = (~crc >> 16) & 0x7fff;
-  	return crc ? crc : 1;
+  	return ~crc;
 }
 /* }}} */
 
@@ -1192,7 +1191,7 @@ static mmc_t *mmc_pool_find(mmc_pool_t *pool, const char *key, unsigned int key_
 	mmc_t *mmc = pool->hash->find_server(pool->hash_state, key, key_len TSRMLS_CC);
 
 	for (i=0; !mmc_server_valid(mmc TSRMLS_CC) && MEMCACHE_G(allow_failover) && i < MEMCACHE_G(max_failover_attempts); i++) {
-		keytmp_len = sprintf(keytmp, "%d%s", i, key);
+		keytmp_len = sprintf(keytmp, "%s-%d", key, i);
 		mmc = pool->hash->find_server(pool->hash_state, keytmp, keytmp_len TSRMLS_CC);
 	}
 	
