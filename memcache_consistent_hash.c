@@ -26,7 +26,6 @@
 #include <stdlib.h>
 
 #include "php.h"
-#include "ext/standard/crc32.h"
 #include "php_memcache.h"
 
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
@@ -42,12 +41,14 @@ typedef struct mmc_consistent_state {
 	int						num_points;
 	mmc_t					*buckets[MMC_CONSISTENT_BUCKETS];
 	int						buckets_populated;
+	mmc_hash_function		hash;
 } mmc_consistent_state_t;
 
-void *mmc_consistent_create_state() /* {{{ */
+void *mmc_consistent_create_state(mmc_hash_function hash) /* {{{ */
 {
 	mmc_consistent_state_t *state = emalloc(sizeof(mmc_consistent_state_t));
 	memset(state, 0, sizeof(mmc_consistent_state_t));
+	state->hash = hash;
 	return state;
 }
 /* }}} */
@@ -61,19 +62,6 @@ void mmc_consistent_free_state(void *s) /* {{{ */
 		}
 		efree(state);
 	}
-}
-/* }}} */
-
-static unsigned int mmc_hash(const char *key, int key_len) /* {{{ */
-{
-	unsigned int crc = ~0;
-	int i;
-
-	for (i=0; i<key_len; i++) {
-		CRC32(crc, key[i]);
-	}
-
-  	return ~crc;
 }
 /* }}} */
 
@@ -138,7 +126,7 @@ mmc_t *mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_D
 	mmc_t *mmc;
 
 	if (state->num_servers > 1) {
-		unsigned int i, hash = mmc_hash(key, key_len);
+		unsigned int i, hash = state->hash(key, key_len);
 
 		if (!state->buckets_populated) {
 			mmc_consistent_pupulate_buckets(state);
@@ -149,10 +137,10 @@ mmc_t *mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_D
 		/* perform failover if needed */
 		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
 			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
-			int next_len = sprintf(next_key, "%d%s", i+1, key);
+			int next_len = sprintf(next_key, "%s-%d", key, i);
 			MMC_DEBUG(("mmc_consistent_find_server: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
 
-			hash += mmc_hash(next_key, next_len);
+			hash = state->hash(next_key, next_len);
 			mmc = state->buckets[hash % MMC_CONSISTENT_BUCKETS];
 
 			efree(next_key);
@@ -174,17 +162,12 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 	char *key;
 
 	/* add weight * MMC_CONSISTENT_POINTS number of points for this server */
-	if (state->num_points) {
-		state->points = erealloc(state->points, sizeof(mmc_consistent_point_t) * (state->num_points + points));
-	}
-	else {
-		state->points = emalloc(sizeof(mmc_consistent_point_t) * (points));
-	}
+	state->points = erealloc(state->points, sizeof(mmc_consistent_point_t) * (state->num_points + points));
 
 	for (i=0; i<points; i++) {
 		key_len = spprintf(&key, 0, "%s:%d-%d", mmc->host, mmc->port, i);
 		state->points[state->num_points + i].server = mmc;
-		state->points[state->num_points + i].point = mmc_hash(key, key_len);
+		state->points[state->num_points + i].point = state->hash(key, key_len);
 		MMC_DEBUG(("mmc_consistent_add_server: key %s, point %lu", key, state->points[state->num_points + i].point));
 		efree(key);
 	}

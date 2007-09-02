@@ -24,7 +24,6 @@
 #endif
 
 #include "php.h"
-#include "ext/standard/crc32.h"
 #include "php_memcache.h"
 
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
@@ -33,12 +32,14 @@ typedef struct mmc_standard_state {
 	int						num_servers;
 	mmc_t					**buckets;
 	int						num_buckets;
+	mmc_hash_function		hash;
 } mmc_standard_state_t;
 
-void *mmc_standard_create_state() /* {{{ */
+void *mmc_standard_create_state(mmc_hash_function hash) /* {{{ */
 {
 	mmc_standard_state_t *state = emalloc(sizeof(mmc_standard_state_t));
 	memset(state, 0, sizeof(mmc_standard_state_t));
+	state->hash = hash;
 	return state;
 }
 /* }}} */
@@ -55,17 +56,10 @@ void mmc_standard_free_state(void *s) /* {{{ */
 }
 /* }}} */
 
-static unsigned int mmc_hash(const char *key, int key_len) /* {{{ */
+static unsigned int mmc_hash(mmc_standard_state_t *state, const char *key, int key_len) /* {{{ */
 {
-	unsigned int crc = ~0;
-	int i;
-
-	for (i=0; i<key_len; i++) {
-		CRC32(crc, key[i]);
-	}
-
-	crc = (~crc >> 16) & 0x7fff;
-  	return crc ? crc : 1;
+	unsigned int hash = (~state->hash(key, key_len) >> 16) & 0x7fff;
+  	return hash ? hash : 1;
 }
 /* }}} */
 
@@ -75,7 +69,7 @@ mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC)
 	mmc_t *mmc;
 
 	if (state->num_servers > 1) {
-		unsigned int hash = mmc_hash(key, key_len), i;
+		unsigned int hash = mmc_hash(state, key, key_len), i;
 		mmc = state->buckets[hash % state->num_buckets];
 
 		/* perform failover if needed */
@@ -84,7 +78,7 @@ mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC)
 			int next_len = sprintf(next_key, "%d%s", i+1, key);
 			MMC_DEBUG(("mmc_standard_find_server: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
 
-			hash += mmc_hash(next_key, next_len);
+			hash += mmc_hash(state, next_key, next_len);
 			mmc = state->buckets[hash % state->num_buckets];
 
 			efree(next_key);

@@ -12,8 +12,8 @@ $host = "localhost";
 $port = 11211;
 
 // Start an extra server and uncomment to enable load-balancing and failover tests
-//$host2 = "localhost";
-//$port2 = 11212;
+$host2 = "localhost";
+$port2 = 11212;
 
 /* Start a server listening to a unix domain socket
  *
@@ -22,7 +22,7 @@ $port = 11211;
  * memcached -d -u memcached -s /var/run/memcached/memcached.sock
  * chmod a+w /var/run/memcached/memcached.sock
  */
-//$domainsocket = 'unix:///var/run/memcached/memcached.sock';
+$domainsocket = 'unix:///var/run/memcached/memcached.sock';
 
 $nonExistingHost = "localhost";
 $nonExistingPort = 11213;

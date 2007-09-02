@@ -35,6 +35,7 @@
 
 #include <zlib.h>
 #include <time.h>
+#include "ext/standard/crc32.h"
 #include "ext/standard/info.h"
 #include "ext/standard/php_string.h"
 #include "ext/standard/php_var.h"
@@ -170,6 +171,23 @@ static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdateHashFunction) /* {{{ */
+{
+	if (!strcasecmp(new_value, "crc32")) {
+		MEMCACHE_G(hash_function) = MMC_HASH_CRC32;
+	}
+	else if (!strcasecmp(new_value, "fnv")) {
+		MEMCACHE_G(hash_function) = MMC_HASH_FNV1A;
+	}
+	else {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_function must be in set {crc32, fnv} ('%s' given)", new_value);
+		return FAILURE;
+	}
+
+	return SUCCESS;
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.allow_failover",	"1",		PHP_INI_ALL, OnUpdateLong,		allow_failover,	zend_memcache_globals,	memcache_globals)
@@ -177,6 +195,7 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.default_port",		"11211",	PHP_INI_ALL, OnUpdateLong,		default_port,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.chunk_size",		"8192",		PHP_INI_ALL, OnUpdateChunkSize,	chunk_size,		zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.hash_strategy",		"standard",	PHP_INI_ALL, OnUpdateHashStrategy,	hash_strategy,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.hash_function",		"crc32",	PHP_INI_ALL, OnUpdateHashFunction,	hash_function,	zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -226,6 +245,7 @@ static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p 
 	MEMCACHE_G(num_persistent)	  = 0;
 	MEMCACHE_G(compression_level) = Z_DEFAULT_COMPRESSION;
 	MEMCACHE_G(hash_strategy)	  = MMC_STANDARD_HASH;
+	MEMCACHE_G(hash_function)	  = MMC_HASH_CRC32;
 }
 /* }}} */
 
@@ -467,8 +487,38 @@ static int mmc_server_store(mmc_t *mmc, const char *request, int request_len TSR
 }
 /* }}} */
 
+static unsigned int mmc_hash_crc32(const char *key, int key_len) /* 
+	CRC32 hash {{{ */
+{
+	unsigned int crc = ~0;
+	int i;
+
+	for (i=0; i<key_len; i++) {
+		CRC32(crc, key[i]);
+	}
+
+  	return ~crc;
+}
+/* }}} */
+
+static unsigned int mmc_hash_fnv1a(const char *key, int key_len) /* 
+	FNV-1a hash {{{ */
+{
+	unsigned int hval = FNV_32_INIT;
+	int i;
+
+	for (i=0; i<key_len; i++) {
+		hval ^= (unsigned int)key[i];
+		hval *= FNV_32_PRIME;
+    }
+
+    return hval;
+}
+/* }}} */
+
 mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 {
+	mmc_hash_function hash;
 	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
 	pool->num_servers = 0;
 	pool->compress_threshold = 0;
@@ -482,7 +532,16 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 		default:
 			pool->hash = &mmc_standard_hash;
 	}
-	pool->hash_state = pool->hash->create_state();
+	
+	switch (MEMCACHE_G(hash_function)) {
+		case MMC_HASH_FNV1A:
+			hash = &mmc_hash_fnv1a;
+			break;
+		default:
+			hash = &mmc_hash_crc32;
+	}
+	
+	pool->hash_state = pool->hash->create_state(hash);
 
 	return pool;
 }
