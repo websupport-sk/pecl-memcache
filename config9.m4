@@ -66,16 +66,12 @@ if test "$PHP_MEMCACHE" != "no"; then
 	AC_MSG_CHECKING([for session includes])
     session_inc_path=""
 
-    if test -f $abs_srcdir/include/php/ext/session/php_session.h; then
-      session_inc_path=$abs_srcdir/include/php
-    elif test -f $abs_srcdir/ext/session/php_session.h; then
-      session_inc_path=$abs_srcdir
-    else
-      for i in php4 php5 php6 php; do
-        if test -f $prefix/include/$i/ext/session/php_session.h; then
-          session_inc_path=$prefix/include/$i
-        fi
-      done
+    if test -f "$abs_srcdir/include/php/ext/session/php_session.h"; then
+      session_inc_path="$abs_srcdir/include/php"
+    elif test -f "$abs_srcdir/ext/session/php_session.h"; then
+      session_inc_path="$abs_srcdir"
+    elif test -f "$phpincludedir/ext/session/php_session.h"; then
+      session_inc_path="$phpincludedir"
     fi
 
     if test "$session_inc_path" = ""; then
