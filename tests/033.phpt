@@ -7,12 +7,15 @@ memcache->addServer() with server failure callback
 
 include 'connect.inc';
 
-function _callback_server_failure($host, $port) {
+function _callback_server_failure($host, $tcp_port, $udp_port, $error, $errnum) {
 	var_dump($host);
-	var_dump($port);
+	var_dump($tcp_port);
+	var_dump($udp_port);
+	var_dump($error);
+	var_dump($errnum);
 
 	global $memcache;
-	$memcache->setServerParams($host, $port, 1, -1, false, '_callback_server_failure');
+	$memcache->setServerParams($host, $tcp_port, 1, -1, false, '_callback_server_failure');
 }
 
 // Test function callback using addServer()
@@ -23,9 +26,12 @@ $result1 = $memcache->set('test_key', 'test-032-01');
 var_dump($result1);
 
 class MemcachedFailureHandler {
-	function _callback_server_failure($host, $port) {
+	function _callback_server_failure($host, $tcp_port, $udp_port, $error, $errnum) {
 		var_dump($host);
-		var_dump($port);
+		var_dump($tcp_port);
+		var_dump($udp_port);
+		var_dump($error);
+		var_dump($errnum);
 	}
 }
 
@@ -63,10 +69,16 @@ var_dump($result7);
 --EXPECTF--
 string(%d) "%s"
 int(%d)
+int(%d)
+string(18) "Connection refused"
+int(111)
 bool(false)
 bool(true)
 string(%d) "%s"
 int(%d)
+int(%d)
+string(18) "Connection refused"
+int(111)
 bool(false)
 bool(false)
 bool(false)

@@ -458,7 +458,7 @@ static void mmc_server_received_error(mmc_t *mmc, int response_len)  /* {{{ */
 		mmc_str_left(mmc->inbuf, "CLIENT_ERROR", response_len, sizeof("CLIENT_ERROR") - 1) ||
 		mmc_str_left(mmc->inbuf, "SERVER_ERROR", response_len, sizeof("SERVER_ERROR") - 1)) 
 	{
-		mmc->inbuf[response_len] = '\0';
+		mmc->inbuf[response_len < MMC_BUF_SIZE - 1 ? response_len : MMC_BUF_SIZE - 1] = '\0';
 		mmc_server_seterror(mmc, mmc->inbuf, 0);
 	}
 	else {
