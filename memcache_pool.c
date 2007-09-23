@@ -263,10 +263,10 @@ static int mmc_request_read_udp(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 	bytes = php_stream_read(request->io->stream, request->io->buffer.value.c + request->io->buffer.value.len, MMC_MAX_UDP_LEN + 1);
 	
 	if (bytes < sizeof(mmc_udp_header_t)) {
-		return mmc_server_failure(mmc, request->io, "failed reading complete UDP header from stream", 0 TSRMLS_CC);
+		return mmc_server_failure(mmc, request->io, "Failed te read complete UDP header from stream", 0 TSRMLS_CC);
 	}
 	if (bytes > MMC_MAX_UDP_LEN) {
-		return mmc_server_failure(mmc, request->io, "server sent packet larger than MMC_MAX_UDP_LEN bytes", 0 TSRMLS_CC);
+		return mmc_server_failure(mmc, request->io, "Server sent packet larger than MMC_MAX_UDP_LEN bytes", 0 TSRMLS_CC);
 	}
 	
 	header = (mmc_udp_header_t *)(request->io->buffer.value.c + request->io->buffer.value.len);
@@ -288,7 +288,7 @@ static int mmc_request_read_udp(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 			return MMC_REQUEST_MORE;
 		}
 		
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "udp packet loss, expected %d:%d got %d:%d",
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "UDP packet loss, expected %d:%d got %d:%d",
 			(int)request->udp.reqid, (int)request->udp.seqid, (int)ntohs(header->reqid), (int)ntohs(header->seqid));
 		return MMC_REQUEST_RETRY;
 	}
@@ -361,7 +361,7 @@ int mmc_prepare_store(
 	unsigned int data_len, data_free = 0;
 
 	if (mmc_prepare_key_ex(key, key_len, request->key, &(request->key_len)) != MMC_OK) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 		return MMC_REQUEST_FAILURE;
 	}
 
@@ -398,7 +398,7 @@ int mmc_prepare_store(
 
 			/* you're trying to save null or something went really wrong */
 			if (buf.c == NULL) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "failed to serialize value");
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to serialize value");
 				zval_dtor(&value_copy);
 				return MMC_REQUEST_FAILURE;
 			}
@@ -476,7 +476,7 @@ static int mmc_unpack_value(mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *bu
 	
 	if (request->value.flags & MMC_COMPRESSED) {
 		if (mmc_uncompress(buffer->value.c, request->value.bytes, &data, &data_len) != MMC_OK) {
-			return mmc_server_failure(mmc, request->io, "failed to uncompress data", 0 TSRMLS_CC);
+			return mmc_server_failure(mmc, request->io, "Failed to uncompress data", 0 TSRMLS_CC);
 		}
 	}
 	else {
@@ -495,7 +495,7 @@ static int mmc_unpack_value(mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *bu
 			if (request->value.flags & MMC_COMPRESSED) {
 				efree(data);
 			}
-			return mmc_server_failure(mmc, request->io, "failed to unserialize data", 0 TSRMLS_CC);
+			return mmc_server_failure(mmc, request->io, "Failed to unserialize data", 0 TSRMLS_CC);
 		}
 
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
@@ -567,7 +567,7 @@ int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 			return MMC_REQUEST_DONE;
 		}
 		if (sscanf(line, MMC_VALUE_HEADER, request->value.key, &(request->value.flags), &(request->value.bytes)) != 3) {
-			return mmc_server_failure(mmc, request->io, "failed parsing VALUE line", 0 TSRMLS_CC);
+			return mmc_server_failure(mmc, request->io, "Malformed VALUE header", 0 TSRMLS_CC);
 		}
 		
 		request->value.key_len = strlen(request->value.key);
@@ -715,7 +715,7 @@ static void mmc_server_deactivate(mmc_pool_t *pool, mmc_t *mmc TSRMLS_DC) /*
 		zval_ptr_dtor(&retval);
 	}
 	else {
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "server %s (tcp %d, udp %d) failed: %s (%d)", 
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Server %s (tcp %d, udp %d) failed with: %s (%d)", 
 			mmc->host, mmc->tcp.port, mmc->udp.port, mmc->error, mmc->errnum);
 	}
 }
@@ -936,7 +936,7 @@ void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	if (mmc->in_free) {
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "recursive reference detected, bailing out");
+		php_error_docref(NULL TSRMLS_CC, E_ERROR, "Recursive reference detected, bailing out");
 		return;
 	}
 	mmc->in_free = 1;
@@ -988,7 +988,7 @@ void mmc_pool_free(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 	mmc_request_t *request;
 
 	if (pool->in_free) {
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "recursive reference detected, bailing out");
+		php_error_docref(NULL TSRMLS_CC, E_ERROR, "Recursive reference detected, bailing out");
 		return;
 	}
 	pool->in_free = 1;
@@ -1285,13 +1285,13 @@ static void mmc_select_failure(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *requ
 {
 	if (result == 0) {
 		/* timeout expired, non-responsive server */
-		if (mmc_server_failure(mmc, request->io, "network timeout", 0 TSRMLS_CC) != MMC_REQUEST_RETRY) {
+		if (mmc_server_failure(mmc, request->io, "Network timeout", 0 TSRMLS_CC) != MMC_REQUEST_RETRY) {
 			mmc_server_deactivate(pool, mmc TSRMLS_CC);
 		}
 	}
 	else {
 		/* hard failure, deactivate connection */
-		mmc_server_seterror(mmc, "select() error", errno);
+		mmc_server_seterror(mmc, "Unknown select() error", errno);
 		mmc_server_deactivate(pool, mmc TSRMLS_CC);
 	}
 }
@@ -1391,7 +1391,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 						break;
 
 					default:
-						php_error_docref(NULL TSRMLS_CC, E_ERROR, "invalid return value, bailing out");
+						php_error_docref(NULL TSRMLS_CC, E_ERROR, "Invalid return value, bailing out");
 				}
 			} while (mmc->sendreq != NULL && (result == MMC_REQUEST_DONE || result == MMC_REQUEST_AGAIN));
 
@@ -1432,7 +1432,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 							break;
 						
 						default:
-							php_error_docref(NULL TSRMLS_CC, E_ERROR, "invalid return value, bailing out");
+							php_error_docref(NULL TSRMLS_CC, E_ERROR, "Invalid return value, bailing out");
 					}
 					
 					/* skip to next request */
@@ -1471,7 +1471,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 						break;
 						
 					default:
-						php_error_docref(NULL TSRMLS_CC, E_ERROR, "invalid return value, bailing out");
+						php_error_docref(NULL TSRMLS_CC, E_ERROR, "Invalid return value, bailing out");
 				}
 			} while (mmc->readreq != NULL && (result == MMC_REQUEST_DONE || result == MMC_REQUEST_AGAIN));
 			

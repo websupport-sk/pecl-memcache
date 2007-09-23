@@ -298,14 +298,14 @@ static int mmc_get_pool(zval *id, mmc_pool_t **pool TSRMLS_DC) /* {{{ */
 	int resource_type;
 
 	if (Z_TYPE_P(id) != IS_OBJECT || zend_hash_find(Z_OBJPROP_P(id), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "cannot find connection identifier");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to extract 'connection' variable from object");
 		return 0;
 	}
 
 	*pool = (mmc_pool_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
 
 	if (!*pool || resource_type != le_memcache_pool) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "connection identifier not found");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown connection identifier");
 		return 0;
 	}
 
@@ -333,7 +333,7 @@ int mmc_stored_handler(mmc_t *mmc, mmc_request_t *request, void *value, unsigned
 		return MMC_REQUEST_DONE;
 	}
 
-	return mmc_server_failure(mmc, request->io, "invalid set/add/replace response line", 0 TSRMLS_CC);
+	return mmc_server_failure(mmc, request->io, "Invalid set/add/replace response", 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -387,7 +387,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 					break;
 
 				default:
-					php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
+					php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 					continue;
 			}
 
@@ -459,7 +459,7 @@ static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, void *value, 
 		return MMC_REQUEST_DONE;
 	}
 	
-	return mmc_server_failure(mmc, request->io, "invalid delete response line", 0 TSRMLS_CC);
+	return mmc_server_failure(mmc, request->io, "Invalid delete response", 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -468,7 +468,7 @@ static int mmc_numeric_handler(mmc_t *mmc, mmc_request_t *request, void *value, 
 {
 	/* must contain digit(s) + \r\n */
 	if (value_len < 3) {
-		return mmc_server_failure(mmc, request->io, "invalid incr/decr response line", 0 TSRMLS_CC);
+		return mmc_server_failure(mmc, request->io, "Invalid incr/decr response", 0 TSRMLS_CC);
 	}
 	
 	/* append return value to result array */
@@ -547,7 +547,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 
 			if (mmc_prepare_key(*key, request->key, &(request->key_len)) != MMC_OK) {
 				mmc_pool_release(pool, request);
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 				continue;
 			}
 			
@@ -585,7 +585,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 
 		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {
 			mmc_pool_release(pool, request);
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 			RETURN_FALSE;
 		}
 
@@ -708,7 +708,7 @@ static mmc_t *php_mmc_pool_addserver(
 	else {
 		pool = (mmc_pool_t *)zend_list_find(Z_LVAL_PP(connection), &resource_type);
 		if (!pool || resource_type != le_memcache_pool) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "connection identifier not found");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown connection identifier");
 			return NULL;
 		}
 	}
@@ -996,7 +996,7 @@ PHP_FUNCTION(memcache_add_server)
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
 		if (!zend_is_callable(failure_callback, 0, NULL)) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid failure callback passed");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
 	}
@@ -1051,13 +1051,13 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	if (!mmc) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "server not found in pool");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Server not found in pool");
 		RETURN_FALSE;
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
 		if (!zend_is_callable(failure_callback, 0, NULL)) {
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid failure callback passed");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
 	}
@@ -1125,7 +1125,7 @@ PHP_FUNCTION(memcache_get_server_status)
 	}
 
 	if (!mmc) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "server not found in pool");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Server not found in pool");
 		RETURN_FALSE;
 	}
 
@@ -1141,7 +1141,7 @@ static int mmc_version_handler(mmc_t *mmc, mmc_request_t *request, void *value, 
 	
 	if (sscanf((char *)value, "VERSION %s", version) != 1) {
 		efree(version);
-		return mmc_server_failure(mmc, request->io, "failed parsing VERSION line", 0 TSRMLS_CC);
+		return mmc_server_failure(mmc, request->io, "Malformed VERSION response", 0 TSRMLS_CC);
 	}
 	
 	ZVAL_STRINGL((zval *)param, version, version_len, 0);
@@ -1311,7 +1311,7 @@ PHP_FUNCTION(memcache_get)
 			zend_hash_move_forward_ex(Z_ARRVAL_P(keys), &pos);
 			
 			if (mmc_prepare_key(*key, keytmp, &keytmp_len) != MMC_OK) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 				continue;
 			}
 			
@@ -1330,7 +1330,7 @@ PHP_FUNCTION(memcache_get)
 
 		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {
 			mmc_pool_release(pool, request);
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid key");
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 			return;
 		}
 
@@ -1421,7 +1421,7 @@ PHP_FUNCTION(memcache_get_stats)
 	}
 	
 	if (!mmc_stats_checktype(type)) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid stats type");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid stats type");
 		RETURN_FALSE;
 	}
 
@@ -1482,7 +1482,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 	}
 
 	if (!mmc_stats_checktype(type)) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid stats type");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid stats type");
 		RETURN_FALSE;
 	}
 	
@@ -1622,7 +1622,7 @@ static int mmc_flush_handler(mmc_t *mmc, mmc_request_t *request, void *value, un
 	parses the OK response line, param is an int pointer to increment on success {{{ */
 {
 	if (!mmc_str_left((char *)value, "OK", value_len, sizeof("OK")-1)) {
-		return mmc_server_failure(mmc, request->io, "expected OK", 0 TSRMLS_CC);
+		return mmc_server_failure(mmc, request->io, "Expected OK", 0 TSRMLS_CC);
 	}
 	(*((int *)param))++;
 	return MMC_REQUEST_DONE;

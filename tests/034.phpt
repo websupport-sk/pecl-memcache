@@ -50,7 +50,7 @@ var_dump(isset($result["$host:$port"]['items']));
 bool(true)
 string(%d) "%d"
 
-Warning: %s: invalid stats type %s
+Warning: %s: Invalid stats type %s
 bool(false)
 bool(true)
 string(%d) "%d"
@@ -62,6 +62,6 @@ string(%d) "%d"
 string(%d) "%d"
 
 
-Warning: %s: invalid stats type %s
+Warning: %s: Invalid stats type %s
 NULL
 bool(true)
