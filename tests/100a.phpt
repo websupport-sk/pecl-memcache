@@ -11,15 +11,15 @@ memcache_flush()
 
 include 'connect.inc';
 
-memcache_add_server($memcache, $nonExistingHost, $nonExistingPort);
+memcache_add_server($memcache, $nonExistingHost, $nonExistingPort, false);
 
-$result1 = @memcache_flush($memcache);
+$result1 = memcache_flush($memcache);
 var_dump($result1);
 
 $memcache2 = new Memcache();
-$memcache2->addServer($nonExistingHost, $nonExistingPort);
+$memcache2->addServer($nonExistingHost, $nonExistingPort, false);
 
-$result2 = @memcache_flush($memcache2);
+$result2 = memcache_flush($memcache2);
 var_dump($result2);
 
 memcache_close($memcache);
@@ -31,10 +31,13 @@ echo "Done\n";
 
 ?>
 --EXPECTF--
+Notice: memcache_flush(): Server %s failed with: Connection refused (111) in %s on line %d
 bool(true)
+
+Notice: memcache_flush(): Server %s failed with: Connection refused (111) in %s on line %d
 bool(false)
 
-Notice: memcache_flush()%s marked server '%s' as failed in %s on line %d
+Notice: memcache_flush(): Server %s failed with: Connection refused (111) in %s on line %d
 bool(true)
 
 Warning: memcache_flush() expects parameter 1 to be Memcache, object given in %s on line %d

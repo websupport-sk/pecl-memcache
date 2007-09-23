@@ -54,7 +54,7 @@ var_dump($result5);
 $memcache = new Memcache();
 $memcache->addServer($nonExistingHost, $nonExistingPort, false, 1, 1, 15, true, '_callback_server_failure');
 $result6 = $memcache->setServerParams($nonExistingHost, $nonExistingPort, 1, 15, true, null);
-$result7 = $memcache->set('test_key', 'test-032-01');
+$result7 = @$memcache->set('test_key', 'test-032-01');
 
 var_dump($result6);
 var_dump($result7);

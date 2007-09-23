@@ -95,6 +95,8 @@ typedef struct mmc {
 	long					retry_interval;
 	int						persistent;
 	int						status;
+	char					*error;					/* last error message */
+	int						errnum;					/* last error code */
 	zval					*failure_callback;
 	zend_bool				in_free;
 } mmc_t;
@@ -148,6 +150,7 @@ ZEND_END_MODULE_GLOBALS(memcache)
 mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int TSRMLS_DC);
 mmc_t *mmc_find_persistent(char *, int, int, int, int TSRMLS_DC);
 int mmc_server_failure(mmc_t * TSRMLS_DC);
+void mmc_server_deactivate(mmc_t * TSRMLS_DC);
 
 mmc_pool_t *mmc_pool_new(TSRMLS_D);
 void mmc_pool_free(mmc_pool_t * TSRMLS_DC);

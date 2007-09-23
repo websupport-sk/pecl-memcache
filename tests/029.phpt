@@ -16,7 +16,7 @@ $memcache = new Memcache();
 $memcache->addServer($host, $port);
 $memcache->addServer($nonExistingHost, $nonExistingPort);
 
-$result1 = $memcache->set($balanceKey1, $var1, false, 1);	// hashes to $host2
+$result1 = @$memcache->set($balanceKey1, $var1, false, 1);	// hashes to $host2
 $result2 = $memcache->set($balanceKey2, $var2, false, 1);	// hashes to $host1
 $result3 = $memcache->get($balanceKey1);
 $result4 = $memcache->get($balanceKey2);

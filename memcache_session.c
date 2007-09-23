@@ -32,8 +32,6 @@
 #include "ext/standard/url.h"
 #include "php_memcache.h"
 
-#if HAVE_MEMCACHE_SESSION
-
 ps_module ps_mod_memcache = {
 	PS_MOD(memcache)
 };
@@ -191,8 +189,8 @@ PS_DESTROY_FUNC(memcache)
 
 	if (pool) {
 		while (result < 0 && (mmc = mmc_pool_find(pool, key, strlen(key) TSRMLS_CC)) != NULL) {
-			if ((result = mmc_delete(mmc, key, strlen(key), 0 TSRMLS_CC)) < 0 && mmc_server_failure(mmc TSRMLS_CC)) {
-				php_error_docref(NULL TSRMLS_CC, E_NOTICE, "marked server '%s:%d' as failed", mmc->host, mmc->port);
+			if ((result = mmc_delete(mmc, key, strlen(key), 0 TSRMLS_CC)) < 0) {
+				mmc_server_failure(mmc TSRMLS_CC);
 			}
 		}
 
@@ -213,7 +211,6 @@ PS_GC_FUNC(memcache)
 }
 /* }}} */
 
-#endif /* HAVE_MEMCACHE_SESSION */
 /*
  * Local variables:
  * tab-width: 4
