@@ -6,7 +6,7 @@ PHP_ARG_ENABLE(memcache, whether to enable memcache support,
 [  --enable-memcache       Enable memcache support])
 
 PHP_ARG_ENABLE(memcache-session, whether to enable memcache session handler support,
-[  --disable-memcache-session       Disable memcache session handler support], yes)
+[  --disable-memcache-session       Disable memcache session handler support], yes, no)
 
 if test -z "$PHP_ZLIB_DIR"; then
 PHP_ARG_WITH(zlib-dir, for the location of ZLIB,
