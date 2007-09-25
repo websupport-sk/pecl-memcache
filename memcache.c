@@ -333,7 +333,7 @@ int mmc_stored_handler(mmc_t *mmc, mmc_request_t *request, void *value, unsigned
 		return MMC_REQUEST_DONE;
 	}
 
-	return mmc_server_failure(mmc, request->io, "Invalid set/add/replace response", 0 TSRMLS_CC);
+	return mmc_request_failure(mmc, request->io, (char *)value, value_len, 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -459,7 +459,7 @@ static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, void *value, 
 		return MMC_REQUEST_DONE;
 	}
 	
-	return mmc_server_failure(mmc, request->io, "Invalid delete response", 0 TSRMLS_CC);
+	return mmc_request_failure(mmc, request->io, (char *)value, value_len, 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -468,7 +468,7 @@ static int mmc_numeric_handler(mmc_t *mmc, mmc_request_t *request, void *value, 
 {
 	/* must contain digit(s) + \r\n */
 	if (value_len < 3) {
-		return mmc_server_failure(mmc, request->io, "Invalid incr/decr response", 0 TSRMLS_CC);
+		return mmc_request_failure(mmc, request->io, (char *)value, value_len, 0 TSRMLS_CC);
 	}
 	
 	/* append return value to result array */
@@ -1141,7 +1141,7 @@ static int mmc_version_handler(mmc_t *mmc, mmc_request_t *request, void *value, 
 	
 	if (sscanf((char *)value, "VERSION %s", version) != 1) {
 		efree(version);
-		return mmc_server_failure(mmc, request->io, "Malformed VERSION response", 0 TSRMLS_CC);
+		return mmc_request_failure(mmc, request->io, (char *)value, value_len, 0 TSRMLS_CC);
 	}
 	
 	ZVAL_STRINGL((zval *)param, version, version_len, 0);
@@ -1622,7 +1622,7 @@ static int mmc_flush_handler(mmc_t *mmc, mmc_request_t *request, void *value, un
 	parses the OK response line, param is an int pointer to increment on success {{{ */
 {
 	if (!mmc_str_left((char *)value, "OK", value_len, sizeof("OK")-1)) {
-		return mmc_server_failure(mmc, request->io, "Expected OK", 0 TSRMLS_CC);
+		return mmc_request_failure(mmc, request->io, (char *)value, value_len, 0 TSRMLS_CC);
 	}
 	(*((int *)param))++;
 	return MMC_REQUEST_DONE;

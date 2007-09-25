@@ -739,6 +739,22 @@ int mmc_server_failure(mmc_t *mmc, mmc_stream_t *io, const char *error, int errn
 }
 /* }}} */
 
+int mmc_request_failure(mmc_t *mmc, mmc_stream_t *io, char *value, unsigned int value_len, int errnum TSRMLS_DC) /* 
+	 checks for a valid server generated error message and calls mmc_server_failure() {{{ */
+{
+	if (mmc_str_left(value, "ERROR", value_len, sizeof("ERROR")-1) ||
+		mmc_str_left(value, "CLIENT_ERROR", value_len, sizeof("CLIENT_ERROR")-1) ||
+		mmc_str_left(value, "SERVER_ERROR", value_len, sizeof("SERVER_ERROR")-1)) 
+	{
+		// Trim off trailing \r\n
+		value[value_len - 2] = '\0';
+		return mmc_server_failure(mmc, io, value, errnum TSRMLS_CC);
+	}
+	
+	return mmc_server_failure(mmc, io, "Malformed server response", errnum TSRMLS_CC);
+}
+/* }}} */
+
 static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, int udp TSRMLS_DC) /* 
 	connects a stream, calls mmc_server_deactivate() on failure {{{ */
 {

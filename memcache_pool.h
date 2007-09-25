@@ -234,6 +234,7 @@ mmc_t *mmc_server_new(const char *, int, unsigned short, unsigned short, int, in
 void mmc_server_free(mmc_t * TSRMLS_DC);
 void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC);
 int mmc_server_failure(mmc_t *, mmc_stream_t *, const char *, int TSRMLS_DC);
+int mmc_request_failure(mmc_t *, mmc_stream_t *, char *, unsigned int, int TSRMLS_DC);
 void mmc_server_set_failure_callback(mmc_t *, zval * TSRMLS_DC);
 
 /* request functions */

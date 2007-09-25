@@ -243,7 +243,7 @@ static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, void *value, 
 		return MMC_REQUEST_DONE;
 	}
 	
-	return mmc_server_failure(mmc, request->io, "Invalid delete response", 0 TSRMLS_CC);
+	return mmc_request_failure(mmc, request->io, (char *)value, value_len, 0 TSRMLS_CC);
 }
 /* }}} */
 
