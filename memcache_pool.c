@@ -687,36 +687,9 @@ static void mmc_server_deactivate(mmc_pool_t *pool, mmc_t *mmc TSRMLS_DC) /*
 	
 	mmc_queue_free(&readqueue);
 
-	if (mmc->failure_callback != NULL) {
-		zval *retval;
-		zval *host, *tcp_port, *udp_port, *error, *errnum;
-		zval **params[5] = {&host, &tcp_port, &udp_port, &error, &errnum};
-
-		MAKE_STD_ZVAL(host);
-		MAKE_STD_ZVAL(tcp_port); MAKE_STD_ZVAL(udp_port);
-		MAKE_STD_ZVAL(error); MAKE_STD_ZVAL(errnum);
-
-		ZVAL_STRING(host, mmc->host, 1);
-		ZVAL_LONG(tcp_port, mmc->tcp.port); ZVAL_LONG(udp_port, mmc->udp.port);
-		
-		if (mmc->error != NULL) {
-			ZVAL_STRING(error, mmc->error, 1);
-		}
-		else {
-			ZVAL_NULL(error);
-		}
-		ZVAL_LONG(errnum, mmc->errnum);
-
-		call_user_function_ex(EG(function_table), NULL, mmc->failure_callback, &retval, 5, params, 0, NULL TSRMLS_CC);
-
-		zval_ptr_dtor(&host);
-		zval_ptr_dtor(&tcp_port); zval_ptr_dtor(&udp_port);
-		zval_ptr_dtor(&error); zval_ptr_dtor(&errnum);
-		zval_ptr_dtor(&retval);
-	}
-	else {
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Server %s (tcp %d, udp %d) failed with: %s (%d)", 
-			mmc->host, mmc->tcp.port, mmc->udp.port, mmc->error, mmc->errnum);
+	/* fire userspace failure event */
+	if (pool->failure_callback != NULL) {
+		pool->failure_callback(pool, mmc, pool->failure_callback_param TSRMLS_CC);
 	}
 }
 /* }}} */
@@ -886,46 +859,6 @@ static inline int mmc_server_valid(mmc_t *mmc TSRMLS_DC) /*
 }
 /* }}} */
 
-/* mmc_server_set_failure_callback {{{ */
-static void mmc_server_callback_dtor(zval *callback TSRMLS_DC)
-{
-	zval **this_obj;
-	
-	if (callback != NULL) {
-		if (Z_TYPE_P(callback) == IS_ARRAY && 
-			zend_hash_index_find(Z_ARRVAL_P(callback), 0, (void **)&this_obj) == SUCCESS &&
-			Z_TYPE_PP(this_obj) == IS_OBJECT) {
-			zval_ptr_dtor(this_obj);
-		}
-		zval_ptr_dtor(&callback);
-	}
-}
-
-static void mmc_server_callback_ctor(zval *callback TSRMLS_DC)
-{
-	zval **this_obj;
-	
-	if (callback != NULL) {
-		if (Z_TYPE_P(callback) == IS_ARRAY && 
-			zend_hash_index_find(Z_ARRVAL_P(callback), 0, (void **)&this_obj) == SUCCESS &&
-			Z_TYPE_PP(this_obj) == IS_OBJECT) {
-			zval_add_ref(this_obj);
-		}
-		zval_add_ref(&callback);
-	}
-}
-
-void mmc_server_set_failure_callback(mmc_t *mmc, zval *callback TSRMLS_DC)
-{
-	if (mmc->failure_callback != NULL) {
-		mmc_server_callback_dtor(mmc->failure_callback TSRMLS_CC);	
-	}
-	
-	mmc->failure_callback = callback;
-	mmc_server_callback_ctor(mmc->failure_callback TSRMLS_CC);
-}
-/* }}} */
-
 void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /* 
 	prepare server struct for persistent sleep {{{ */
 {
@@ -939,9 +872,6 @@ void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 	mmc_queue_free(&(mmc->sendqueue));
 	mmc_queue_free(&(mmc->readqueue));
 	
-	mmc_server_callback_dtor(mmc->failure_callback TSRMLS_CC);
-	mmc->failure_callback = NULL;
-	
 	if (mmc->error != NULL) {
 		efree(mmc->error);
 		mmc->error = NULL;
@@ -951,12 +881,6 @@ void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 
 void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
-	if (mmc->in_free) {
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "Recursive reference detected, bailing out");
-		return;
-	}
-	mmc->in_free = 1;
-	
 	mmc_server_sleep(mmc TSRMLS_CC);
 	mmc_server_disconnect(mmc, &(mmc->tcp) TSRMLS_CC);
 	mmc_server_disconnect(mmc, &(mmc->udp) TSRMLS_CC);
@@ -1002,12 +926,6 @@ void mmc_pool_free(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 {
 	int i;
 	mmc_request_t *request;
-
-	if (pool->in_free) {
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "Recursive reference detected, bailing out");
-		return;
-	}
-	pool->in_free = 1;
 
 	for (i=0; i<pool->num_servers; i++) {
 		if (pool->servers[i] != NULL) {

@@ -187,8 +187,6 @@ struct mmc {
 	uint16_t			reqid;					/* next sequential request id */
 	char				*error;					/* last error message */
 	int					errnum;					/* last error code */
-	zval				*failure_callback;
-	zend_bool			in_free;
 };
 
 /* hashing strategy */
@@ -212,21 +210,25 @@ extern mmc_hash_t mmc_consistent_hash;
 #define FNV_32_PRIME 0x01000193
 #define FNV_32_INIT 0x811c9dc5 
 
+/* failure callback prototype */
+typedef void (*mmc_failure_callback)(mmc_pool_t *pool, mmc_t *mmc, void *param TSRMLS_DC);
+
 /* server pool */
 struct mmc_pool {
-	mmc_t			**servers;
-	int				num_servers;
-	mmc_hash_t		*hash;					/* hash strategy methods */
-	void			*hash_state;			/* strategy specific state */
-	mmc_queue_t		*sending;				/* mmc_queue_t<mmc_t *>, list of connections that want to send */
-	mmc_queue_t		*reading;				/* mmc_queue_t<mmc_t *>, list of connections that want to read */
-	mmc_queue_t		_sending1, _sending2;
-	mmc_queue_t		_reading1, _reading2;
-	mmc_queue_t		pending;				/* mmc_queue_t<mmc_t *>, list of that have non-finalized requests */
-	mmc_queue_t		free_requests;			/* mmc_queue_t<mmc_request_t *>, list of non-used requests */
-	double			min_compress_savings;
-	unsigned int	compress_threshold;
-	zend_bool		in_free;
+	mmc_t					**servers;
+	int						num_servers;
+	mmc_hash_t				*hash;						/* hash strategy methods */
+	void					*hash_state;				/* strategy specific state */
+	mmc_queue_t				*sending;					/* mmc_queue_t<mmc_t *>, connections that want to send */
+	mmc_queue_t				*reading;					/* mmc_queue_t<mmc_t *>, connections that want to read */
+	mmc_queue_t				_sending1, _sending2;
+	mmc_queue_t				_reading1, _reading2;
+	mmc_queue_t				pending;					/* mmc_queue_t<mmc_t *>, connections that have non-finalized requests */
+	mmc_queue_t				free_requests;				/* mmc_queue_t<mmc_request_t *>, request free-list */
+	double					min_compress_savings;
+	unsigned int			compress_threshold;
+	mmc_failure_callback	failure_callback;			/* receives notification when a server fails */
+	void					*failure_callback_param;
 };
 
 /* server functions */
@@ -235,7 +237,6 @@ void mmc_server_free(mmc_t * TSRMLS_DC);
 void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC);
 int mmc_server_failure(mmc_t *, mmc_stream_t *, const char *, int TSRMLS_DC);
 int mmc_request_failure(mmc_t *, mmc_stream_t *, char *, unsigned int, int TSRMLS_DC);
-void mmc_server_set_failure_callback(mmc_t *, zval * TSRMLS_DC);
 
 /* request functions */
 int mmc_request_parse_line(mmc_t *, mmc_request_t * TSRMLS_DC);
