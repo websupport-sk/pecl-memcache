@@ -189,14 +189,30 @@ static PHP_INI_MH(OnUpdateHashFunction) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdateRedundancy) /* {{{ */
+{
+	long int lval;
+
+	lval = strtol(new_value, NULL, 10);
+	if (lval <= 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.redundancy must be a positive integer ('%s' given)", new_value);
+		return FAILURE;
+	}
+
+	return OnUpdateLong(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
-	STD_PHP_INI_ENTRY("memcache.allow_failover",	"1",		PHP_INI_ALL, OnUpdateLong,		allow_failover,	zend_memcache_globals,	memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.max_failover_attempts",	"20",	PHP_INI_ALL, OnUpdateFailoverAttempts,		max_failover_attempts,	zend_memcache_globals,	memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.default_port",		"11211",	PHP_INI_ALL, OnUpdateLong,		default_port,	zend_memcache_globals,	memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.chunk_size",		"8192",		PHP_INI_ALL, OnUpdateChunkSize,	chunk_size,		zend_memcache_globals,	memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.hash_strategy",		"standard",	PHP_INI_ALL, OnUpdateHashStrategy,	hash_strategy,	zend_memcache_globals,	memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.hash_function",		"crc32",	PHP_INI_ALL, OnUpdateHashFunction,	hash_function,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.allow_failover",		"1",		PHP_INI_ALL, OnUpdateLong,			allow_failover,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.max_failover_attempts",	"20",		PHP_INI_ALL, OnUpdateFailoverAttempts,		max_failover_attempts,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.default_port",			"11211",	PHP_INI_ALL, OnUpdateLong,			default_port,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.chunk_size",			"8192",		PHP_INI_ALL, OnUpdateChunkSize,		chunk_size,		zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.hash_strategy",			"standard",	PHP_INI_ALL, OnUpdateHashStrategy,	hash_strategy,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.hash_function",			"crc32",	PHP_INI_ALL, OnUpdateHashFunction,	hash_function,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.redundancy",			"1",		PHP_INI_ALL, OnUpdateRedundancy,	redundancy,			zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.session_redundancy",	"1",		PHP_INI_ALL, OnUpdateRedundancy,	session_redundancy,	zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -409,7 +425,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 			}
 			
 			/* schedule request */
-			if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+			if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(redundancy) TSRMLS_CC) != MMC_OK) {
 				continue;
 			}
 
@@ -429,7 +445,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *cmd, int cmd_len) 
 		}
 		
 		/* schedule request */
-		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(redundancy) TSRMLS_CC) != MMC_OK) {
 			RETURN_FALSE;
 		}
 	}
@@ -564,7 +580,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 			smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 
 			/* schedule request */
-			if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+			if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(redundancy) TSRMLS_CC) != MMC_OK) {
 				continue;
 			}
 
@@ -602,7 +618,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, const char *cmd, unsig
 		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 
 		/* schedule request */
-		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(redundancy) TSRMLS_CC) != MMC_OK) {
 			RETURN_FALSE;
 		}
 	}
@@ -1407,7 +1423,7 @@ PHP_FUNCTION(memcache_get)
 		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 
 		/* schedule request */
-		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, 1 TSRMLS_CC) != MMC_OK) {
 			return;
 		}
 	}

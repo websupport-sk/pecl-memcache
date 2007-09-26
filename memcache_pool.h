@@ -193,8 +193,8 @@ struct mmc {
 typedef unsigned int (*mmc_hash_function)(const char *, int);
 typedef void * (*mmc_hash_create_state)(mmc_hash_function);
 typedef void (*mmc_hash_free_state)(void *);
-typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
-typedef void (*mmc_hash_add_server)(void *, mmc_t *, unsigned int);
+typedef int (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
+typedef void (*mmc_hash_add_server)(void *, mmc_t *, int, unsigned int);
 
 typedef struct mmc_hash {
 	mmc_hash_create_state	create_state;
@@ -210,6 +210,9 @@ extern mmc_hash_t mmc_consistent_hash;
 #define FNV_32_PRIME 0x01000193
 #define FNV_32_INIT 0x811c9dc5 
 
+/* failover selection prototype */
+typedef int (*mmc_next_server)(mmc_pool_t *pool, const char *key, unsigned int key_len, int i, int prev_index TSRMLS_DC);
+
 /* failure callback prototype */
 typedef void (*mmc_failure_callback)(mmc_pool_t *pool, mmc_t *mmc, void *param TSRMLS_DC);
 
@@ -219,6 +222,7 @@ struct mmc_pool {
 	int						num_servers;
 	mmc_hash_t				*hash;						/* hash strategy methods */
 	void					*hash_state;				/* strategy specific state */
+	mmc_next_server			next_server;				/* failover selection strategy */
 	mmc_queue_t				*sending;					/* mmc_queue_t<mmc_t *>, connections that want to send */
 	mmc_queue_t				*reading;					/* mmc_queue_t<mmc_t *>, connections that want to read */
 	mmc_queue_t				_sending1, _sending2;
@@ -260,8 +264,7 @@ int mmc_prepare_store(
 	mmc_pool_t *, mmc_request_t *, const char *, unsigned int,
 	const char *, unsigned int, unsigned int, unsigned int, zval * TSRMLS_DC);
 
-int mmc_pool_schedule(mmc_pool_t *, mmc_t *, mmc_request_t * TSRMLS_DC);
-int mmc_pool_schedule_key(mmc_pool_t *, const char *, unsigned int, mmc_request_t * TSRMLS_DC);
+int mmc_pool_schedule_key(mmc_pool_t *, const char *, unsigned int, mmc_request_t *, unsigned int TSRMLS_DC);
 int mmc_pool_schedule_get(mmc_pool_t *, int, const char *, unsigned int, 
 	mmc_request_value_handler, void *, mmc_request_failover_handler, void *, unsigned int TSRMLS_DC);
 int mmc_pool_schedule_command(mmc_pool_t *, mmc_t *, char *, unsigned int, 
@@ -281,6 +284,8 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long hash_function;
 	long allow_failover;
 	long max_failover_attempts;
+	long redundancy;
+	long session_redundancy;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #ifdef ZTS

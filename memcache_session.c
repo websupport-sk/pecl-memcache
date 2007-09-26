@@ -173,7 +173,7 @@ PS_READ_FUNC(memcache)
 		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 
 		/* schedule request */
-		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, 1 TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 	
@@ -217,7 +217,7 @@ PS_WRITE_FUNC(memcache)
 		}
 		
 		/* schedule request */
-		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(session_redundancy) TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 
@@ -273,7 +273,7 @@ PS_DESTROY_FUNC(memcache)
 		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 
 		/* schedule request */
-		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request TSRMLS_CC) != MMC_OK) {
+		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(session_redundancy) TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 	
