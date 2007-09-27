@@ -37,7 +37,6 @@
 ZEND_DECLARE_MODULE_GLOBALS(memcache)
 
 static void mmc_pool_switch(mmc_pool_t *);
-static int mmc_pool_schedule(mmc_pool_t *, mmc_t *, mmc_request_t * TSRMLS_DC);
 
 static inline void mmc_buffer_alloc(mmc_buffer_t *buffer, unsigned int size)  /* {{{ */
 {
@@ -777,7 +776,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 }
 /* }}} */
 
-static inline int mmc_server_valid(mmc_t *mmc TSRMLS_DC) /* 
+int mmc_server_valid(mmc_t *mmc TSRMLS_DC) /* 
 	checks if a server should be considered valid to serve requests {{{ */
 {
 	if (mmc != NULL) {
@@ -923,7 +922,7 @@ int mmc_pool_open(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, int udp TSRMLS
 }
 /* }}} */
 
-static mmc_t *mmc_pool_find_next(mmc_pool_t *pool, const char *key, unsigned int key_len, mmc_queue_t *skip_servers, unsigned int *last_index TSRMLS_DC) /* 
+mmc_t *mmc_pool_find_next(mmc_pool_t *pool, const char *key, unsigned int key_len, mmc_queue_t *skip_servers, unsigned int *last_index TSRMLS_DC) /* 
 	finds the next server in the failover sequence {{{ */ 
 {
 	mmc_t *mmc;
@@ -939,7 +938,7 @@ static mmc_t *mmc_pool_find_next(mmc_pool_t *pool, const char *key, unsigned int
 	return mmc;
 }
 	
-static mmc_t *mmc_pool_find(mmc_pool_t *pool, const char *key, unsigned int key_len TSRMLS_DC) /* 
+mmc_t *mmc_pool_find(mmc_pool_t *pool, const char *key, unsigned int key_len TSRMLS_DC) /* 
 	maps a key to a non-failed server {{{ */ 
 {
 	mmc_t *mmc = pool->hash->find_server(pool->hash_state, key, key_len TSRMLS_CC); 
@@ -960,11 +959,11 @@ static mmc_t *mmc_pool_find(mmc_pool_t *pool, const char *key, unsigned int key_
 int mmc_pool_failover_handler(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC) /* 
 	uses request->key to reschedule request to other server {{{ */
 {
-	if (MEMCACHE_G(allow_failover) && request->failed_servers.len < MEMCACHE_G(max_failover_attempts)) {
+	if (MEMCACHE_G(allow_failover) && request->failed_index < MEMCACHE_G(max_failover_attempts) && request->failed_servers.len < pool->num_servers) {
 		do {
 			mmc_queue_push(&(request->failed_servers), mmc);
 			mmc = mmc_pool_find_next(pool, request->key, request->key_len, &(request->failed_servers), &(request->failed_index) TSRMLS_CC);
-		} while (!mmc_server_valid(mmc TSRMLS_CC) && request->failed_index < MEMCACHE_G(max_failover_attempts));
+		} while (!mmc_server_valid(mmc TSRMLS_CC) && request->failed_index < MEMCACHE_G(max_failover_attempts) && request->failed_servers.len < pool->num_servers);
 
 		return mmc_pool_schedule(pool, mmc, request TSRMLS_CC);
 	}
@@ -1077,7 +1076,7 @@ static int mmc_pool_slot_send(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reque
 }
 /* }}} */
 
-static int mmc_pool_schedule(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
+int mmc_pool_schedule(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
 	schedules a request against a server, return MMC_OK on success {{{ */
 {
 	if (!mmc_server_valid(mmc TSRMLS_CC)) {
@@ -1130,7 +1129,7 @@ int mmc_pool_schedule_key(mmc_pool_t *pool, const char *key, unsigned int key_le
 		result = mmc_pool_schedule(pool, mmc, request TSRMLS_CC);
 
 		/* clone and schedule redundancy-1 additional requests */ 
-		for (i=0; i<redundancy-1 && i<pool->num_servers-1; i++) {
+		for (i=0; i < redundancy-1 && i < pool->num_servers-1; i++) {
 			mmc_queue_push(&skip_servers, mmc);
 			mmc = mmc_pool_find_next(pool, key, key_len, &skip_servers, &last_index TSRMLS_CC);
 			

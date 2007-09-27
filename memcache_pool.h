@@ -219,6 +219,7 @@ struct mmc_pool {
 mmc_t *mmc_server_new(const char *, int, unsigned short, unsigned short, int, int, int TSRMLS_DC);
 void mmc_server_free(mmc_t * TSRMLS_DC);
 void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC);
+int mmc_server_valid(mmc_t * TSRMLS_DC);
 int mmc_server_failure(mmc_t *, mmc_stream_t *, const char *, int TSRMLS_DC);
 int mmc_request_failure(mmc_t *, mmc_stream_t *, char *, unsigned int, int TSRMLS_DC);
 
@@ -233,7 +234,9 @@ void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
 int mmc_pool_open(mmc_pool_t *, mmc_t *, mmc_stream_t *, int TSRMLS_DC);
 void mmc_pool_select(mmc_pool_t *, long TSRMLS_DC);
 void mmc_pool_run(mmc_pool_t * TSRMLS_DC);
-
+mmc_t *mmc_pool_find_next(mmc_pool_t *, const char *, unsigned int, mmc_queue_t *, unsigned int * TSRMLS_DC);
+mmc_t *mmc_pool_find(mmc_pool_t *, const char *, unsigned int TSRMLS_DC);
+int mmc_pool_schedule(mmc_pool_t *, mmc_t *, mmc_request_t * TSRMLS_DC);
 int mmc_pool_failover_handler(mmc_pool_t *, mmc_t *, mmc_request_t *, void * TSRMLS_DC);
 
 mmc_request_t *mmc_pool_request(mmc_pool_t *, int, mmc_request_parser, 

@@ -42,8 +42,8 @@ switch (strtolower(ini_get('memcache.hash_strategy'))) {
 		break;
 
 	default:
-		$balanceKey1 = 'load_test_key1';	// Must hash to host1
-		$balanceKey2 = 'load_test_key2';	// Must hash to host2
+		$balanceKey1 = 'load_test_key1';
+		$balanceKey2 = 'load_test_key2';
 }
 
 $memcache = memcache_connect($host, $port);

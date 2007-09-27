@@ -148,6 +148,24 @@ PS_CLOSE_FUNC(memcache)
 }
 /* }}} */
 
+static mmc_request_t *php_mmc_session_read_request(mmc_pool_t *pool, const char *key, zval *result TSRMLS_DC) /* {{{ */
+{
+	mmc_request_t *request = mmc_pool_request(pool, MMC_PROTO_UDP, mmc_request_parse_value, 
+		mmc_value_handler_single, result, mmc_pool_failover_handler, NULL TSRMLS_CC);
+
+	if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
+		mmc_pool_release(pool, request);
+		return NULL;
+	}
+
+	smart_str_appendl(&(request->sendbuf.value), "get ", sizeof("get ")-1);
+	smart_str_appendl(&(request->sendbuf.value), request->key, request->key_len);
+	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+	
+	return request;
+}
+/* }}} */
+
 /* {{{ PS_READ_FUNC
  */
 PS_READ_FUNC(memcache)
@@ -156,29 +174,47 @@ PS_READ_FUNC(memcache)
 
 	if (pool != NULL) {
 		zval result;
+		mmc_t *mmc;
 		mmc_request_t *request;
+		mmc_queue_t skip_servers;
+		unsigned int last_index = 0;
+		
 		ZVAL_FALSE(&result);
+		memset(&skip_servers, 0, sizeof(skip_servers));
 
-		/* allocate request */
-		request = mmc_pool_request(pool, MMC_PROTO_UDP, mmc_request_parse_value, 
-			mmc_value_handler_single, &result, mmc_pool_failover_handler, NULL TSRMLS_CC);
-
-		if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
-			mmc_pool_release(pool, request);
+		/* create request */
+		request = php_mmc_session_read_request(pool, key, &result TSRMLS_CC);  
+		if (request == NULL) {
 			return FAILURE;
 		}
-
-		smart_str_appendl(&(request->sendbuf.value), "get ", sizeof("get ")-1);
-		smart_str_appendl(&(request->sendbuf.value), request->key, request->key_len);
-		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
-
-		/* schedule request */
-		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, 1 TSRMLS_CC) != MMC_OK) {
+		
+		/* schedule the first request */
+		mmc = mmc_pool_find(pool, request->key, request->key_len TSRMLS_CC);
+		if (mmc_pool_schedule(pool, mmc, request TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 	
 		/* execute request */
 		mmc_pool_run(pool TSRMLS_CC);
+		
+		/* retry missing value (possibly due to server restart) */
+		while (Z_TYPE(result) != IS_STRING && skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers) {
+			request = php_mmc_session_read_request(pool, key, &result TSRMLS_CC);  
+			if (request == NULL) {
+				break;
+			}
+
+			zval_dtor(&result);
+			mmc_queue_push(&skip_servers, mmc);
+			mmc = mmc_pool_find_next(pool, request->key, request->key_len, &skip_servers, &last_index TSRMLS_CC);
+			
+			if (mmc_server_valid(mmc TSRMLS_CC)) {
+				mmc_pool_schedule(pool, mmc, request TSRMLS_CC);
+				mmc_pool_run(pool TSRMLS_CC);
+			}
+		}
+		
+		mmc_queue_free(&skip_servers);
 		
 		if (Z_TYPE(result) == IS_STRING) {
 			*val = Z_STRVAL(result);
