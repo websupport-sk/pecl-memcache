@@ -30,7 +30,7 @@ ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
 typedef struct mmc_standard_state {
 	int						num_servers;
-	int						*buckets;
+	mmc_t					**buckets;
 	int						num_buckets;
 	mmc_hash_function		hash;
 } mmc_standard_state_t;
@@ -56,7 +56,7 @@ void mmc_standard_free_state(void *s) /* {{{ */
 }
 /* }}} */
 
-int mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
+mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
 
@@ -70,7 +70,7 @@ int mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /*
 }
 /* }}} */
 
-void mmc_standard_add_server(void *s, mmc_t *mmc, int server_index, unsigned int weight) /* {{{ */
+void mmc_standard_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
 	int i;
@@ -79,7 +79,7 @@ void mmc_standard_add_server(void *s, mmc_t *mmc, int server_index, unsigned int
 	state->buckets = erealloc(state->buckets, sizeof(*state->buckets) * (state->num_buckets + weight));
 
 	for (i=0; i<weight; i++) {
-		state->buckets[state->num_buckets + i] = server_index;
+		state->buckets[state->num_buckets + i] = mmc;
 	}
 
 	state->num_buckets += weight;

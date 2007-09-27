@@ -31,7 +31,7 @@
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
 typedef struct mmc_consistent_point {
-	int						server_index;
+	mmc_t					*server;
 	unsigned int			point;
 } mmc_consistent_point_t;
 
@@ -39,7 +39,7 @@ typedef struct mmc_consistent_state {
 	int						num_servers;
 	mmc_consistent_point_t	*points;
 	int						num_points;
-	int						buckets[MMC_CONSISTENT_BUCKETS];
+	mmc_t					*buckets[MMC_CONSISTENT_BUCKETS];
 	int						buckets_populated;
 	mmc_hash_function		hash;
 } mmc_consistent_state_t;
@@ -77,14 +77,14 @@ static int mmc_consistent_compare(const void *a, const void *b) /* {{{ */
 }
 /* }}} */
 
-static int mmc_consistent_find(mmc_consistent_state_t *state, unsigned int point) /* {{{ */
+static mmc_t *mmc_consistent_find(mmc_consistent_state_t *state, unsigned int point) /* {{{ */
 {
 	int lo = 0, hi = state->num_points - 1, mid;
 
 	while (1) {
 		/* point is outside interval or lo >= hi, wrap-around */
 		if (point <= state->points[lo].point || point > state->points[hi].point) {
-			return state->points[lo].server_index;
+			return state->points[lo].server;
 		}
 
 		/* best guess with random distribution, distance between lowpoint and point scaled down to lo-hi interval */
@@ -92,7 +92,7 @@ static int mmc_consistent_find(mmc_consistent_state_t *state, unsigned int point
 
 		/* perfect match */
 		if (point <= state->points[mid].point && point > (mid ? state->points[mid-1].point : 0)) {
-			return state->points[mid].server_index;
+			return state->points[mid].server;
 		}
 
 		/* too low, go up */
@@ -119,7 +119,7 @@ static void mmc_consistent_pupulate_buckets(mmc_consistent_state_t *state) /* {{
 }
 /* }}} */
 
-int mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
+mmc_t *mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
 {
 	mmc_consistent_state_t *state = s;
 
@@ -130,11 +130,11 @@ int mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_DC) 
 		return state->buckets[state->hash(key, key_len) % MMC_CONSISTENT_BUCKETS];
 	}
 
-	return state->points[0].server_index;
+	return state->points[0].server;
 }
 /* }}} */
 
-void mmc_consistent_add_server(void *s, mmc_t *mmc, int server_index, unsigned int weight) /* {{{ */
+void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ */
 {
 	mmc_consistent_state_t *state = s;
 	int i, key_len, points = weight * MMC_CONSISTENT_POINTS;
@@ -145,7 +145,7 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, int server_index, unsigned i
 
 	for (i=0; i<points; i++) {
 		key_len = spprintf(&key, 0, "%s:%d-%d", mmc->host, mmc->tcp.port, i);
-		state->points[state->num_points + i].server_index = server_index;
+		state->points[state->num_points + i].server = mmc;
 		state->points[state->num_points + i].point = state->hash(key, key_len);
 		efree(key);
 	}

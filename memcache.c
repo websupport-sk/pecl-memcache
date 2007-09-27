@@ -1316,22 +1316,19 @@ int mmc_value_handler_single(mmc_t *mmc, mmc_request_t *request, void *value, un
 }
 /* }}} */
 
-static int mmc_value_failover_handler(mmc_pool_t *pool, mmc_request_t *request, void *param TSRMLS_DC) /* 
+static int mmc_value_failover_handler(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC) /* 
 	uses keys and return value to reschedule requests to other servers, param is a zval ** pointer {{{ */
 {
 	char keytmp[MMC_MAX_KEY_LEN + 1];
-	unsigned int keytmp_len, failures;
+	unsigned int keytmp_len;
 	
 	zval **key, *keys = ((zval **)param)[0], *return_value = ((zval **)param)[0];
 	HashPosition pos;
 
-	if (!MEMCACHE_G(allow_failover) || request->failures++ >= MEMCACHE_G(max_failover_attempts)) {
+	if (!MEMCACHE_G(allow_failover) || request->failed_servers.len >= MEMCACHE_G(max_failover_attempts)) {
 		mmc_pool_release(pool, request);
 		return MMC_REQUEST_FAILURE;
 	}
-	
-	failures = request->failures;
-	mmc_pool_release(pool, request);
 	
 	zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(keys), &pos);
 	
@@ -1346,10 +1343,11 @@ static int mmc_value_failover_handler(mmc_pool_t *pool, mmc_request_t *request, 
 		if (!zend_hash_exists(Z_ARRVAL_P(return_value), keytmp, keytmp_len)) {
 			mmc_pool_schedule_get(pool, MMC_PROTO_UDP, keytmp, keytmp_len,
 				mmc_value_handler_multi, return_value, 
-				mmc_value_failover_handler, param, failures TSRMLS_CC);
+				mmc_value_failover_handler, param, request TSRMLS_CC);
 		}
 	}
-	
+
+	mmc_pool_release(pool, request);
 	return MMC_OK;
 }
 /* }}}*/
@@ -1402,7 +1400,7 @@ PHP_FUNCTION(memcache_get)
 			/* schedule request */
 			mmc_pool_schedule_get(pool, MMC_PROTO_UDP, keytmp, keytmp_len,
 				mmc_value_handler_multi, return_value, 
-				mmc_value_failover_handler, failover_handler_param, 0 TSRMLS_CC);
+				mmc_value_failover_handler, failover_handler_param, NULL TSRMLS_CC);
 		}
 	}
 	else {

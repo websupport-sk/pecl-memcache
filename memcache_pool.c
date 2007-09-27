@@ -37,6 +37,7 @@
 ZEND_DECLARE_MODULE_GLOBALS(memcache)
 
 static void mmc_pool_switch(mmc_pool_t *);
+static int mmc_pool_schedule(mmc_pool_t *, mmc_t *, mmc_request_t * TSRMLS_DC);
 
 static inline void mmc_buffer_alloc(mmc_buffer_t *buffer, unsigned int size)  /* {{{ */
 {
@@ -53,72 +54,6 @@ static inline void mmc_buffer_free(mmc_buffer_t *buffer)  /* {{{ */
 	memset(buffer, 0, sizeof(*buffer));
 }
 /* }}} */
-
-inline void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
-	if (queue->len >= queue->alloc) {
-		int increase = 1 + MMC_QUEUE_PREALLOC;
-		queue->alloc += increase;
-		queue->items = erealloc(queue->items, sizeof(*queue->items) * queue->alloc);
-		
-		/* move tail segment downwards */
-		if (queue->head < queue->tail) {
-			memmove(queue->items + queue->tail + increase, queue->items + queue->tail, (queue->alloc - queue->tail - increase) * sizeof(*queue->items));
-			queue->tail += increase;
-		}
-	}
-
-	if (queue->len) {
-		queue->head++;
-
-		if (queue->head >= queue->alloc) {
-			queue->head = 0;
-		}
-	}
-
-	queue->items[queue->head] = ptr;
-	queue->len++;
-}
-
-static inline void *mmc_queue_pop(mmc_queue_t *queue) {
-	if (queue->len) {
-		void *ptr;
-		
-		ptr = queue->items[queue->tail];
-		queue->len--;
-
-		if (queue->len) {
-			queue->tail++;
-	
-			if (queue->tail >= queue->alloc) {
-				queue->tail = 0;
-			}
-		}
-		
-		return ptr;
-	}
-	return NULL;
-}
-
-static inline void mmc_queue_free(mmc_queue_t *queue) {
-	if (queue->items != NULL) {
-		efree(queue->items);
-	}
-	memset(queue, 0, sizeof(*queue));
-}
-
-static inline void mmc_queue_remove(mmc_queue_t *queue, void *ptr) { 
-	void *item;
-	mmc_queue_t original = *queue;
-	mmc_queue_release(queue);
-	
-	while ((item = mmc_queue_pop(&original)) != NULL) {
-		if (item != ptr) {
-			mmc_queue_push(queue, item);
-		}
-	}
-	
-	mmc_queue_free(&original);
-}
 
 static unsigned int mmc_hash_crc32(const char *key, int key_len) /* 
 	CRC32 hash {{{ */
@@ -227,6 +162,7 @@ static inline void mmc_request_free(mmc_request_t *request)  /* {{{ */
 {
 	mmc_buffer_free(&(request->sendbuf));
 	mmc_buffer_free(&(request->readbuf));
+	mmc_queue_free(&(request->failed_servers));
 	efree(request);
 }
 /* }}} */
@@ -682,7 +618,7 @@ static void mmc_server_deactivate(mmc_pool_t *pool, mmc_t *mmc TSRMLS_DC) /*
 
 	/* delegate to failover handlers */
 	while ((request = mmc_queue_pop(&readqueue)) != NULL) {
-		request->failover_handler(pool, request, request->failover_handler_param TSRMLS_CC);
+		request->failover_handler(pool, mmc, request, request->failover_handler_param TSRMLS_CC);
 	}
 	
 	mmc_queue_free(&readqueue);
@@ -890,20 +826,6 @@ void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-static int mmc_next_server_stride1(mmc_pool_t *pool, const char *key, unsigned int key_len, int i, int prev_index TSRMLS_DC) /* {{{ */
-{
-	return prev_index + 1 < pool->num_servers ? prev_index + 1 : 0; 
-}
-/* }}} */
-
-static int mmc_next_server_rehash(mmc_pool_t *pool, const char *key, unsigned int key_len, int i, int prev_index TSRMLS_DC) /* {{{ */
-{
-	char keytmp[MMC_MAX_KEY_LEN + MAX_LENGTH_OF_LONG + 1];
-	unsigned int keytmp_len = sprintf(keytmp, "%s-%d", key, i);
-	return pool->hash->find_server(pool->hash_state, keytmp, keytmp_len TSRMLS_CC);
-}
-/* }}} */
-
 mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 {
 	mmc_hash_function hash;
@@ -927,8 +849,6 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 	}
 	
 	pool->hash_state = pool->hash->create_state(hash);
-	pool->next_server = &mmc_next_server_stride1;
-	
 	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
 	
 	pool->sending = &(pool->_sending1);
@@ -979,11 +899,9 @@ void mmc_pool_free(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* 
 	adds a server to the pool and hash strategy {{{ */
 {
-	pool->servers = erealloc(pool->servers, sizeof(mmc_t *) * (pool->num_servers + 1));
-	
+	pool->hash->add_server(pool->hash_state, mmc, weight);
+	pool->servers = erealloc(pool->servers, sizeof(*pool->servers) * (pool->num_servers + 1));
 	pool->servers[pool->num_servers] = mmc;
-	pool->hash->add_server(pool->hash_state, mmc, pool->num_servers, weight);
-
 	pool->num_servers++;
 }
 /* }}} */
@@ -1005,18 +923,58 @@ int mmc_pool_open(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, int udp TSRMLS
 }
 /* }}} */
 
-int mmc_pool_failover_handler(mmc_pool_t *pool, mmc_request_t *request, void *param TSRMLS_DC) /* 
+static mmc_t *mmc_pool_find_next(mmc_pool_t *pool, const char *key, unsigned int key_len, mmc_queue_t *skip_servers, unsigned int *last_index TSRMLS_DC) /* 
+	finds the next server in the failover sequence {{{ */ 
+{
+	mmc_t *mmc;
+	char keytmp[MMC_MAX_KEY_LEN + MAX_LENGTH_OF_LONG + 1];
+	unsigned int keytmp_len;
+	
+	/* find the next server not present in the skip-list */
+	do {
+		keytmp_len = sprintf(keytmp, "%s-%d", key, (*last_index)++);
+		mmc = pool->hash->find_server(pool->hash_state, keytmp, keytmp_len TSRMLS_CC);
+	} while (mmc_queue_contains(skip_servers, mmc) && *last_index < MEMCACHE_G(max_failover_attempts));
+	
+	return mmc;
+}
+	
+static mmc_t *mmc_pool_find(mmc_pool_t *pool, const char *key, unsigned int key_len TSRMLS_DC) /* 
+	maps a key to a non-failed server {{{ */ 
+{
+	mmc_t *mmc = pool->hash->find_server(pool->hash_state, key, key_len TSRMLS_CC); 
+
+	/* check validity and try to failover otherwise */ 
+	if (!mmc_server_valid(mmc TSRMLS_CC) && MEMCACHE_G(allow_failover)) {
+		unsigned int last_index = 0;
+		
+		do {
+			mmc = mmc_pool_find_next(pool, key, key_len, NULL, &last_index TSRMLS_CC);
+		} while (!mmc_server_valid(mmc TSRMLS_CC) && last_index < MEMCACHE_G(max_failover_attempts));
+	}
+	
+	return mmc;
+}
+/* }}} */
+
+int mmc_pool_failover_handler(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC) /* 
 	uses request->key to reschedule request to other server {{{ */
 {
-	if (!MEMCACHE_G(allow_failover) || request->failures++ >= MEMCACHE_G(max_failover_attempts)) {
-		mmc_pool_release(pool, request);
-		return MMC_REQUEST_FAILURE;
+	if (MEMCACHE_G(allow_failover) && request->failed_servers.len < MEMCACHE_G(max_failover_attempts)) {
+		do {
+			mmc_queue_push(&(request->failed_servers), mmc);
+			mmc = mmc_pool_find_next(pool, request->key, request->key_len, &(request->failed_servers), &(request->failed_index) TSRMLS_CC);
+		} while (!mmc_server_valid(mmc TSRMLS_CC) && request->failed_index < MEMCACHE_G(max_failover_attempts));
+
+		return mmc_pool_schedule(pool, mmc, request TSRMLS_CC);
 	}
-	return mmc_pool_schedule_key(pool, request->key, request->key_len, request, 1 TSRMLS_CC);
+
+	mmc_pool_release(pool, request);
+	return MMC_REQUEST_FAILURE;
 }
 /* }}}*/
 
-static int mmc_pool_failover_handler_null(mmc_pool_t *pool, mmc_request_t *request, void *param TSRMLS_DC) /* 
+static int mmc_pool_failover_handler_null(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC) /* 
 	always returns failure {{{ */
 {
 	mmc_pool_release(pool, request);
@@ -1036,6 +994,8 @@ mmc_request_t *mmc_pool_request(mmc_pool_t *pool, int protocol, mmc_request_pars
 	else {
 		request->key_len = 0;
 		mmc_buffer_reset(&(request->sendbuf));
+		mmc_queue_reset(&(request->failed_servers));
+		request->failed_index = 0;
 	}
 	
 	request->protocol = protocol;
@@ -1106,7 +1066,7 @@ static int mmc_pool_slot_send(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reque
 		else {
 			mmc->sendreq = NULL;
 			if (handle_failover) {
-				return request->failover_handler(pool, request, request->failover_handler_param TSRMLS_CC);
+				return request->failover_handler(pool, mmc, request, request->failover_handler_param TSRMLS_CC);
 			}
 			return MMC_REQUEST_FAILURE; 
 		}
@@ -1122,7 +1082,7 @@ static int mmc_pool_schedule(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reques
 {
 	if (!mmc_server_valid(mmc TSRMLS_CC)) {
 		/* delegate to failover handler if connect fails */
-		return request->failover_handler(pool, request, request->failover_handler_param TSRMLS_CC);
+		return request->failover_handler(pool, mmc, request, request->failover_handler_param TSRMLS_CC);
 	}
 	
 	/* reset sendbuf to start position */
@@ -1133,7 +1093,7 @@ static int mmc_pool_schedule(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reques
 	/* push request into sendreq slot if available */
 	if (mmc->sendreq == NULL) {
 		if (mmc_pool_slot_send(pool, mmc, request, 0 TSRMLS_CC) != MMC_OK) {
-			return request->failover_handler(pool, request, request->failover_handler_param TSRMLS_CC);
+			return request->failover_handler(pool, mmc, request, request->failover_handler_param TSRMLS_CC);
 		}
 		mmc_queue_push(pool->sending, mmc);
 	}
@@ -1154,44 +1114,36 @@ static int mmc_pool_schedule(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reques
 }
 /* }}} */
 
-static mmc_t *mmc_pool_find(mmc_pool_t *pool, const char *key, unsigned int key_len, int *first_index TSRMLS_DC) 
-{
-	int i, server_index = pool->hash->find_server(pool->hash_state, key, key_len TSRMLS_CC);
-
-	if (first_index != NULL) {
-		*first_index = server_index;
-	}
-	
-	for (i=0; !mmc_server_valid(pool->servers[server_index] TSRMLS_CC) && MEMCACHE_G(allow_failover) && i < MEMCACHE_G(max_failover_attempts); i++) {
-		server_index = pool->next_server(pool, key, key_len, i, server_index TSRMLS_CC);
-	}
-
-	return pool->servers[server_index];
-}
-/* }}} */
-
 int mmc_pool_schedule_key(mmc_pool_t *pool, const char *key, unsigned int key_len, mmc_request_t *request, unsigned int redundancy TSRMLS_DC) /* 
 	schedules a request against a server selected by the provided key, return MMC_OK on success {{{ */
 {
 	if (redundancy > 1) {
-		int i, result, server_index;
+		int i, result;
+		mmc_t *mmc;
+		
+		unsigned int last_index = 0;
+		mmc_queue_t skip_servers;
+		memset(&skip_servers, 0, sizeof(skip_servers));
 		
 		/* schedule the first request */
-		result = mmc_pool_schedule(pool, mmc_pool_find(pool, key, key_len, &server_index TSRMLS_CC), request TSRMLS_CC);
+		mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
+		result = mmc_pool_schedule(pool, mmc, request TSRMLS_CC);
 
 		/* clone and schedule redundancy-1 additional requests */ 
 		for (i=0; i<redundancy-1 && i<pool->num_servers-1; i++) {
-			server_index = pool->next_server(pool, key, key_len, i, server_index TSRMLS_CC);
+			mmc_queue_push(&skip_servers, mmc);
+			mmc = mmc_pool_find_next(pool, key, key_len, &skip_servers, &last_index TSRMLS_CC);
 			
-			if (mmc_server_valid(pool->servers[server_index] TSRMLS_CC)) {
-				mmc_pool_schedule(pool, pool->servers[server_index], mmc_pool_clone_request(pool, request TSRMLS_CC) TSRMLS_CC);
+			if (mmc_server_valid(mmc TSRMLS_CC)) {
+				mmc_pool_schedule(pool, mmc, mmc_pool_clone_request(pool, request TSRMLS_CC) TSRMLS_CC);
 			}
 		}
 		
+		mmc_queue_free(&skip_servers);
 		return result;
 	}
 	
-	return mmc_pool_schedule(pool, mmc_pool_find(pool, key, key_len, NULL TSRMLS_CC), request TSRMLS_CC);
+	return mmc_pool_schedule(pool, mmc_pool_find(pool, key, key_len TSRMLS_CC), request TSRMLS_CC);
 }
 /* }}} */
 
@@ -1199,10 +1151,10 @@ int mmc_pool_schedule_get(
 	mmc_pool_t *pool, int protocol, const char *key, unsigned int key_len, 
 	mmc_request_value_handler value_handler, void *value_handler_param,
 	mmc_request_failover_handler failover_handler, void *failover_handler_param, 
-	unsigned int failures TSRMLS_DC) /* 
+	mmc_request_t *failed_request TSRMLS_DC) /* 
 	schedules a get command against a server {{{ */
 {
-	mmc_t *mmc = mmc_pool_find(pool, key, key_len, NULL TSRMLS_CC);
+	mmc_t *mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
 	if (!mmc_server_valid(mmc TSRMLS_CC)) {
 		return MMC_REQUEST_FAILURE;
 	}
@@ -1212,7 +1164,11 @@ int mmc_pool_schedule_get(
 		
 		mmc->buildreq = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
 			value_handler, value_handler_param, failover_handler, failover_handler_param TSRMLS_CC);
-		mmc->buildreq->failures = failures;
+		
+		if (failed_request != NULL) {
+			mmc_queue_copy(&(failed_request->failed_servers), &(mmc->buildreq->failed_servers));
+			mmc->buildreq->failed_index = failed_request->failed_index;
+		}
 
 		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "get", sizeof("get")-1);
 	}
@@ -1226,7 +1182,11 @@ int mmc_pool_schedule_get(
 		
 		mmc->buildreq = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
 			value_handler, value_handler_param, failover_handler, failover_handler_param TSRMLS_CC);
-		mmc->buildreq->failures = failures;
+
+		if (failed_request != NULL) {
+			mmc_queue_copy(&(failed_request->failed_servers), &(mmc->buildreq->failed_servers));
+			mmc->buildreq->failed_index = failed_request->failed_index;
+		}
 
 		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "get", sizeof("get")-1);
 	}
@@ -1300,7 +1260,7 @@ static void mmc_select_retry(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reques
 		mmc->readreq = mmc_queue_pop(&(mmc->readqueue));
 	}
 
-	request->failover_handler(pool, request, request->failover_handler_param TSRMLS_CC);
+	request->failover_handler(pool, mmc, request, request->failover_handler_param TSRMLS_CC);
 }
 /* }}} */
 
@@ -1321,7 +1281,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 	tv.tv_sec = timeout;
 	tv.tv_usec = 0;
 
-	for (i=0; i<mmc_queue_len(sending); i++) {
+	for (i=0; i < sending->len; i++) {
 		mmc = mmc_queue_item(sending, i);
 		if (mmc->sendreq->io->fd > nfds) {
 			nfds = mmc->sendreq->io->fd;
@@ -1329,7 +1289,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 		FD_SET(mmc->sendreq->io->fd, &wfds);
 	}
 	
-	for (i=0; i<mmc_queue_len(reading); i++) {
+	for (i=0; i < reading->len; i++) {
 		mmc = mmc_queue_item(reading, i);
 		if (mmc->readreq->io->fd > nfds) {
 			nfds = mmc->readreq->io->fd;
@@ -1340,16 +1300,16 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 	result = select(nfds + 1, &rfds, &wfds, NULL, &tv);
 	
 	if (result <= 0) {
-		for (i=0; i<mmc_queue_len(sending); i++) {
+		for (i=0; i < sending->len; i++) {
 			mmc_select_failure(pool, mmc_queue_item(sending, i), ((mmc_t *)mmc_queue_item(sending, i))->sendreq, result TSRMLS_CC);
 		}
-		for (i=0; i<mmc_queue_len(reading); i++) {
+		for (i=0; i < reading->len; i++) {
 			mmc_select_failure(pool, mmc_queue_item(reading, i), ((mmc_t *)mmc_queue_item(reading, i))->readreq, result TSRMLS_CC);
 		}
 	}
 	
 	/* until stream buffer is empty */
-	for (i=0; i<mmc_queue_len(sending); i++) {
+	for (i=0; i < sending->len; i++) {
 		mmc = mmc_queue_item(sending, i);
 		
 		if (FD_ISSET(mmc->sendreq->io->fd, &wfds)) {
@@ -1395,7 +1355,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 		}
 	}
 
-	for (i=0; i<mmc_queue_len(reading); i++) {
+	for (i=0; i < reading->len; i++) {
 		mmc = mmc_queue_item(reading, i);
 
 		if (FD_ISSET(mmc->readreq->io->fd, &rfds)) {
@@ -1487,7 +1447,7 @@ void mmc_pool_run(mmc_pool_t *pool TSRMLS_DC)  /*
 		mmc->buildreq = NULL;
 	}
 
-	while (mmc_queue_len(pool->reading) || mmc_queue_len(pool->sending)) {
+	while (pool->reading->len || pool->sending->len) {
 		/* TODO: replace 1 with pool->timeout */
 		mmc_pool_select(pool, 1 TSRMLS_CC);
 	}

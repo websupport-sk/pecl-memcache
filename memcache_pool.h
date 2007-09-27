@@ -31,6 +31,7 @@
 
 #include "php.h"
 #include "ext/standard/php_smart_str_public.h"
+#include "memcache_queue.h"
 
 #ifndef ZSTR
 #define ZSTR
@@ -84,24 +85,6 @@ typedef struct mmc_buffer {
 #define mmc_buffer_release(b) memset((b), 0, sizeof(*(b)))
 #define mmc_buffer_reset(b) (b)->value.len = (b)->idx = 0   
 
-/* request / server stack */
-#define MMC_QUEUE_PREALLOC 25
-
-typedef struct mmc_queue {
-	void	**items;				/* items on queue */
-	int		alloc;					/* allocated size */
-	int		head;					/* head index in ring buffer */
-	int		tail;					/* tail index in ring buffer */
-	int		len;
-} mmc_queue_t;
-
-#define mmc_queue_release(q) memset((q), 0, sizeof(*(q)))
-#define mmc_queue_reset(q) (q)->len = (q)->head = (q)->tail = 0
-#define mmc_queue_item(q, i) ((q)->tail + (i) < (q)->alloc ? (q)->items[(q)->tail + (i)] : (q)->items[(i) - ((q)->alloc - (q)->tail)]) 
-#define mmc_queue_len(q) ((q)->len) 
-
-inline void mmc_queue_push(mmc_queue_t *, void *);
-
 /* stream handlers */
 typedef struct mmc_stream mmc_stream_t;
 
@@ -134,7 +117,7 @@ typedef struct mmc_request mmc_request_t;
 typedef int (*mmc_request_reader)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_parser)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_value_handler)(mmc_t *mmc, mmc_request_t *request, void *value, unsigned int value_len, void *param TSRMLS_DC);
-typedef int (*mmc_request_failover_handler)(mmc_pool_t *pool, mmc_request_t *request, void *param TSRMLS_DC);
+typedef int (*mmc_request_failover_handler)(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC);
 
 /* server request */
 struct mmc_request {
@@ -144,7 +127,8 @@ struct mmc_request {
 	char						key[MMC_MAX_KEY_LEN + 1];	/* key buffer to use on failover of single-key requests */
 	unsigned int				key_len;
 	unsigned int				protocol;					/* protocol encoding of request */
-	unsigned int				failures;					/* number of times this request has failed */
+	mmc_queue_t					failed_servers;				/* servers this request has failed at */
+	unsigned int				failed_index;				/* last index probed on failure */
 	mmc_request_reader			read;						/* handles reading (and validating datagrams) */
 	mmc_request_parser			parse;						/* parses read values */
 	mmc_request_value_handler		value_handler;					/* called when values has been parsed */
@@ -193,8 +177,8 @@ struct mmc {
 typedef unsigned int (*mmc_hash_function)(const char *, int);
 typedef void * (*mmc_hash_create_state)(mmc_hash_function);
 typedef void (*mmc_hash_free_state)(void *);
-typedef int (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
-typedef void (*mmc_hash_add_server)(void *, mmc_t *, int, unsigned int);
+typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
+typedef void (*mmc_hash_add_server)(void *, mmc_t *, unsigned int);
 
 typedef struct mmc_hash {
 	mmc_hash_create_state	create_state;
@@ -210,9 +194,6 @@ extern mmc_hash_t mmc_consistent_hash;
 #define FNV_32_PRIME 0x01000193
 #define FNV_32_INIT 0x811c9dc5 
 
-/* failover selection prototype */
-typedef int (*mmc_next_server)(mmc_pool_t *pool, const char *key, unsigned int key_len, int i, int prev_index TSRMLS_DC);
-
 /* failure callback prototype */
 typedef void (*mmc_failure_callback)(mmc_pool_t *pool, mmc_t *mmc, void *param TSRMLS_DC);
 
@@ -222,7 +203,6 @@ struct mmc_pool {
 	int						num_servers;
 	mmc_hash_t				*hash;						/* hash strategy methods */
 	void					*hash_state;				/* strategy specific state */
-	mmc_next_server			next_server;				/* failover selection strategy */
 	mmc_queue_t				*sending;					/* mmc_queue_t<mmc_t *>, connections that want to send */
 	mmc_queue_t				*reading;					/* mmc_queue_t<mmc_t *>, connections that want to read */
 	mmc_queue_t				_sending1, _sending2;
@@ -254,7 +234,7 @@ int mmc_pool_open(mmc_pool_t *, mmc_t *, mmc_stream_t *, int TSRMLS_DC);
 void mmc_pool_select(mmc_pool_t *, long TSRMLS_DC);
 void mmc_pool_run(mmc_pool_t * TSRMLS_DC);
 
-int mmc_pool_failover_handler(mmc_pool_t *, mmc_request_t *, void * TSRMLS_DC);
+int mmc_pool_failover_handler(mmc_pool_t *, mmc_t *, mmc_request_t *, void * TSRMLS_DC);
 
 mmc_request_t *mmc_pool_request(mmc_pool_t *, int, mmc_request_parser, 
 	mmc_request_value_handler, void *, mmc_request_failover_handler, void * TSRMLS_DC);
@@ -266,7 +246,7 @@ int mmc_prepare_store(
 
 int mmc_pool_schedule_key(mmc_pool_t *, const char *, unsigned int, mmc_request_t *, unsigned int TSRMLS_DC);
 int mmc_pool_schedule_get(mmc_pool_t *, int, const char *, unsigned int, 
-	mmc_request_value_handler, void *, mmc_request_failover_handler, void *, unsigned int TSRMLS_DC);
+	mmc_request_value_handler, void *, mmc_request_failover_handler, void *, mmc_request_t * TSRMLS_DC);
 int mmc_pool_schedule_command(mmc_pool_t *, mmc_t *, char *, unsigned int, 
 	mmc_request_parser, mmc_request_value_handler, void * TSRMLS_DC);
 
