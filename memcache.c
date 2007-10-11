@@ -2201,12 +2201,13 @@ PHP_FUNCTION(memcache_get)
 			zval_dtor(return_value);
 			RETVAL_FALSE;
 		}
-	}
-	else {
+	} else if (zend_hash_num_elements(Z_ARRVAL(tmp_key))){
 		if (mmc_exec_retrieval_cmd_multi(pool, &tmp_key, &return_value TSRMLS_CC) < 0) {
 			zval_dtor(return_value);
 			RETVAL_FALSE;
 		}
+	} else {
+		RETVAL_FALSE;
 	}
 	zval_dtor(&tmp_key);
 }
