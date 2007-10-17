@@ -220,7 +220,7 @@ static char * mmc_get_version(mmc_t * TSRMLS_DC);
 static int mmc_str_left(char *, char *, int, int);
 static int mmc_sendcmd(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_parse_response(mmc_t *mmc, char *, int, char **, int *, int *, int *);
-static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
+static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval **, zval * TSRMLS_DC);
 static int mmc_read_value(mmc_t *, char **, int *, char **, int *, int * TSRMLS_DC);
 static int mmc_flush(mmc_t *, int TSRMLS_DC);
 static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *, int);
@@ -1152,11 +1152,11 @@ static int mmc_postprocess_value(zval **return_value, char *value, int value_len
 }
 /* }}} */
 
-int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval **return_value TSRMLS_DC) /* {{{ */
+int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval **return_value, zval *return_flags TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 	char *command, *value;
-	int result = -1, command_len, response_len, value_len, flags;
+	int result = -1, command_len, response_len, value_len, flags = 0;
 
 	MMC_DEBUG(("mmc_exec_retrieval_cmd: key '%s'", key));
 
@@ -1191,12 +1191,17 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval 
 		}
 	}
 
+	if (return_flags != NULL) {
+		zval_dtor(return_flags);
+		ZVAL_LONG(return_flags, flags);
+	}
+	
 	efree(command);
 	return result;
 }
 /* }}} */
 
-static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **return_value TSRMLS_DC) /* {{{ */
+static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **return_value, zval *return_flags TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 	HashPosition pos;
@@ -1206,6 +1211,11 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 	mmc_queue_t serialized = {0};		/* mmc_queue_t<zval *>, pointers to zvals which need unserializing */
 
 	array_init(*return_value);
+	
+	if (return_flags != NULL) {
+		zval_dtor(return_flags);
+		array_init(return_flags);
+	}
 
 	/* until no retrival errors or all servers have failed */
 	do {
@@ -1273,6 +1283,10 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 					}
 					else {
 						add_assoc_stringl_ex(*return_value, result_key, result_key_len + 1, value, value_len, 0);
+					}
+					
+					if (return_flags != NULL) {
+						add_assoc_long_ex(return_flags, result_key, result_key_len + 1, flags);
 					}
 					
 					efree(result_key);
@@ -2177,20 +2191,20 @@ PHP_FUNCTION(memcache_replace)
 }
 /* }}} */
 
-/* {{{ proto mixed memcache_get( object memcache, mixed key )
+/* {{{ proto mixed memcache_get( object memcache, mixed key [, mixed &flags ] )
    Returns value of existing item or false */
 PHP_FUNCTION(memcache_get)
 {
 	mmc_pool_t *pool;
-	zval *key, *mmc_object = getThis(), tmp_key;
+	zval *key, *mmc_object = getThis(), tmp_key, *flags = NULL;
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz", &mmc_object, memcache_class_entry_ptr, &key) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz|z", &mmc_object, memcache_class_entry_ptr, &key, &flags) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &key) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z|z", &key, &flags) == FAILURE) {
 			return;
 		}
 	}
@@ -2212,12 +2226,12 @@ PHP_FUNCTION(memcache_get)
 
 		MMC_PREPARE_KEY(Z_STRVAL(tmp_key), Z_STRLEN(tmp_key));
 
-		if (mmc_exec_retrieval_cmd(pool, Z_STRVAL(tmp_key), Z_STRLEN(tmp_key), &return_value TSRMLS_CC) < 0) {
+		if (mmc_exec_retrieval_cmd(pool, Z_STRVAL(tmp_key), Z_STRLEN(tmp_key), &return_value, flags TSRMLS_CC) < 0) {
 			zval_dtor(return_value);
 			RETVAL_FALSE;
 		}
 	} else if (zend_hash_num_elements(Z_ARRVAL(tmp_key))){
-		if (mmc_exec_retrieval_cmd_multi(pool, &tmp_key, &return_value TSRMLS_CC) < 0) {
+		if (mmc_exec_retrieval_cmd_multi(pool, &tmp_key, &return_value, flags TSRMLS_CC) < 0) {
 			zval_dtor(return_value);
 			RETVAL_FALSE;
 		}

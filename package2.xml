@@ -36,6 +36,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
+    - Added argument to Memcache::get() that receives the flags for retrieved value(s)
     - Fixed PECL bug 11369 ("nested" get calls in __wakeup() functions breaks)
     - Fixed incompatibility with standard hash strategy in previous versions
   </notes>

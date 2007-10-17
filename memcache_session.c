@@ -149,7 +149,7 @@ PS_READ_FUNC(memcache)
 		MAKE_STD_ZVAL(result);
 		ZVAL_NULL(result);
 
-		if (mmc_exec_retrieval_cmd(pool, key, strlen(key), &result TSRMLS_CC) <= 0 || Z_TYPE_P(result) != IS_STRING) {
+		if (mmc_exec_retrieval_cmd(pool, key, strlen(key), &result, NULL TSRMLS_CC) <= 0 || Z_TYPE_P(result) != IS_STRING) {
 			zval_ptr_dtor(&result);
 			return FAILURE;
 		}
