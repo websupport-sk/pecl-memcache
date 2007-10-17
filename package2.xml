@@ -25,10 +25,10 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2007-09-21</date>
+  <date>2007-10-17</date>
   <version>
-    <release>2.2.0</release>
-    <api>2.2.0</api>
+    <release>2.2.1</release>
+    <api>2.2.1</api>
   </version>
   <stability>
     <release>stable</release>
@@ -36,15 +36,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    - Added support for consistent hash strategy
-    - New INI directives 
-        "memcache.hash_strategy" = {standard, consistent}
-        "memcache.hash_function" = {crc32, fnv}
-    - PHP6 support
-    - Fixed PECL bug #11221 (Double free when returning cached object with __sleep)
-    - Fixed PECL bug #10607 (Segfault on array key retrieval when array key is not IS_STRING)
-    - Don't failover on "object to large" errors
-    - Use $phpincludedir for finding php_session.h
+    - Fixed PECL bug 11369 ("nested" get calls in __wakeup() functions breaks)
+    - Fixed incompatibility with standard hash strategy in previous versions
   </notes>
   <contents>
     <dir name="/">
@@ -54,11 +47,13 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="CREDITS" role="doc" />
       <file name="example.php" role="doc" />
       <file name="memcache.c" role="src" />
+      <file name="memcache_queue.c" role="src" />
       <file name="memcache_session.c" role="src" />
       <file name="memcache_standard_hash.c" role="src" />
       <file name="memcache_consistent_hash.c" role="src" />
       <file name="memcache.dsp" role="src" />
       <file name="php_memcache.h" role="doc" />
+      <file name="memcache_queue.h" role="doc" />
       <file name="README" role="doc" />
     </dir>
   </contents>
@@ -75,6 +70,29 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <providesextension>memcache</providesextension>
   <extsrcrelease />
   <changelog>
+    <release>
+      <date>2007-09-21</date>
+      <version>
+        <release>2.2.0</release>
+        <api>2.2.0</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Added support for consistent hash strategy
+        - New INI directives 
+            "memcache.hash_strategy" = {standard, consistent}
+            "memcache.hash_function" = {crc32, fnv}
+        - PHP6 support
+        - Fixed PECL bug #11221 (Double free when returning cached object with __sleep)
+        - Fixed PECL bug #10607 (Segfault on array key retrieval when array key is not IS_STRING)
+        - Don't failover on "object to large" errors
+        - Use $phpincludedir for finding php_session.h
+      </notes>
+    </release>
     <release>
       <date>2007-03-27</date>
       <version>

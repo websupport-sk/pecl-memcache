@@ -27,21 +27,20 @@ $domainsocket = 'unix:///var/run/memcached/memcached.sock';
 $nonExistingHost = "localhost";
 $nonExistingPort = 11213;
 
-switch (strtolower(ini_get('memcache.hash_strategy'))) {
-	case 'consistent':
-		// with preloaded buckets
-		$balanceKey1 = 'key1_abc';
-		$balanceKey2 = 'key2_abcde';
-		
-		// without preloaded buckets
-		//$balanceKey1 = 'key1_abcde';
-		//$balanceKey2 = 'key2_abcdefg';
-		break;
+$balanceKeys = array(
+	'consistent'	=> array(
+			'crc32'		=> array('key1_abc', 'key2_abcde'),
+			'fnv'		=> array('key1_a', 'key2_2534534'),
+			),
+	'standard'		=> array(
+			'crc32'		=> array('load_test_key1', 'load_test_key2'),
+			'fnv'		=> array('key1_ab', 'key2_a'),
+			),
+	);
 
-	default:
-		$balanceKey1 = 'load_test_key1';	// Must hash to host1
-		$balanceKey2 = 'load_test_key2';	// Must hash to host2
-}
+$strat = strtolower(ini_get('memcache.hash_strategy'));
+$func = strtolower(ini_get('memcache.hash_function'));
+list ($balanceKey1, $balanceKey2) = $balanceKeys[$strat][$func];
 
 $memcache = @memcache_connect($host, $port);
 

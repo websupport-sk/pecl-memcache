@@ -40,6 +40,7 @@
 #include "ext/standard/php_smart_str.h"
 #include "php_network.h"
 #include "php_memcache.h"
+#include "memcache_queue.h"
 
 #ifndef ZEND_ENGINE_2
 #define OnUpdateLong OnUpdateInt
@@ -220,7 +221,7 @@ static int mmc_str_left(char *, char *, int, int);
 static int mmc_sendcmd(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_parse_response(mmc_t *mmc, char *, int, char **, int *, int *, int *);
 static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval ** TSRMLS_DC);
-static int mmc_read_value(mmc_t *, char **, int *, zval ** TSRMLS_DC);
+static int mmc_read_value(mmc_t *, char **, int *, char **, int *, int * TSRMLS_DC);
 static int mmc_flush(mmc_t *, int TSRMLS_DC);
 static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *, int);
 static int mmc_get_stats(mmc_t *, char *, int, int, zval * TSRMLS_DC);
@@ -1131,11 +1132,31 @@ static int mmc_parse_response(mmc_t *mmc, char *response, int response_len, char
 }
 /* }}} */
 
+static int mmc_postprocess_value(zval **return_value, char *value, int value_len TSRMLS_DC) /* 
+	post-process a value into a result zval struct, value will be free()'ed during process {{{ */
+{
+	const char *value_tmp = value;
+	php_unserialize_data_t var_hash;
+	PHP_VAR_UNSERIALIZE_INIT(var_hash);
+
+	if (!php_var_unserialize(return_value, (const unsigned char **)&value_tmp, (const unsigned char *)(value_tmp + value_len), &var_hash TSRMLS_CC)) {
+		ZVAL_FALSE(*return_value);
+		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+		efree(value);
+		return -1;
+	}
+
+	PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
+	efree(value);
+	return 1;
+}
+/* }}} */
+
 int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval **return_value TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
-	char *command;
-	int result = -1, command_len, response_len;
+	char *command, *value;
+	int result = -1, command_len, response_len, value_len, flags;
 
 	MMC_DEBUG(("mmc_exec_retrieval_cmd: key '%s'", key));
 
@@ -1146,7 +1167,7 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval 
 
 		/* send command and read value */
 		if ((result = mmc_sendcmd(mmc, command, command_len TSRMLS_CC)) > 0 &&
-			(result = mmc_read_value(mmc, NULL, NULL, return_value TSRMLS_CC)) >= 0) {
+			(result = mmc_read_value(mmc, NULL, NULL, &value, &value_len, &flags TSRMLS_CC)) >= 0) {
 
 			/* not found */
 			if (result == 0) {
@@ -1156,6 +1177,12 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval 
 			else if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0 || !mmc_str_left(mmc->inbuf, "END", response_len, sizeof("END")-1)) {
 				mmc_server_seterror(mmc, "Malformed END line", 0);
 				result = -1;
+			}
+			else if (flags & MMC_SERIALIZED ) {
+				result = mmc_postprocess_value(return_value, value, value_len TSRMLS_CC);				
+			}
+			else {
+				ZVAL_STRINGL(*return_value, value, value_len, 0);
 			}
 		}
 
@@ -1173,9 +1200,10 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 {
 	mmc_t *mmc;
 	HashPosition pos;
-	zval **key, *value;
-	char *result_key, *str_key;
-	int	i = 0, j, num_requests, result, result_status, result_key_len, key_len;
+	zval **key;
+	char *result_key, *str_key, *value;
+	int	i = 0, j, num_requests, result, result_status, result_key_len, key_len, value_len, flags;
+	mmc_queue_t serialized = {0};		/* mmc_queue_t<zval *>, pointers to zvals which need unserializing */
 
 	array_init(*return_value);
 
@@ -1235,8 +1263,18 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 		/* third pass to read responses */
 		for (j=0; j<num_requests; j++) {
 			if (pool->requests[j]->status != MMC_STATUS_FAILED) {
-				for (value = NULL; (result = mmc_read_value(pool->requests[j], &result_key, &result_key_len, &value TSRMLS_CC)) > 0; value = NULL) {
-					add_assoc_zval_ex(*return_value, result_key, result_key_len + 1, value);
+				for (value = NULL; (result = mmc_read_value(pool->requests[j], &result_key, &result_key_len, &value, &value_len, &flags TSRMLS_CC)) > 0; value = NULL) {
+					if (flags & MMC_SERIALIZED) {
+						zval *result;
+						MAKE_STD_ZVAL(result);
+						ZVAL_STRINGL(result, value, value_len, 0);
+						add_assoc_zval_ex(*return_value, result_key, result_key_len + 1, result);
+						mmc_queue_push(&serialized, result);
+					}
+					else {
+						add_assoc_stringl_ex(*return_value, result_key, result_key_len + 1, value, value_len, 0);
+					}
+					
 					efree(result_key);
 				}
 
@@ -1250,15 +1288,26 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 			smart_str_free(&(pool->requests[j]->outbuf));
 		}
 	} while (result_status < 0 && MEMCACHE_G(allow_failover) && i++ < MEMCACHE_G(max_failover_attempts));
+	
+	/* post-process serialized values */
+	if (serialized.len) {
+		zval *value;
+		
+		while ((value = (zval *)mmc_queue_pop(&serialized)) != NULL) {
+			mmc_postprocess_value(&value, Z_STRVAL_P(value), Z_STRLEN_P(value) TSRMLS_CC);
+		}
+		
+		mmc_queue_free(&serialized);
+	}
 
 	return result_status;
 }
 /* }}} */
 
-static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSRMLS_DC) /* {{{ */
+static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, char **value, int *value_len, int *flags TSRMLS_DC) /* {{{ */
 {
-	int response_len, flags, data_len, i, size;
 	char *data;
+	int response_len, data_len, i, size;
 
 	/* read "VALUE <key> <flags> <bytes>\r\n" header line */
 	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0) {
@@ -1271,7 +1320,7 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSR
 		return 0;
 	}
 
-	if (mmc_parse_response(mmc, mmc->inbuf, response_len, key, key_len, &flags, &data_len) < 0) {
+	if (mmc_parse_response(mmc, mmc->inbuf, response_len, key, key_len, flags, &data_len) < 0) {
 		return -1;
 	}
 
@@ -1292,16 +1341,8 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSR
 	}
 
 	data[data_len] = '\0';
-	if (!data) {
-		if (*value == NULL) {
-			MAKE_STD_ZVAL(*value);
-		}
-		ZVAL_EMPTY_STRING(*value);
-		efree(data);
-		return 1;
-	}
-
-	if (flags & MMC_COMPRESSED) {
+	
+	if ((*flags & MMC_COMPRESSED) && data_len > 0) {
 		char *result_data;
 		unsigned long result_len = 0;
 
@@ -1319,34 +1360,8 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, zval **value TSR
 		data_len = result_len;
 	}
 
-	MMC_DEBUG(("mmc_read_value: data '%s'", data));
-
-	if (*value == NULL) {
-		MAKE_STD_ZVAL(*value);
-	}
-
-	if (flags & MMC_SERIALIZED) {
-		const char *tmp = data;
-		php_unserialize_data_t var_hash;
-		PHP_VAR_UNSERIALIZE_INIT(var_hash);
-
-		if (!php_var_unserialize(value, (const unsigned char **)&tmp, (const unsigned char *)(tmp + data_len), &var_hash TSRMLS_CC)) {
-			mmc_server_seterror(mmc, "Failed to unserialize data", 0);
-			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-			if (key) {
-				efree(*key);
-			}
-			efree(data);
-			return -1;
-		}
-
-		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-		efree(data);
-	}
-	else {
-		ZVAL_STRINGL(*value, data, data_len, 0);
-	}
-
+	*value = data;
+	*value_len = data_len;
 	return 1;
 }
 /* }}} */

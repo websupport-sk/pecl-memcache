@@ -58,7 +58,7 @@ void mmc_standard_free_state(void *s) /* {{{ */
 
 static unsigned int mmc_hash(mmc_standard_state_t *state, const char *key, int key_len) /* {{{ */
 {
-	unsigned int hash = (~state->hash(key, key_len) >> 16) & 0x7fff;
+	unsigned int hash = (state->hash(key, key_len) >> 16) & 0x7fff;
   	return hash ? hash : 1;
 }
 /* }}} */
