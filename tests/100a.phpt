@@ -31,18 +31,18 @@ echo "Done\n";
 
 ?>
 --EXPECTF--
-Notice: memcache_flush(): Server %s failed with: Connection refused (111) in %s on line %d
+Notice: memcache_flush(): Server %s failed with: Connection %s
 bool(true)
 
-Notice: memcache_flush(): Server %s failed with: Connection refused (111) in %s on line %d
+Notice: memcache_flush(): Server %s failed with: Connection %s
 bool(false)
 
-Notice: memcache_flush(): Server %s failed with: Connection refused (111) in %s on line %d
+Notice: memcache_flush(): Server %s failed with: Connection %s
 bool(true)
 
-Warning: memcache_flush() expects parameter 1 to be Memcache, object given in %s on line %d
+Warning: memcache_flush() expects parameter 1 to be Memcache, object given %s
 NULL
 
-Warning: memcache_flush() expects parameter 1 to be Memcache, string given in %s on line %d
+Warning: memcache_flush() expects parameter 1 to be Memcache, string given %s
 NULL
 Done

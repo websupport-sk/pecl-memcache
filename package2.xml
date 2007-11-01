@@ -25,7 +25,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2007-10-17</date>
+  <date>2007-11-01</date>
   <version>
     <release>2.2.1</release>
     <api>2.2.1</api>
@@ -38,6 +38,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <notes>
     - Added argument to Memcache::get() that receives the flags for retrieved value(s)
     - Fixed PECL bug 11369 ("nested" get calls in __wakeup() functions breaks)
+    - Fixed problem with keys being modified in-place and empty keys (PECL Bug #11236)
     - Fixed incompatibility with standard hash strategy in previous versions
   </notes>
   <contents>

@@ -7,7 +7,7 @@ Nested get's in __wakeup()
 
 include 'connect.inc';
 
-class A {
+class testclass {
 	function __wakeup() {
 		global $memcache;
 		$result = $memcache->get('_test_key2');
@@ -15,7 +15,7 @@ class A {
 	}
 }
 
-$a1 = new A();
+$a1 = new testclass();
 
 $memcache->set('_test_key1', $a1);
 $memcache->set('_test_key2', 'Test2');
@@ -30,12 +30,12 @@ var_dump($result);
 ?>
 --EXPECTF--
 string(5) "Test2"
-object(A)%s {
+object(testclass)%s {
 }
 string(5) "Test2"
 array(2) {
   ["_test_key1"]=>
-  object(A)%s {
+  object(testclass)%s {
   }
   ["_test_key2"]=>
   string(5) "Test2"
