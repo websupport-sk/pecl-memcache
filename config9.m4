@@ -72,6 +72,12 @@ if test "$PHP_MEMCACHE" != "no"; then
       session_inc_path="$abs_srcdir"
     elif test -f "$phpincludedir/ext/session/php_session.h"; then
       session_inc_path="$phpincludedir"
+    else
+      for i in php php4 php5 php6; do
+        if test -f "$prefix/include/$i/ext/session/php_session.h"; then
+          session_inc_path="$prefix/include/$i"
+        fi
+      done
     fi
 
     if test "$session_inc_path" = ""; then
