@@ -146,10 +146,17 @@ PS_READ_FUNC(memcache)
 	zval *result;
 
 	if (pool) {
+		char key_tmp[MMC_KEY_MAX_SIZE];
+		unsigned int key_tmp_len;
+
+		if (mmc_prepare_key_ex(key, strlen(key), key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+			return FAILURE;
+		}
+
 		MAKE_STD_ZVAL(result);
 		ZVAL_NULL(result);
 
-		if (mmc_exec_retrieval_cmd(pool, key, strlen(key), &result, NULL TSRMLS_CC) <= 0 || Z_TYPE_P(result) != IS_STRING) {
+		if (mmc_exec_retrieval_cmd(pool, key_tmp, key_tmp_len, &result, NULL TSRMLS_CC) <= 0 || Z_TYPE_P(result) != IS_STRING) {
 			zval_ptr_dtor(&result);
 			return FAILURE;
 		}
@@ -170,8 +177,17 @@ PS_WRITE_FUNC(memcache)
 {
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
 
-	if (pool && mmc_pool_store(pool, "set", sizeof("set")-1, key, strlen(key), 0, INI_INT("session.gc_maxlifetime"), val, vallen TSRMLS_CC)) {
-		return SUCCESS;
+	if (pool) { 
+		char key_tmp[MMC_KEY_MAX_SIZE];
+		unsigned int key_tmp_len;
+
+		if (mmc_prepare_key_ex(key, strlen(key), key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+			return FAILURE;
+		}			
+		
+		if (mmc_pool_store(pool, "set", sizeof("set")-1, key_tmp, key_tmp_len, 0, INI_INT("session.gc_maxlifetime"), val, vallen TSRMLS_CC)) {
+			return SUCCESS;
+		}
 	}
 
 	return FAILURE;
@@ -188,8 +204,15 @@ PS_DESTROY_FUNC(memcache)
 	int result = -1;
 
 	if (pool) {
-		while (result < 0 && (mmc = mmc_pool_find(pool, key, strlen(key) TSRMLS_CC)) != NULL) {
-			if ((result = mmc_delete(mmc, key, strlen(key), 0 TSRMLS_CC)) < 0) {
+		char key_tmp[MMC_KEY_MAX_SIZE];
+		unsigned int key_tmp_len;
+
+		if (mmc_prepare_key_ex(key, strlen(key), key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+			return FAILURE;
+		}
+		
+		while (result < 0 && (mmc = mmc_pool_find(pool, key_tmp, key_tmp_len TSRMLS_CC)) != NULL) {
+			if ((result = mmc_delete(mmc, key_tmp, key_tmp_len, 0 TSRMLS_CC)) < 0) {
 				mmc_server_failure(mmc TSRMLS_CC);
 			}
 		}

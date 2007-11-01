@@ -76,6 +76,9 @@ PHP_FUNCTION(memcache_flush);
 #define MMC_STATUS_UNKNOWN 2
 #define MMC_STATUS_CONNECTED 3
 
+#define MMC_OK 					0
+#define MMC_REQUEST_FAILURE 	-1
+
 #define MMC_STANDARD_HASH 1
 #define MMC_CONSISTENT_HASH 2
 #define MMC_HASH_CRC32 1					/* CRC32 hash function */
@@ -151,6 +154,9 @@ mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int TSRMLS_DC);
 mmc_t *mmc_find_persistent(char *, int, int, int, int TSRMLS_DC);
 int mmc_server_failure(mmc_t * TSRMLS_DC);
 void mmc_server_deactivate(mmc_t * TSRMLS_DC);
+
+int mmc_prepare_key(zval *, char *, unsigned int * TSRMLS_DC);
+int mmc_prepare_key_ex(const char *, unsigned int, char *, unsigned int * TSRMLS_DC);
 
 mmc_pool_t *mmc_pool_new(TSRMLS_D);
 void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
