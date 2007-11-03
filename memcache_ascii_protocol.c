@@ -32,7 +32,7 @@ typedef struct mmc_ascii_request {
 		char			key[MMC_MAX_KEY_LEN + 1];	/* key buffer to use on failover of single-key requests */
 		unsigned int	flags;
 		unsigned long	length;
-		uint64_t		cas;						/* CAS counter */
+		unsigned long	cas;						/* CAS counter */
 	} value;
 } mmc_ascii_request_t;
 
@@ -74,8 +74,17 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 		else if (mmc_str_left(line, "NOT_FOUND", line_len, sizeof("NOT_FOUND")-1)) {
 			response = MMC_RESPONSE_NOT_FOUND;
 		}
-		else if (mmc_str_left(line, "NOT_STORED", line_len, sizeof("NOT_STORED")-1)) {
+		else if (
+			mmc_str_left(line, "NOT_STORED", line_len, sizeof("NOT_STORED")-1) ||
+			mmc_str_left(line, "EXISTS", line_len, sizeof("EXISTS")-1)) 
+		{
 			response = MMC_RESPONSE_EXISTS;
+		}
+		else if (mmc_str_left(line, "SERVER_ERROR out of memory", line_len, sizeof("SERVER_ERROR out of memory")-1)) {
+			response = MMC_RESPONSE_OUT_OF_MEMORY;
+		}
+		else if (mmc_str_left(line, "SERVER_ERROR object too large", line_len, sizeof("SERVER_ERROR object too large")-1)) {
+			response = MMC_RESPONSE_TOO_LARGE;
 		}
 		else if (
 			mmc_str_left(line, "ERROR", line_len, sizeof("ERROR")-1) ||
@@ -96,7 +105,7 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 /* }}}*/
 
 static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
-	reads and parses the VALUE <key> <flags> <size> header and then reads the value body {{{ */
+	reads and parses the VALUE <key> <flags> <size> <cas> header and then reads the value body {{{ */
 {
 	char *line;
 	int line_len;
@@ -107,7 +116,8 @@ static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 		if (mmc_str_left(line, "END", line_len, sizeof("END")-1)) {
 			return MMC_REQUEST_DONE;
 		}
-		if (sscanf(line, MMC_VALUE_HEADER, req->value.key, &(req->value.flags), &(req->value.length)) != 3) {
+		
+		if (sscanf(line, MMC_VALUE_HEADER, req->value.key, &(req->value.flags), &(req->value.length), &(req->value.cas)) < 3) {
 			return mmc_server_failure(mmc, request->io, "Malformed VALUE header", 0 TSRMLS_CC);
 		}
 		
@@ -136,7 +146,7 @@ static int mmc_server_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /
 	if (request->readbuf.idx >= req->value.length + 2) {
 		int result = mmc_unpack_value(
 			mmc, request, &(request->readbuf), req->value.key, strlen(req->value.key), 
-			req->value.flags, req->value.length TSRMLS_CC);
+			req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
 		
 		/* allow parse_value to read next VALUE or END line */
 		request->parse = mmc_request_parse_value;
@@ -157,19 +167,40 @@ static mmc_request_t *mmc_ascii_create_request() /* {{{ */
 }
 /* }}} */
 
-static void mmc_ascii_get(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len) /* {{{ */ 
+static void mmc_ascii_reset_request(mmc_request_t *request) /* {{{ */ 
+{
+	mmc_ascii_request_t *req = (mmc_ascii_request_t *)request;
+	req->value.cas = 0;
+	mmc_request_reset(request);
+}
+/* }}} */
+
+static void mmc_ascii_get(mmc_request_t *request, int op, zval *zkey, const char *key, unsigned int key_len) /* {{{ */ 
 {
 	request->parse = mmc_request_parse_value;
-	smart_str_appendl(&(request->sendbuf.value), "get ", sizeof("get ")-1);
+
+	if (op == MMC_OP_GETS) {
+		smart_str_appendl(&(request->sendbuf.value), "gets ", sizeof("gets ")-1);		
+	}
+	else {
+		smart_str_appendl(&(request->sendbuf.value), "get ", sizeof("get ")-1);
+	}
+
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
 	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 }
 /* }}} */
 
-static void mmc_ascii_begin_get(mmc_request_t *request) /* {{{ */
+static void mmc_ascii_begin_get(mmc_request_t *request, int op) /* {{{ */
 {
 	request->parse = mmc_request_parse_value;
-	smart_str_appendl(&(request->sendbuf.value), "get", sizeof("get")-1);	
+
+	if (op == MMC_OP_GETS) {
+		smart_str_appendl(&(request->sendbuf.value), "gets", sizeof("gets")-1);		
+	}
+	else {
+		smart_str_appendl(&(request->sendbuf.value), "get", sizeof("get")-1);
+	}
 }
 /* }}} */
 
@@ -187,7 +218,8 @@ static void mmc_ascii_end_get(mmc_request_t *request) /* {{{ */
 /* }}} */
 
 static int mmc_ascii_store(
-	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, unsigned int flags, unsigned int exptime, zval *value TSRMLS_DC) /* {{{ */ 
+	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, 
+	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC) /* {{{ */ 
 {
 	int status;
 	mmc_buffer_t buffer;
@@ -210,6 +242,11 @@ static int mmc_ascii_store(
 		case MMC_OP_REPLACE:
 			smart_str_appendl(&(request->sendbuf.value), "replace", sizeof("replace")-1);
 			break;
+		case MMC_OP_CAS:
+			smart_str_appendl(&(request->sendbuf.value), "cas", sizeof("cas")-1);
+			break;
+		default:
+			return MMC_REQUEST_FAILURE;
 	}
 	
 	smart_str_appendl(&(request->sendbuf.value), " ", 1);
@@ -220,6 +257,12 @@ static int mmc_ascii_store(
 	smart_str_append_unsigned(&(request->sendbuf.value), exptime);
 	smart_str_appendl(&(request->sendbuf.value), " ", 1);
 	smart_str_append_unsigned(&(request->sendbuf.value), buffer.value.len);
+
+	if (op == MMC_OP_CAS) {
+		smart_str_appendl(&(request->sendbuf.value), " ", 1);
+		smart_str_append_unsigned(&(request->sendbuf.value), cas);
+	}
+	
 	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 	smart_str_appendl(&(request->sendbuf.value), buffer.value.c, buffer.value.len);
 	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
@@ -309,7 +352,7 @@ static void mmc_ascii_stats(mmc_request_t *request, const char *type, long slabi
 
 mmc_protocol_t mmc_ascii_protocol = {
 	mmc_ascii_create_request,
-	mmc_request_reset,
+	mmc_ascii_reset_request,
 	mmc_request_free,
 	mmc_ascii_get,
 	mmc_ascii_begin_get,

@@ -31,6 +31,9 @@ if (is_array($result4))
 var_dump($result3);
 var_dump($result4);
 
+$result5 = $memcache->get('test_key1', null);
+var_dump($result5);
+
 // Test procedural
 $result1 = null;
 $result2 = memcache_get($memcache, 'test_key1', $result1);
@@ -49,6 +52,9 @@ if (is_array($result4))
 var_dump($result3);
 var_dump($result4);
 
+$result5 = memcache_get($memcache, 'test_key1', null);
+var_dump($result5);
+
 ?>
 --EXPECT--
 int(256)
@@ -65,6 +71,7 @@ array(2) {
   ["test_key2"]=>
   string(5) "test2"
 }
+string(5) "test1"
 int(256)
 string(5) "test1"
 array(2) {
@@ -79,3 +86,4 @@ array(2) {
   ["test_key2"]=>
   string(5) "test2"
 }
+string(5) "test1"

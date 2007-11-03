@@ -43,7 +43,6 @@
 #define MMC_REQUEST_MAGIC	0x0f
 #define	MMC_RESPONSE_MAGIC	0xf0
 
-#define MMC_OP_GET			0x00
 #define MMC_OP_DELETE		0x04
 #define MMC_OP_MUTATE		0x05
 #define MMC_OP_FLUSH		0x07
@@ -55,6 +54,7 @@ typedef struct mmc_binary_request {
 	mmc_request_t	base;			/* enable cast to mmc_request_t */
 	mmc_queue_t		keys;			/* mmc_queue_t<zval *>, reqid -> key mappings */
 	struct {
+		uint8_t			cmdid;
 		uint8_t			error;		/* error received in current request */
 		uint32_t		reqid;		/* current reqid being processed */
 		uint32_t		reqid_end;	/* last reqid in a stream of requests */
@@ -68,7 +68,7 @@ typedef struct mmc_binary_request {
 
 typedef struct mmc_request_header {
 	uint8_t		magic;
-	uint8_t		command;
+	uint8_t		cmdid;
 	uint8_t		key_len;
 	uint8_t		_reserved;
 	uint32_t	reqid;				/* opaque request id */
@@ -80,6 +80,11 @@ typedef struct mmc_store_request_header {
 	uint32_t				flags;
 	uint32_t				exptime;
 } mmc_store_request_header_t;
+
+typedef struct mmc_cas_request_header {
+	mmc_store_request_header_t	base;
+	uint64_t					cas;
+} mmc_cas_request_header_t;
 
 typedef struct mmc_delete_request_header {
 	mmc_request_header_t	base;
@@ -100,7 +105,7 @@ typedef struct mmc_flush_request_header {
 
 typedef struct mmc_response_header {
 	uint8_t		magic;
-	uint8_t		command;
+	uint8_t		cmdid;
 	uint8_t		error;
 	uint8_t		_reserved;
 	uint32_t	reqid;				/* echo'ed from request */
@@ -111,8 +116,14 @@ typedef struct mmc_get_response_header {
 	uint32_t				flags;
 } mmc_get_response_header_t;
 
+typedef struct mmc_gets_response_header {
+	uint32_t				flags;
+	uint64_t				cas;
+} mmc_gets_response_header_t;
+
 static int mmc_request_read_response(mmc_t *, mmc_request_t * TSRMLS_DC);
 static int mmc_request_parse_value(mmc_t *, mmc_request_t * TSRMLS_DC);
+static int mmc_request_parse_value_cas(mmc_t *, mmc_request_t * TSRMLS_DC);
 static int mmc_request_read_value(mmc_t *, mmc_request_t * TSRMLS_DC);
 
 static inline char *mmc_stream_get(mmc_stream_t *io, size_t bytes TSRMLS_DC) /* 
@@ -216,15 +227,21 @@ static int mmc_request_parse_value_header(mmc_t *mmc, mmc_request_t *request TSR
 		}
 		else {
 			/* last command in multi-get */
-			if (header->command == MMC_OP_NOOP) {
+			if (header->cmdid == MMC_OP_NOOP) {
 				return MMC_REQUEST_DONE;
 			}
 			
 			req->command.reqid = header->reqid;
-			req->value.length = header->length - sizeof(mmc_get_response_header_t);
 			
 			/* allow parse_value_ handler to read the value specific header */
-			request->parse = mmc_request_parse_value;
+			if (header->cmdid == MMC_OP_GETS) {
+				request->parse = mmc_request_parse_value_cas;
+				req->value.length = header->length - sizeof(mmc_gets_response_header_t);
+			}
+			else {
+				request->parse = mmc_request_parse_value;
+				req->value.length = header->length - sizeof(mmc_get_response_header_t);
+			}
 		}
 		
 		/* read more, php streams buffer input which must be read if available */
@@ -258,6 +275,31 @@ static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 }
 /* }}}*/
 
+static int mmc_request_parse_value_cas(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
+	reads and parses the value header and then reads the value body {{{ */
+{
+	mmc_gets_response_header_t *header;
+	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
+
+	header = (mmc_gets_response_header_t *)mmc_stream_get(request->io, sizeof(*header) TSRMLS_CC);
+	if (header != NULL) {
+		req->value.flags = ntohl(header->flags);
+		req->value.cas = ntohll(header->cas);
+		
+		/* memory for data + \0 */
+		mmc_buffer_alloc(&(request->readbuf), req->value.length + 1);
+
+		/* allow read_value handler to read the value body */
+		request->parse = mmc_request_read_value;
+
+		/* read more, php streams buffer input which must be read if available */
+		return MMC_REQUEST_AGAIN;
+	}
+	
+	return MMC_REQUEST_MORE;
+}
+/* }}}*/
+
 static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
 	read the value body into the buffer {{{ */
 {
@@ -273,7 +315,7 @@ static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) 
 		key = (zval *)mmc_queue_item(&(req->keys), req->command.reqid);
 		result = mmc_unpack_value(
 			mmc, request, &(request->readbuf), Z_STRVAL_P(key), Z_STRLEN_P(key), 
-			req->value.flags, req->value.length TSRMLS_CC);
+			req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
 		
 		if (result == MMC_REQUEST_AGAIN) {
 			if (req->command.reqid >= req->command.reqid_end) {
@@ -292,10 +334,10 @@ static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) 
 }
 /* }}}*/
 
-static inline void mmc_pack_header(mmc_request_header_t *header, uint8_t command, unsigned int key_len, unsigned int reqid, unsigned int length) /* {{{ */ 
+static inline void mmc_pack_header(mmc_request_header_t *header, uint8_t cmdid, unsigned int key_len, unsigned int reqid, unsigned int length) /* {{{ */ 
 {
 	header->magic = MMC_REQUEST_MAGIC;
-	header->command = command;
+	header->cmdid = cmdid;
 	header->key_len = key_len & 0xff;
 	header->_reserved = 0;
 	header->reqid = htonl(reqid);
@@ -315,6 +357,7 @@ static void mmc_binary_reset_request(mmc_request_t *request) /* {{{ */
 {
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	mmc_queue_reset(&(req->keys));
+	req->value.cas = 0;
 	mmc_request_reset(request);
 }
 /* }}} */
@@ -327,7 +370,7 @@ static void mmc_binary_free_request(mmc_request_t *request) /* {{{ */
 }
 /* }}} */
 
-static void mmc_binary_get(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len) /* {{{ */ 
+static void mmc_binary_get(mmc_request_t *request, int op, zval *zkey, const char *key, unsigned int key_len) /* {{{ */ 
 {
 	mmc_request_header_t header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
@@ -335,7 +378,7 @@ static void mmc_binary_get(mmc_request_t *request, zval *zkey, const char *key, 
 
 	/* reqid/opaque is the index into the collection of key pointers */  
 	req->command.reqid_end = req->keys.len;
-	mmc_pack_header(&header, MMC_OP_GET, key_len, req->command.reqid_end, key_len);
+	mmc_pack_header(&header, op, key_len, req->command.reqid_end, key_len);
 	
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));	
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
@@ -345,9 +388,11 @@ static void mmc_binary_get(mmc_request_t *request, zval *zkey, const char *key, 
 }
 /* }}} */
 
-static void mmc_binary_begin_get(mmc_request_t *request) /* {{{ */
+static void mmc_binary_begin_get(mmc_request_t *request, int op) /* {{{ */
 {
 	request->parse = mmc_request_parse_value_header;
+	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
+	req->command.cmdid = (op == MMC_OP_GET ? MMC_OP_GETQ : MMC_OP_GETS); 
 }
 /* }}} */
 
@@ -357,7 +402,7 @@ static void mmc_binary_append_get(mmc_request_t *request, zval *zkey, const char
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 
 	/* reqid/opaque is the index into the collection of key pointers */  
-	mmc_pack_header(&header, MMC_OP_GETQ, key_len, req->keys.len, key_len);
+	mmc_pack_header(&header, req->command.cmdid, key_len, req->keys.len, key_len);
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));	
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
 
@@ -379,7 +424,8 @@ static void mmc_binary_end_get(mmc_request_t *request) /* {{{ */
 /* }}} */
 
 static int mmc_binary_store(
-	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, unsigned int flags, unsigned int exptime, zval *value TSRMLS_DC) /* {{{ */ 
+	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, 
+	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC) /* {{{ */ 
 {
 	int status, prevlen;
 	mmc_store_request_header_t *header;
@@ -388,8 +434,14 @@ static int mmc_binary_store(
 	prevlen = request->sendbuf.value.len;
 
 	/* allocate space for header */
-	mmc_buffer_alloc(&(request->sendbuf), sizeof(*header));
-	request->sendbuf.value.len += sizeof(*header);
+	if (op == MMC_OP_CAS) {
+		mmc_buffer_alloc(&(request->sendbuf), sizeof(mmc_cas_request_header_t));
+		request->sendbuf.value.len += sizeof(mmc_cas_request_header_t);
+	}
+	else {
+		mmc_buffer_alloc(&(request->sendbuf), sizeof(*header));
+		request->sendbuf.value.len += sizeof(*header);
+	}
 	
 	/* append key and data */
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
@@ -402,8 +454,13 @@ static int mmc_binary_store(
 	/* initialize header */
 	header = (mmc_store_request_header_t *)(request->sendbuf.value.c + prevlen);
 	mmc_pack_header(&(header->base), op, key_len, 0, request->sendbuf.value.len - prevlen - sizeof(header->base));
+	
 	header->flags = htonl(flags);
 	header->exptime = htonl(exptime);
+	
+	if (op == MMC_OP_CAS) {
+		((mmc_cas_request_header_t *)header)->cas = htonll(cas); 
+	}
 	
 	return MMC_OK;
 }

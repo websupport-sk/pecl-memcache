@@ -160,7 +160,7 @@ static mmc_request_t *php_mmc_session_read_request(mmc_pool_t *pool, zval *zkey,
 		return NULL;
 	}
 
-	pool->protocol->get(request, zkey, request->key, request->key_len);
+	pool->protocol->get(request, MMC_OP_GET, zkey, request->key, request->key_len);
 	return request;
 }
 /* }}} */
@@ -173,7 +173,7 @@ PS_READ_FUNC(memcache)
 
 	if (pool != NULL) {
 		zval result, zkey;
-		zval *param[2];
+		zval *value_handler_param[3];
 		
 		mmc_t *mmc;
 		mmc_request_t *request;
@@ -181,14 +181,15 @@ PS_READ_FUNC(memcache)
 		unsigned int last_index = 0;
 		
 		ZVAL_FALSE(&result);
-		param[0] = &result;
-		param[1] = NULL;
+		value_handler_param[0] = &result;
+		value_handler_param[1] = NULL;
+		value_handler_param[2] = NULL;
 		
 		ZVAL_STRING(&zkey, (char *)key, 0);
 		memset(&skip_servers, 0, sizeof(skip_servers));
 
 		/* create request */
-		request = php_mmc_session_read_request(pool, &zkey, param TSRMLS_CC);  
+		request = php_mmc_session_read_request(pool, &zkey, value_handler_param TSRMLS_CC);  
 		if (request == NULL) {
 			return FAILURE;
 		}
@@ -204,7 +205,7 @@ PS_READ_FUNC(memcache)
 		
 		/* retry missing value (possibly due to server restart) */
 		while (Z_TYPE(result) != IS_STRING && skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers) {
-			request = php_mmc_session_read_request(pool, &zkey, param TSRMLS_CC);  
+			request = php_mmc_session_read_request(pool, &zkey, value_handler_param TSRMLS_CC);  
 			if (request == NULL) {
 				break;
 			}
@@ -257,7 +258,7 @@ PS_WRITE_FUNC(memcache)
 		ZVAL_STRINGL(&value, (char *)val, vallen, 0);
 
 		/* assemble command */
-		if (pool->protocol->store(pool, request, MMC_OP_SET, request->key, request->key_len, 0, INI_INT("session.gc_maxlifetime"), &value TSRMLS_CC) != MMC_OK) {
+		if (pool->protocol->store(pool, request, MMC_OP_SET, request->key, request->key_len, 0, INI_INT("session.gc_maxlifetime"), 0, &value TSRMLS_CC) != MMC_OK) {
 			mmc_pool_release(pool, request);
 			return FAILURE;
 		}

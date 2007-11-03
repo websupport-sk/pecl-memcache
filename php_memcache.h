@@ -49,6 +49,7 @@ PHP_FUNCTION(memcache_get_version);
 PHP_FUNCTION(memcache_add);
 PHP_FUNCTION(memcache_set);
 PHP_FUNCTION(memcache_replace);
+PHP_FUNCTION(memcache_cas);
 PHP_FUNCTION(memcache_get);
 PHP_FUNCTION(memcache_delete);
 PHP_FUNCTION(memcache_debug);
@@ -66,7 +67,7 @@ PHP_FUNCTION(memcache_flush);
 
 /* internal functions */
 mmc_t *mmc_find_persistent(const char *, int, unsigned short, unsigned short, int, int TSRMLS_DC);
-int mmc_value_handler_single(mmc_t *, mmc_request_t *, const char *, unsigned int, void *, unsigned int, unsigned int, void * TSRMLS_DC);
+int mmc_value_handler_single(mmc_t *, mmc_request_t *, const char *, unsigned int, void *, unsigned int, unsigned int, unsigned long, void * TSRMLS_DC);
 int mmc_stored_handler(mmc_t *, mmc_request_t *, int, const char *, unsigned int, void * TSRMLS_DC);
 
 /* session handler struct */

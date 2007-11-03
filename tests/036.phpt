@@ -21,9 +21,9 @@ session_write_close();
 $result3 = $memcache->get($id);
 
 // Test destroy
-session_start();
-$result4 = session_destroy();
-$result5 = $memcache->get($id);
+$result4 = session_start();
+$result5 = session_destroy();
+$result6 = $memcache->get($id);
 
 var_dump($result1);
 var_dump($id);
@@ -31,6 +31,7 @@ var_dump($result2);
 var_dump($result3);
 var_dump($result4);
 var_dump($result5);
+var_dump($result6);
 
 ?>
 --EXPECTF--
@@ -38,5 +39,6 @@ bool(true)
 string(%d) "%s"
 bool(false)
 string(%d) "%s"
+bool(true)
 bool(true)
 bool(false)

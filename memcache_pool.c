@@ -354,8 +354,8 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 /* }}} */
 
 int mmc_unpack_value(
-	mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *buffer, 
-	const char *key, unsigned int key_len, unsigned int flags, unsigned int bytes TSRMLS_DC) /* 
+	mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *buffer, const char *key, unsigned int key_len, 
+	unsigned int flags, unsigned long cas, unsigned int bytes TSRMLS_DC) /* 
 	does uncompression and unserializing to reconstruct a zval {{{ */
 {
 	char *data = NULL;
@@ -394,7 +394,7 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, key, key_len, object, 0, flags, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(mmc, request, key, key_len, object, 0, flags, cas, request->value_handler_param TSRMLS_CC);
 	}
 	else {
 		/* room for \0 since buffer contains trailing \r\n and uncompress allocates + 1 */
@@ -406,7 +406,7 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, key, key_len, &value, 0, flags, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(mmc, request, key, key_len, &value, 0, flags, cas, request->value_handler_param TSRMLS_CC);
 	}
 }
 /* }}}*/
@@ -934,7 +934,6 @@ mmc_request_t *mmc_pool_request_get(mmc_pool_t *pool, int protocol,
 	
 	request->value_handler = value_handler;
 	request->value_handler_param = value_handler_param;
-	
 	return request;
 }
 /* }}} */
@@ -1077,7 +1076,7 @@ int mmc_pool_schedule_key(mmc_pool_t *pool, const char *key, unsigned int key_le
 /* }}} */
 
 int mmc_pool_schedule_get(
-	mmc_pool_t *pool, int protocol, zval *zkey,  
+	mmc_pool_t *pool, int protocol, int op, zval *zkey, 
 	mmc_request_value_handler value_handler, void *value_handler_param,
 	mmc_request_failover_handler failover_handler, void *failover_handler_param, 
 	mmc_request_t *failed_request TSRMLS_DC) /* 
@@ -1109,7 +1108,7 @@ int mmc_pool_schedule_get(
 			mmc->buildreq->failed_index = failed_request->failed_index;
 		}
 
-		pool->protocol->begin_get(mmc->buildreq);
+		pool->protocol->begin_get(mmc->buildreq, op);
 	}
 	else if (protocol == MMC_PROTO_UDP && mmc->buildreq->sendbuf.value.len + key_len + 3 > MMC_MAX_UDP_LEN) {
 		/* datagram if full, schedule for delivery */
@@ -1128,7 +1127,7 @@ int mmc_pool_schedule_get(
 			mmc->buildreq->failed_index = failed_request->failed_index;
 		}
 
-		pool->protocol->begin_get(mmc->buildreq);
+		pool->protocol->begin_get(mmc->buildreq, op);
 	}
 
 	pool->protocol->append_get(mmc->buildreq, zkey, key, key_len);

@@ -40,10 +40,12 @@ http://pear.php.net/dtd/package-2.0.xsd">
     - Binary protocol support 
     - Non-blocking IO using select()
     - Pipelined multi-set/delete/increment/decrement
+    - CAS (Compare-And-Swap) support
     - Key and session redundancy (values are written to N mirrors)
     - Improved error reporting and failover handling
     - Added class "MemcachePool" implementing the new API
     - New INI directives
+       memcache.protocol = {ascii, binary}
        memcache.redundancy = 1
        memcache.session_redundancy = 2
     - Changed INI defaults 

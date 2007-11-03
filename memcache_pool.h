@@ -47,10 +47,10 @@
 #define MMC_BUFFER_SIZE			4096
 #define MMC_MAX_UDP_LEN			1400
 #define MMC_MAX_KEY_LEN			250
-#define MMC_VALUE_HEADER		"VALUE %250s %u %lu"	/* keep in sync with MMC_MAX_KEY_LEN */
+#define MMC_VALUE_HEADER		"VALUE %250s %u %lu %lu"	/* keep in sync with MMC_MAX_KEY_LEN */
 
 #define MMC_COMPRESSION_LEVEL 	Z_DEFAULT_COMPRESSION
-#define MMC_DEFAULT_SAVINGS 	0.2						/* minimum 20% savings for compression to be used */
+#define MMC_DEFAULT_SAVINGS 	0.2							/* minimum 20% savings for compression to be used */
 
 #define MMC_PROTO_TCP 0
 #define MMC_PROTO_UDP 1
@@ -68,10 +68,13 @@
 #define MMC_REQUEST_AGAIN 		2			/* more data follows in this packet, try read/write again */
 #define MMC_REQUEST_RETRY 		3			/* retry/reschedule request */
 
-#define MMC_RESPONSE_UNKNOWN	-2
-#define MMC_RESPONSE_ERROR		-1				
-#define MMC_RESPONSE_NOT_FOUND	1			/* same as binary protocol */
-#define MMC_RESPONSE_EXISTS		2			/* same as binary protocol */
+#define MMC_RESPONSE_UNKNOWN		-2
+#define MMC_RESPONSE_ERROR			-1				
+#define MMC_RESPONSE_NOT_FOUND		0x01			/* same as binary protocol */
+#define MMC_RESPONSE_EXISTS			0x02			/* same as binary protocol */
+#define MMC_RESPONSE_TOO_LARGE		0x03			/* same as binary protocol */
+#define MMC_RESPONSE_NOT_STORED		0x05			/* same as binary protocol */
+#define MMC_RESPONSE_OUT_OF_MEMORY	0x82			/* same as binary protocol */
 
 #define MMC_STANDARD_HASH 		1
 #define MMC_CONSISTENT_HASH 	2
@@ -124,7 +127,9 @@ typedef struct mmc_request mmc_request_t;
 
 typedef int (*mmc_request_reader)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_parser)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
-typedef int (*mmc_request_value_handler)(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, unsigned int flags, void *param TSRMLS_DC);
+typedef int (*mmc_request_value_handler)(
+	mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, 
+	unsigned int flags, unsigned long cas, void *param TSRMLS_DC);
 typedef int (*mmc_request_response_handler)(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC);
 typedef int (*mmc_request_failover_handler)(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC);
 
@@ -186,20 +191,25 @@ struct mmc {
 #define MMC_BINARY_PROTOCOL	2
 
 /* same as in binary protocol */
-#define MMC_OP_SET			1
-#define MMC_OP_ADD			2
-#define MMC_OP_REPLACE		3
+#define MMC_OP_GET			0x00
+#define MMC_OP_SET			0x01
+#define MMC_OP_ADD			0x02
+#define MMC_OP_REPLACE		0x03
+#define MMC_OP_GETS			0x32
+#define MMC_OP_CAS			0x33
 
 typedef mmc_request_t * (*mmc_protocol_create_request)();
 typedef void (*mmc_protocol_reset_request)(mmc_request_t *request);
 typedef void (*mmc_protocol_free_request)(mmc_request_t *request);
 
-typedef void (*mmc_protocol_get)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len);
-typedef void (*mmc_protocol_begin_get)(mmc_request_t *request);
+typedef void (*mmc_protocol_get)(mmc_request_t *request, int op, zval *zkey, const char *key, unsigned int key_len);
+typedef void (*mmc_protocol_begin_get)(mmc_request_t *request, int op);
 typedef void (*mmc_protocol_append_get)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len);
 typedef void (*mmc_protocol_end_get)(mmc_request_t *request);
 
-typedef int (*mmc_protocol_store)(mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, unsigned int flags, unsigned int exptime, zval *value TSRMLS_DC);
+typedef int (*mmc_protocol_store)(
+	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, 
+	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC);
 typedef void (*mmc_protocol_delete)(mmc_request_t *request, const char *key, unsigned int key_len, unsigned int exptime);
 typedef void (*mmc_protocol_mutate)(mmc_request_t *request, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime);
 
@@ -304,12 +314,12 @@ int mmc_prepare_store(
 	const char *, unsigned int, unsigned int, unsigned int, zval * TSRMLS_DC);
 
 int mmc_pool_schedule_key(mmc_pool_t *, const char *, unsigned int, mmc_request_t *, unsigned int TSRMLS_DC);
-int mmc_pool_schedule_get(mmc_pool_t *, int, zval *, 
+int mmc_pool_schedule_get(mmc_pool_t *, int, int, zval *, 
 	mmc_request_value_handler, void *, mmc_request_failover_handler, void *, mmc_request_t * TSRMLS_DC);
 
 /* utility functions */
 int mmc_pack_value(mmc_pool_t *, mmc_buffer_t *, zval *, unsigned int * TSRMLS_DC);
-int mmc_unpack_value(mmc_t *, mmc_request_t *, mmc_buffer_t *, const char *, unsigned int, unsigned int, unsigned int TSRMLS_DC); 
+int mmc_unpack_value(mmc_t *, mmc_request_t *, mmc_buffer_t *, const char *, unsigned int, unsigned int, unsigned long, unsigned int TSRMLS_DC); 
 
 inline int mmc_prepare_key_ex(const char *, unsigned int, char *, unsigned int *);
 inline int mmc_prepare_key(zval *, char *, unsigned int *);
