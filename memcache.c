@@ -1319,27 +1319,41 @@ PHP_FUNCTION(memcache_replace)
 }
 /* }}} */
 
-static int mmc_value_handler_multi(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, void *param TSRMLS_DC) /* 
-	receives a multiple values, param is a zval pointer array to store value in {{{ */
+static int mmc_value_handler_multi(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, unsigned int flags, void *param TSRMLS_DC) /* 
+	receives a multiple values, param is a zval** array to store value and flags in {{{ */
 {
-	zval *arrval;
+	zval *arrval, **result = (zval **)param;
 	ALLOC_ZVAL(arrval);
 	*((zval *)arrval) = *((zval *)value);
 	
-	if (Z_TYPE_P((zval *)param) != IS_ARRAY) {
-		array_init((zval *)param);
+	/* add value to result */
+	if (Z_TYPE_P(result[0]) != IS_ARRAY) {
+		array_init(result[0]);
 	}
-	add_assoc_zval_ex((zval *)param, (char *)key, key_len + 1, arrval);
+	add_assoc_zval_ex(result[0], (char *)key, key_len + 1, arrval);
+	
+	/* add flags to result */
+	if (result[1] != NULL) {
+		if (Z_TYPE_P(result[1]) != IS_ARRAY) {
+			array_init(result[1]);
+		}
+		add_assoc_long_ex(result[1], (char *)key, key_len + 1, flags);
+	}
 
 	/* request more data (more values or END line) */
 	return MMC_REQUEST_AGAIN;
 }
 /* }}} */
 
-int mmc_value_handler_single(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, void *param TSRMLS_DC) /* 
+int mmc_value_handler_single(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, unsigned int flags, void *param TSRMLS_DC) /* 
 	receives a single value, param is a zval pointer to store value to {{{ */
 {
-	*((zval *)param) = *((zval *)value);
+	zval **result = (zval **)param;
+	*(result[0]) = *((zval *)value);
+	
+	if (result[1] != NULL) {
+		ZVAL_LONG(result[1], flags);
+	}
 
 	/* request more data (END line) */
 	return MMC_REQUEST_AGAIN;
@@ -1375,21 +1389,21 @@ static int mmc_value_failover_handler(mmc_pool_t *pool, mmc_t *mmc, mmc_request_
 }
 /* }}}*/
 
-/* {{{ proto mixed memcache_get( object memcache, mixed key )
+/* {{{ proto mixed memcache_get( object memcache, mixed key [, mixed &flags ] )
    Returns value of existing item or false */
 PHP_FUNCTION(memcache_get)
 {
 	mmc_pool_t *pool;
-	zval *failover_handler_param[2];
-	zval *keys, *mmc_object = getThis();
+	zval *keys, *flags = NULL, *mmc_object = getThis();
+	zval *value_handler_param[2], *failover_handler_param[2];
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz", &mmc_object, memcache_pool_ce, &keys) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz|z", &mmc_object, memcache_pool_ce, &keys, &flags) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &keys) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z|z", &keys, &flags) == FAILURE) {
 			return;
 		}
 	}
@@ -1399,6 +1413,8 @@ PHP_FUNCTION(memcache_get)
 	}
 
 	ZVAL_FALSE(return_value);
+	value_handler_param[0] = return_value;
+	value_handler_param[1] = flags;
 	
 	if (Z_TYPE_P(keys) == IS_ARRAY) {
 		zval **key;
@@ -1414,7 +1430,7 @@ PHP_FUNCTION(memcache_get)
 			
 			/* schedule request */
 			mmc_pool_schedule_get(pool, MMC_PROTO_UDP, *key,
-				mmc_value_handler_multi, return_value, 
+				mmc_value_handler_multi, value_handler_param, 
 				mmc_value_failover_handler, failover_handler_param, NULL TSRMLS_CC);
 		}
 	}
@@ -1424,7 +1440,7 @@ PHP_FUNCTION(memcache_get)
 		/* allocate request */
 		request = mmc_pool_request_get(
 			pool, MMC_PROTO_UDP,  
-			mmc_value_handler_single, return_value, 
+			mmc_value_handler_single, value_handler_param, 
 			mmc_pool_failover_handler, NULL TSRMLS_CC);
 
 		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {

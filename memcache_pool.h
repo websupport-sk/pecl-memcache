@@ -124,7 +124,7 @@ typedef struct mmc_request mmc_request_t;
 
 typedef int (*mmc_request_reader)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_parser)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
-typedef int (*mmc_request_value_handler)(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, void *param TSRMLS_DC);
+typedef int (*mmc_request_value_handler)(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, unsigned int flags, void *param TSRMLS_DC);
 typedef int (*mmc_request_response_handler)(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC);
 typedef int (*mmc_request_failover_handler)(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC);
 

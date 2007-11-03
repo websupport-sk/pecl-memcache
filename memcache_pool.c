@@ -394,7 +394,7 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, key, key_len, object, 0, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(mmc, request, key, key_len, object, 0, flags, request->value_handler_param TSRMLS_CC);
 	}
 	else {
 		/* room for \0 since buffer contains trailing \r\n and uncompress allocates + 1 */
@@ -406,7 +406,7 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, key, key_len, &value, 0, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(mmc, request, key, key_len, &value, 0, flags, request->value_handler_param TSRMLS_CC);
 	}
 }
 /* }}}*/

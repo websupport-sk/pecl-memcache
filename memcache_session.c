@@ -148,11 +148,11 @@ PS_CLOSE_FUNC(memcache)
 }
 /* }}} */
 
-static mmc_request_t *php_mmc_session_read_request(mmc_pool_t *pool, zval *zkey, zval *result TSRMLS_DC) /* {{{ */
+static mmc_request_t *php_mmc_session_read_request(mmc_pool_t *pool, zval *zkey, zval **param TSRMLS_DC) /* {{{ */
 {
 	mmc_request_t *request = mmc_pool_request_get(
 		pool, MMC_PROTO_UDP,  
-		mmc_value_handler_single, result, 
+		mmc_value_handler_single, param, 
 		mmc_pool_failover_handler, NULL TSRMLS_CC);
 
 	if (mmc_prepare_key_ex(Z_STRVAL_P(zkey), Z_STRLEN_P(zkey), request->key, &(request->key_len)) != MMC_OK) {
@@ -173,17 +173,22 @@ PS_READ_FUNC(memcache)
 
 	if (pool != NULL) {
 		zval result, zkey;
+		zval *param[2];
+		
 		mmc_t *mmc;
 		mmc_request_t *request;
 		mmc_queue_t skip_servers;
 		unsigned int last_index = 0;
 		
 		ZVAL_FALSE(&result);
+		param[0] = &result;
+		param[1] = NULL;
+		
 		ZVAL_STRING(&zkey, (char *)key, 0);
 		memset(&skip_servers, 0, sizeof(skip_servers));
 
 		/* create request */
-		request = php_mmc_session_read_request(pool, &zkey, &result TSRMLS_CC);  
+		request = php_mmc_session_read_request(pool, &zkey, param TSRMLS_CC);  
 		if (request == NULL) {
 			return FAILURE;
 		}
@@ -199,7 +204,7 @@ PS_READ_FUNC(memcache)
 		
 		/* retry missing value (possibly due to server restart) */
 		while (Z_TYPE(result) != IS_STRING && skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers) {
-			request = php_mmc_session_read_request(pool, &zkey, &result TSRMLS_CC);  
+			request = php_mmc_session_read_request(pool, &zkey, param TSRMLS_CC);  
 			if (request == NULL) {
 				break;
 			}
