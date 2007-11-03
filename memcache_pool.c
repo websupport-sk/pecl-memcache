@@ -38,14 +38,15 @@ ZEND_DECLARE_MODULE_GLOBALS(memcache)
 
 static void mmc_pool_switch(mmc_pool_t *);
 
-static inline void mmc_buffer_alloc(mmc_buffer_t *buffer, unsigned int size)  /* {{{ */
+inline void mmc_buffer_alloc(mmc_buffer_t *buffer, unsigned int size)  /* 
+	ensures space for an additional size bytes {{{ */
 {
 	register size_t newlen;
 	smart_str_alloc((&(buffer->value)), size, 0);
 }
 /* }}} */
 
-static inline void mmc_buffer_free(mmc_buffer_t *buffer)  /* {{{ */
+inline void mmc_buffer_free(mmc_buffer_t *buffer)  /* {{{ */
 {
 	if (buffer->value.c != NULL) {
 		smart_str_free(&(buffer->value));
@@ -54,11 +55,10 @@ static inline void mmc_buffer_free(mmc_buffer_t *buffer)  /* {{{ */
 }
 /* }}} */
 
-static unsigned int mmc_hash_crc32(const char *key, int key_len) /* 
+static unsigned int mmc_hash_crc32(const char *key, unsigned int key_len) /* 
 	CRC32 hash {{{ */
 {
-	unsigned int crc = ~0;
-	int i;
+	unsigned int i, crc = ~0;
 
 	for (i=0; i<key_len; i++) {
 		CRC32(crc, key[i]);
@@ -68,11 +68,10 @@ static unsigned int mmc_hash_crc32(const char *key, int key_len) /*
 }
 /* }}} */
 
-static unsigned int mmc_hash_fnv1a(const char *key, int key_len) /* 
+static unsigned int mmc_hash_fnv1a(const char *key, unsigned int key_len) /* 
 	FNV-1a hash {{{ */
 {
-	unsigned int hval = FNV_32_INIT;
-	int i;
+	unsigned int i, hval = FNV_32_INIT;
 
 	for (i=0; i<key_len; i++) {
 		hval ^= (unsigned int)key[i];
@@ -131,33 +130,16 @@ static char *mmc_stream_readline_wrapper(mmc_stream_t *io, char *buf, size_t max
 }
 /* }}} */
 
-static int mmc_stream_get_line(mmc_stream_t *io, char **line TSRMLS_DC) /* 
-	attempts to read a line from server, returns the line size or 0 if no complete line was available {{{ */
+void mmc_request_reset(mmc_request_t *request) /* {{{ */ 
 {
-	size_t returned_len = 0;
-	io->readline(io, io->input.value + io->input.idx, MMC_BUFFER_SIZE - io->input.idx, &returned_len TSRMLS_CC);
-	io->input.idx += returned_len;
-	
-	if (io->input.idx && io->input.value[io->input.idx - 1] == '\n') {
-		int result = io->input.idx;
-		*line = io->input.value;
-		io->input.idx = 0;
-		return result;
-	}
-	
-	return 0;
-}	
-/* }}} */
-
-static inline mmc_request_t *mmc_request_new() /* {{{ */
-{
-	mmc_request_t *request = emalloc(sizeof(mmc_request_t));
-	memset(request, 0, sizeof(*request));
-	return request;
+	request->key_len = 0;
+	mmc_buffer_reset(&(request->sendbuf));
+	mmc_queue_reset(&(request->failed_servers));
+	request->failed_index = 0;
 }
 /* }}} */
-
-static inline void mmc_request_free(mmc_request_t *request)  /* {{{ */
+	
+void mmc_request_free(mmc_request_t *request)  /* {{{ */
 {
 	mmc_buffer_free(&(request->sendbuf));
 	mmc_buffer_free(&(request->readbuf));
@@ -176,6 +158,10 @@ static inline int mmc_request_send(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 	/* done sending? */
 	if (request->sendbuf.idx >= request->sendbuf.value.len) {
 		return MMC_REQUEST_DONE;
+	}
+	
+	if (php_stream_eof(request->io->stream)) {
+		return mmc_server_failure(mmc, request->io, "Write failed (socket was unexpectedly closed)", 0 TSRMLS_CC);
 	}
 	
 	return MMC_REQUEST_MORE;
@@ -246,25 +232,56 @@ static int mmc_request_read_udp(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 }
 /* }}} */
 
-static int mmc_compress(const char *data, unsigned long data_len, char **result, unsigned long *result_len) /* 
-	compresses value into a buffer, returns MMC_OK on success {{{ */
+static void mmc_compress(mmc_pool_t *pool, mmc_buffer_t *buffer, const char *value, int value_len, unsigned int *flags, int copy TSRMLS_DC) /* {{{ */ 
 {
-	int status;
-	*result_len = data_len + (data_len / 1000) + 25 + 1; /* some magic from zlib.c */
-	*result = emalloc(*result_len);
-	
-	if (MMC_COMPRESSION_LEVEL >= 0) {
-		status = compress2((unsigned char *)*result, result_len, (unsigned const char *)data, data_len, MMC_COMPRESSION_LEVEL);
-	} else {
-		status = compress((unsigned char *)*result, result_len, (unsigned const char *)data, data_len);
+	/* autocompress large values */
+	if (pool->compress_threshold && value_len >= pool->compress_threshold) {
+		*flags |= MMC_COMPRESSED;
 	}
 
-	if (status == Z_OK) {
-		return MMC_OK;
-	}
+	if (*flags & MMC_COMPRESSED) {
+		int status;
+		mmc_buffer_t prev;
+		unsigned long result_len = value_len * (1 - pool->min_compress_savings);
+		
+		if (copy) {
+			/* value is already in output buffer */
+			prev = *buffer;
+			
+			/* allocate space for prev header + result */
+			memset(buffer, 0, sizeof(*buffer));
+			mmc_buffer_alloc(buffer, prev.value.len + result_len);
 
-	efree(*result);
-	return MMC_REQUEST_FAILURE;
+			/* append prev header */ 
+			smart_str_appendl(&(buffer->value), prev.value.c, prev.value.len - value_len);
+			buffer->idx = prev.idx;
+		}
+		else {
+			/* allocate space directly in buffer */
+			mmc_buffer_alloc(buffer, result_len);
+		}
+		
+		if (MMC_COMPRESSION_LEVEL >= 0) {
+			status = compress2((unsigned char *)buffer->value.c + buffer->value.len, &result_len, (unsigned const char *)value, value_len, MMC_COMPRESSION_LEVEL);
+		} else {
+			status = compress((unsigned char *)buffer->value.c + buffer->value.len, &result_len, (unsigned const char *)value, value_len);
+		}
+
+		if (status == Z_OK) {
+			buffer->value.len += result_len;
+		}
+		else {
+			smart_str_appendl(&(buffer->value), value, value_len);
+			*flags &= ~MMC_COMPRESSED;
+		}
+		
+		if (copy) {
+			mmc_buffer_free(&prev);
+		}
+	}
+	else if (!copy) {
+		smart_str_appendl(&(buffer->value), value, value_len);
+	}
 }
 /* }}}*/
 
@@ -287,121 +304,59 @@ static int mmc_uncompress(const char *data, unsigned long data_len, char **resul
 }
 /* }}}*/
 
-int mmc_prepare_store(
-	mmc_pool_t *pool, mmc_request_t *request, const char *cmd, unsigned int cmd_len,
-	const char *key, unsigned int key_len, unsigned int flags, unsigned int exptime, zval *value TSRMLS_DC) /* 
-	assembles a SET/ADD/REPLACE request does into the buffer, returns MMC_OK on success {{{ */
+int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned int *flags TSRMLS_DC) /* 
+	does serialization and compression to pack a zval into the buffer {{{ */
 {
-	char *data = NULL;
-	unsigned int data_len, data_free = 0;
-
-	if (mmc_prepare_key_ex(key, key_len, request->key, &(request->key_len)) != MMC_OK) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
-		return MMC_REQUEST_FAILURE;
-	}
-
 	switch (Z_TYPE_P(value)) {
 		case IS_STRING:
-			data = Z_STRVAL_P(value);
-			data_len = Z_STRLEN_P(value);
-			flags &= ~MMC_SERIALIZED;
+			*flags &= ~MMC_SERIALIZED;
+			mmc_compress(pool, buffer, Z_STRVAL_P(value), Z_STRLEN_P(value), flags, 0 TSRMLS_CC);
 			break;
 
 		case IS_LONG:
 		case IS_DOUBLE:
 		case IS_BOOL:
+			*flags &= ~MMC_SERIALIZED;
 			convert_to_string(value);
-			data = Z_STRVAL_P(value);
-			data_len = Z_STRLEN_P(value);
-			flags &= ~MMC_SERIALIZED;
+			mmc_compress(pool, buffer, Z_STRVAL_P(value), Z_STRLEN_P(value), flags, 0 TSRMLS_CC); 
 			break;
 
 		default: {
 			php_serialize_data_t value_hash;
 			zval value_copy, *value_copy_ptr;
-			smart_str buf = {0};
+			size_t prev_len = buffer->value.len;
 			
 			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
 			value_copy = *value;
 			zval_copy_ctor(&value_copy);
 			value_copy_ptr = &value_copy;
 
-			/* TODO: serialize straight into buffer (voids auto-compression) */
 			PHP_VAR_SERIALIZE_INIT(value_hash);
-			php_var_serialize(&buf, &value_copy_ptr, &value_hash TSRMLS_CC);
+			php_var_serialize(&(buffer->value), &value_copy_ptr, &value_hash TSRMLS_CC);
 			PHP_VAR_SERIALIZE_DESTROY(value_hash);
 
-			/* you're trying to save null or something went really wrong */
-			if (buf.c == NULL) {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to serialize value");
+			/* trying to save null or something went really wrong */
+			if (buffer->value.c == NULL || buffer->value.len == prev_len) {
 				zval_dtor(&value_copy);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to serialize value");
 				return MMC_REQUEST_FAILURE;
 			}
 
-			data = buf.c;
-			data_len = buf.len;
-			data_free = 1;
-			flags |= MMC_SERIALIZED;
-			
+			*flags |= MMC_SERIALIZED;
 			zval_dtor(&value_copy);
+			
+			mmc_compress(pool, buffer, buffer->value.c + prev_len, buffer->value.len - prev_len, flags, 1 TSRMLS_CC);
 		}
-	}
-	
-	/* autocompress large values */
-	if (pool->compress_threshold && data_len >= pool->compress_threshold) {
-		flags |= MMC_COMPRESSED;
-	}
-
-	if (flags & MMC_COMPRESSED) {
-		char *result;
-		unsigned long result_len;
-		
-		/* TODO: compress straight into buffer */
-		if (mmc_compress(data, data_len, &result, &result_len) == MMC_OK) {
-			if (result_len < data_len * (1 - pool->min_compress_savings)) {
-				if (data_free) {
-					efree(data);
-				}
-				
-				data = result;
-				data_len = result_len;
-				data_free = 1;
-			}
-			else {
-				efree(result);
-				flags &= ~MMC_COMPRESSED;
-			}
-		}
-		else {
-			flags &= ~MMC_COMPRESSED;
-		}
-	}
-
-	/* assemble command */
-	smart_str_appendl(&(request->sendbuf.value), cmd, cmd_len);
-	smart_str_appendl(&(request->sendbuf.value), " ", 1);
-	smart_str_appendl(&(request->sendbuf.value), request->key, request->key_len);
-	smart_str_appendl(&(request->sendbuf.value), " ", 1);
-	smart_str_append_unsigned(&(request->sendbuf.value), flags);
-	smart_str_appendl(&(request->sendbuf.value), " ", 1);
-	smart_str_append_unsigned(&(request->sendbuf.value), exptime);
-	smart_str_appendl(&(request->sendbuf.value), " ", 1);
-	smart_str_append_unsigned(&(request->sendbuf.value), data_len);
-	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
-
-	smart_str_appendl(&(request->sendbuf.value), data, data_len);
-	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
-	
-	if (data_free) {
-		efree(data);
 	}
 
 	return MMC_OK;
 }
 /* }}} */
 
-static int mmc_unpack_value(mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *buffer TSRMLS_DC) /* 
-	does uncompression and unserializing to construct a zval {{{ */
+int mmc_unpack_value(
+	mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *buffer, 
+	const char *key, unsigned int key_len, unsigned int flags, unsigned int bytes TSRMLS_DC) /* 
+	does uncompression and unserializing to reconstruct a zval {{{ */
 {
 	char *data = NULL;
 	unsigned long data_len;
@@ -409,17 +364,17 @@ static int mmc_unpack_value(mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *bu
 	zval value;
 	INIT_ZVAL(value);
 	
-	if (request->value.flags & MMC_COMPRESSED) {
-		if (mmc_uncompress(buffer->value.c, request->value.bytes, &data, &data_len) != MMC_OK) {
+	if (flags & MMC_COMPRESSED) {
+		if (mmc_uncompress(buffer->value.c, bytes, &data, &data_len) != MMC_OK) {
 			return mmc_server_failure(mmc, request->io, "Failed to uncompress data", 0 TSRMLS_CC);
 		}
 	}
 	else {
 		data = buffer->value.c;
-		data_len = request->value.bytes;
+		data_len = bytes;
 	}
 
-	if (request->value.flags & MMC_SERIALIZED) {
+	if (flags & MMC_SERIALIZED) {
 		php_unserialize_data_t var_hash;
 		const unsigned char *p = (unsigned char *)data;
 		zval *object = &value;  
@@ -427,99 +382,35 @@ static int mmc_unpack_value(mmc_t *mmc, mmc_request_t *request, mmc_buffer_t *bu
 		PHP_VAR_UNSERIALIZE_INIT(var_hash);
 		if (!php_var_unserialize(&object, &p, p + data_len, &var_hash TSRMLS_CC)) {
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-			if (request->value.flags & MMC_COMPRESSED) {
+			if (flags & MMC_COMPRESSED) {
 				efree(data);
 			}
 			return mmc_server_failure(mmc, request->io, "Failed to unserialize data", 0 TSRMLS_CC);
 		}
 
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-		if (request->value.flags & MMC_COMPRESSED) {
+		if (flags & MMC_COMPRESSED) {
 			efree(data);
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, object, 0, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(mmc, request, key, key_len, object, 0, request->value_handler_param TSRMLS_CC);
 	}
 	else {
 		/* room for \0 since buffer contains trailing \r\n and uncompress allocates + 1 */
 		data[data_len] = '\0';
 		ZVAL_STRINGL(&value, data, data_len, 0);
 		
-		if (!(request->value.flags & MMC_COMPRESSED)) {
+		if (!(flags & MMC_COMPRESSED)) {
 			mmc_buffer_release(buffer);
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, &value, 0, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(mmc, request, key, key_len, &value, 0, request->value_handler_param TSRMLS_CC);
 	}
 }
 /* }}}*/
 
-static int mmc_server_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
-	read the value body into the buffer {{{ */
-{
-	request->readbuf.idx += 
-		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, request->value.bytes + 2 - request->readbuf.idx TSRMLS_CC);
-
-	/* done reading? */
-	if (request->readbuf.idx >= request->value.bytes + 2) {
-		int result = mmc_unpack_value(mmc, request, &(request->readbuf) TSRMLS_CC);
-		
-		/* allow parse_value to read next VALUE or END line */
-		request->parse = mmc_request_parse_value;
-		mmc_buffer_reset(&(request->readbuf));
-
-		return result;
-	}
-	
-	return MMC_REQUEST_MORE;
-}
-/* }}}*/
-
-int mmc_request_parse_line(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
-	reads a single line and delegates it to value_handler {{{ */
-{
-	char *line;
-	int line_len = mmc_stream_get_line(request->io, &line TSRMLS_CC);
-	
-	if (line_len > 0) {
-		return request->value_handler(mmc, request, line, line_len, request->value_handler_param TSRMLS_CC);
-	}
-	
-	return MMC_REQUEST_MORE;
-}
-/* }}}*/
-
-int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
-	reads and parses the VALUE <key> <flags> <size> header and then reads the value body {{{ */
-{
-	char *line;
-	int line_len = mmc_stream_get_line(request->io, &line TSRMLS_CC);
-	
-	if (line_len > 0) {
-		if (mmc_str_left(line, "END", line_len, sizeof("END")-1)) {
-			return MMC_REQUEST_DONE;
-		}
-		if (sscanf(line, MMC_VALUE_HEADER, request->value.key, &(request->value.flags), &(request->value.bytes)) != 3) {
-			return mmc_server_failure(mmc, request->io, "Malformed VALUE header", 0 TSRMLS_CC);
-		}
-		
-		request->value.key_len = strlen(request->value.key);
-		
-		/* memory for data + \r\n */
-		mmc_buffer_alloc(&(request->readbuf), request->value.bytes + 2);
-
-		/* allow read_value handler to read the value body */
-		request->parse = mmc_server_read_value;
-
-		/* read more, php streams buffer input which must be read if available */
-		return MMC_REQUEST_AGAIN;
-	}
-	
-	return MMC_REQUEST_MORE;
-}
-/* }}}*/
 
 mmc_t *mmc_server_new(
 	const char *host, int host_len, unsigned short tcp_port, unsigned short udp_port, 
@@ -647,16 +538,14 @@ int mmc_server_failure(mmc_t *mmc, mmc_stream_t *io, const char *error, int errn
 }
 /* }}} */
 
-int mmc_request_failure(mmc_t *mmc, mmc_stream_t *io, char *value, unsigned int value_len, int errnum TSRMLS_DC) /* 
+int mmc_request_failure(mmc_t *mmc, mmc_stream_t *io, const char *message, unsigned int message_len, int errnum TSRMLS_DC) /* 
 	 checks for a valid server generated error message and calls mmc_server_failure() {{{ */
 {
-	if (mmc_str_left(value, "ERROR", value_len, sizeof("ERROR")-1) ||
-		mmc_str_left(value, "CLIENT_ERROR", value_len, sizeof("CLIENT_ERROR")-1) ||
-		mmc_str_left(value, "SERVER_ERROR", value_len, sizeof("SERVER_ERROR")-1)) 
+	if (mmc_str_left(message, "ERROR", message_len, sizeof("ERROR")-1) ||
+		mmc_str_left(message, "CLIENT_ERROR", message_len, sizeof("CLIENT_ERROR")-1) ||
+		mmc_str_left(message, "SERVER_ERROR", message_len, sizeof("SERVER_ERROR")-1)) 
 	{
-		// Trim off trailing \r\n
-		value[value_len - 2] = '\0';
-		return mmc_server_failure(mmc, io, value, errnum TSRMLS_CC);
+		return mmc_server_failure(mmc, io, message, errnum TSRMLS_CC);
 	}
 	
 	return mmc_server_failure(mmc, io, "Malformed server response", errnum TSRMLS_CC);
@@ -831,6 +720,14 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
 	memset(pool, 0, sizeof(*pool));
 
+	switch (MEMCACHE_G(protocol)) {
+		case MMC_BINARY_PROTOCOL:
+			pool->protocol = &mmc_binary_protocol;
+			break;
+		default:
+			pool->protocol = &mmc_ascii_protocol;
+	}
+	
 	switch (MEMCACHE_G(hash_strategy)) {
 		case MMC_CONSISTENT_HASH:
 			pool->hash = &mmc_consistent_hash;
@@ -887,7 +784,7 @@ void mmc_pool_free(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 	
 	/* requests are owned by us so free them */
 	while ((request = mmc_queue_pop(&(pool->free_requests))) != NULL) {
-		mmc_request_free(request);
+		pool->protocol->free_request(request);
 	}
 	mmc_queue_free(&(pool->free_requests));
 	
@@ -981,20 +878,22 @@ static int mmc_pool_failover_handler_null(mmc_pool_t *pool, mmc_t *mmc, mmc_requ
 }
 /* }}}*/
 
-mmc_request_t *mmc_pool_request(mmc_pool_t *pool, int protocol, mmc_request_parser parse, 
-	mmc_request_value_handler value_handler, void *value_handler_param, 
-	mmc_request_failover_handler failover_handler, void *failover_handler_param TSRMLS_DC) /* 
-	allocates a request, must be added to pool using mmc_pool_schedule or released with mmc_pool_release {{{ */ 
+static int mmc_pool_response_handler_null(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC) /* 
+	always returns failure {{{ */
+{
+	return MMC_REQUEST_DONE;
+}
+/* }}}*/
+
+static inline mmc_request_t *mmc_pool_request_alloc(mmc_pool_t *pool, int protocol, 
+	mmc_request_failover_handler failover_handler, void *failover_handler_param TSRMLS_DC) /* {{{ */ 
 {
 	mmc_request_t *request = mmc_queue_pop(&(pool->free_requests));
 	if (request == NULL) {
-		request = mmc_request_new();
+		request = pool->protocol->create_request();
 	}
 	else {
-		request->key_len = 0;
-		mmc_buffer_reset(&(request->sendbuf));
-		mmc_queue_reset(&(request->failed_servers));
-		request->failed_index = 0;
+		pool->protocol->reset_request(request);
 	}
 	
 	request->protocol = protocol;
@@ -1004,10 +903,6 @@ mmc_request_t *mmc_pool_request(mmc_pool_t *pool, int protocol, mmc_request_pars
 		smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 	}
 	
-	request->parse = parse;
-	request->value_handler = value_handler;
-	request->value_handler_param = value_handler_param;
-	
 	request->failover_handler = failover_handler != NULL ? failover_handler : mmc_pool_failover_handler_null;
 	request->failover_handler_param = failover_handler_param;
 
@@ -1015,11 +910,47 @@ mmc_request_t *mmc_pool_request(mmc_pool_t *pool, int protocol, mmc_request_pars
 }
 /* }}} */
 
+mmc_request_t *mmc_pool_request(mmc_pool_t *pool, int protocol, 
+	mmc_request_response_handler response_handler, void *response_handler_param, 
+	mmc_request_failover_handler failover_handler, void *failover_handler_param TSRMLS_DC) /* 
+	allocates a request, must be added to pool using mmc_pool_schedule or released with mmc_pool_release {{{ */ 
+{
+	mmc_request_t *request = mmc_pool_request_alloc(pool, protocol, failover_handler, failover_handler_param TSRMLS_CC);
+	request->response_handler = response_handler;
+	request->response_handler_param = response_handler_param;
+	return request;
+}
+/* }}} */
+	
+mmc_request_t *mmc_pool_request_get(mmc_pool_t *pool, int protocol, 
+	mmc_request_value_handler value_handler, void *value_handler_param, 
+	mmc_request_failover_handler failover_handler, void *failover_handler_param TSRMLS_DC) /* 
+	allocates a request, must be added to pool using mmc_pool_schedule or released with mmc_pool_release {{{ */ 
+{
+	mmc_request_t *request = mmc_pool_request(
+		pool, protocol, 
+		mmc_pool_response_handler_null, NULL,
+		failover_handler, failover_handler_param TSRMLS_CC);
+	
+	request->value_handler = value_handler;
+	request->value_handler_param = value_handler_param;
+	
+	return request;
+}
+/* }}} */
+
 mmc_request_t *mmc_pool_clone_request(mmc_pool_t *pool, mmc_request_t *request TSRMLS_DC) /* 
 	clones a request, must be added to pool using mmc_pool_schedule or released with mmc_pool_release {{{ */ 
 {
-	mmc_request_t *clone = mmc_pool_request(pool, request->protocol, request->parse, 
-		request->value_handler, request->value_handler_param, NULL, NULL TSRMLS_CC); 
+	mmc_request_t *clone = mmc_pool_request_alloc(pool, request->protocol, NULL, NULL TSRMLS_CC);
+	
+	clone->response_handler = request->response_handler;
+	clone->response_handler_param = request->response_handler_param;
+	clone->value_handler = request->value_handler;
+	clone->value_handler_param = request->value_handler_param;
+	
+	/* copy payload parser */
+	clone->parse = request->parse;
 	
 	/* copy key */
 	memcpy(clone->key, request->key, request->key_len); 
@@ -1121,8 +1052,7 @@ int mmc_pool_schedule_key(mmc_pool_t *pool, const char *key, unsigned int key_le
 		mmc_t *mmc;
 		
 		unsigned int last_index = 0;
-		mmc_queue_t skip_servers;
-		memset(&skip_servers, 0, sizeof(skip_servers));
+		mmc_queue_t skip_servers = {0};
 		
 		/* schedule the first request */
 		mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
@@ -1147,13 +1077,22 @@ int mmc_pool_schedule_key(mmc_pool_t *pool, const char *key, unsigned int key_le
 /* }}} */
 
 int mmc_pool_schedule_get(
-	mmc_pool_t *pool, int protocol, const char *key, unsigned int key_len, 
+	mmc_pool_t *pool, int protocol, zval *zkey,  
 	mmc_request_value_handler value_handler, void *value_handler_param,
 	mmc_request_failover_handler failover_handler, void *failover_handler_param, 
 	mmc_request_t *failed_request TSRMLS_DC) /* 
 	schedules a get command against a server {{{ */
 {
-	mmc_t *mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
+	mmc_t *mmc;
+	char key[MMC_MAX_KEY_LEN + 1];
+	unsigned int key_len;
+	
+	if (mmc_prepare_key(zkey, key, &key_len) != MMC_OK) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
+		return MMC_REQUEST_FAILURE;
+	}
+	
+	mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
 	if (!mmc_server_valid(mmc TSRMLS_CC)) {
 		return MMC_REQUEST_FAILURE;
 	}
@@ -1161,54 +1100,38 @@ int mmc_pool_schedule_get(
 	if (mmc->buildreq == NULL) {
 		mmc_queue_push(&(pool->pending), mmc);
 		
-		mmc->buildreq = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
-			value_handler, value_handler_param, failover_handler, failover_handler_param TSRMLS_CC);
+		mmc->buildreq = mmc_pool_request_get(
+			pool, protocol, value_handler, value_handler_param, 
+			failover_handler, failover_handler_param TSRMLS_CC);
 		
 		if (failed_request != NULL) {
 			mmc_queue_copy(&(failed_request->failed_servers), &(mmc->buildreq->failed_servers));
 			mmc->buildreq->failed_index = failed_request->failed_index;
 		}
 
-		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "get", sizeof("get")-1);
+		pool->protocol->begin_get(mmc->buildreq);
 	}
 	else if (protocol == MMC_PROTO_UDP && mmc->buildreq->sendbuf.value.len + key_len + 3 > MMC_MAX_UDP_LEN) {
 		/* datagram if full, schedule for delivery */
-		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+		pool->protocol->end_get(mmc->buildreq);
 		mmc_pool_schedule(pool, mmc, mmc->buildreq TSRMLS_CC);
 
 		/* begin sending requests immediatly */
 		mmc_pool_select(pool, 0 TSRMLS_CC);
 		
-		mmc->buildreq = mmc_pool_request(pool, protocol, mmc_request_parse_value, 
-			value_handler, value_handler_param, failover_handler, failover_handler_param TSRMLS_CC);
+		mmc->buildreq = mmc_pool_request_get(
+			pool, protocol, value_handler, value_handler_param, 
+			failover_handler, failover_handler_param TSRMLS_CC);
 
 		if (failed_request != NULL) {
 			mmc_queue_copy(&(failed_request->failed_servers), &(mmc->buildreq->failed_servers));
 			mmc->buildreq->failed_index = failed_request->failed_index;
 		}
 
-		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "get", sizeof("get")-1);
+		pool->protocol->begin_get(mmc->buildreq);
 	}
 
-	smart_str_appendl(&(mmc->buildreq->sendbuf.value), " ", 1);
-	smart_str_appendl(&(mmc->buildreq->sendbuf.value), key, key_len);
-
-	return MMC_OK;
-}
-/* }}} */
-
-int mmc_pool_schedule_command(
-	mmc_pool_t *pool, mmc_t *mmc, char *cmd, unsigned int cmd_len, mmc_request_parser parse, 
-	mmc_request_value_handler value_handler, void *value_handler_param TSRMLS_DC) /* 
-	schedules a single command against a server {{{ */
-{
-	mmc_request_t *request = mmc_pool_request(pool, MMC_PROTO_TCP, parse, value_handler, value_handler_param, NULL, NULL TSRMLS_CC);
-	smart_str_appendl(&(request->sendbuf.value), cmd, cmd_len);
-	
-	if (mmc_pool_schedule(pool, mmc, request TSRMLS_CC) != MMC_OK) {
-		return MMC_REQUEST_FAILURE;
-	}
-	
+	pool->protocol->append_get(mmc->buildreq, zkey, key, key_len);
 	return MMC_OK;
 }
 /* }}} */
@@ -1300,10 +1223,19 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 	
 	if (result <= 0) {
 		for (i=0; i < sending->len; i++) {
-			mmc_select_failure(pool, mmc_queue_item(sending, i), ((mmc_t *)mmc_queue_item(sending, i))->sendreq, result TSRMLS_CC);
+			mmc = (mmc_t *)mmc_queue_item(sending, i);
+			if (!FD_ISSET(mmc->sendreq->io->fd, &wfds)) {
+				mmc_queue_remove(sending, mmc);
+				mmc_select_failure(pool, mmc, mmc->sendreq, result TSRMLS_CC);
+			}
 		}
+		
 		for (i=0; i < reading->len; i++) {
-			mmc_select_failure(pool, mmc_queue_item(reading, i), ((mmc_t *)mmc_queue_item(reading, i))->readreq, result TSRMLS_CC);
+			mmc = (mmc_t *)mmc_queue_item(reading, i);
+			if (!FD_ISSET(mmc->readreq->io->fd, &rfds)) {
+				mmc_queue_remove(reading, mmc);
+				mmc_select_failure(pool, mmc, mmc->readreq, result TSRMLS_CC);
+			}
 		}
 	}
 	
@@ -1336,6 +1268,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 						break;
 					
 					case MMC_REQUEST_MORE:
+						/* send more data to socket */
 						break;
 
 					default:
@@ -1412,6 +1345,14 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 						break;
 					
 					case MMC_REQUEST_MORE:
+						/* read more data from socket */ 
+						if (php_stream_eof(mmc->readreq->io->stream)) {
+							result = mmc_server_failure(mmc, mmc->readreq->io, "Read failed (socket was unexpectedly closed)", 0 TSRMLS_CC);
+							if (result == MMC_REQUEST_FAILURE) {
+								/* take server offline and failover requests */
+								mmc_server_deactivate(pool, mmc TSRMLS_CC);
+							}
+						}
 						break;
 					
 					case MMC_REQUEST_AGAIN:
@@ -1441,7 +1382,7 @@ void mmc_pool_run(mmc_pool_t *pool TSRMLS_DC)  /*
 {
 	mmc_t *mmc;
 	while ((mmc = mmc_queue_pop(&(pool->pending))) != NULL) {
-		smart_str_appendl(&(mmc->buildreq->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+		pool->protocol->end_get(mmc->buildreq);
 		mmc_pool_schedule(pool, mmc, mmc->buildreq TSRMLS_CC);
 		mmc->buildreq = NULL;
 	}
@@ -1494,3 +1435,13 @@ inline int mmc_prepare_key(zval *key, char *result, unsigned int *result_len)  /
 	}
 }
 /* }}} */
+
+
+/*
+ * Local variables:
+ * tab-width: 4
+ * c-basic-offset: 4
+ * End:
+ * vim600: noet sw=4 ts=4 fdm=marker
+ * vim<600: noet sw=4 ts=4
+ */

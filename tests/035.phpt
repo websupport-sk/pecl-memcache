@@ -1,7 +1,7 @@
 --TEST--
 memcache::connect() with unix domain socket
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($domainsocket)) die('skip $domainsocket not set'); ?>
+<?php include 'connect.inc'; if (!isset($domainsocket)) die('skip $domainsocket not set'); if (ini_get('memcache.protocol') == 'binary') die('skip binary protocol does not support unix domain sockets'); ?>
 --FILE--
 <?php
 

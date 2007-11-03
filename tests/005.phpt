@@ -14,13 +14,16 @@ memcache_set($memcache, $key, $var, false, 10);
 $result = memcache_get($memcache, $key);
 var_dump($result);
 
-$result = memcache_get($memcache, Array($key, $key."1"));
-var_dump($result);
+$result = memcache_get($memcache, array($key, $key."1"));
+var_dump(count($result));
+
+if (is_array($result)) {
+	$keys = array_keys($result);
+	var_dump(strtr($keys[0], "\r\n\0", "___"));
+}
 
 ?>
---EXPECT--
+--EXPECTF--
 string(4) "test"
-array(1) {
-  ["test____-_really_strange_key"]=>
-  string(4) "test"
-}
+int(1)
+string(28) "test%skey"

@@ -1,7 +1,7 @@
 --TEST--
 memcache->getExtendedStats()
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
+<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); if (ini_get('memcache.protocol') == 'binary') die('skip binary protocol does not support stats'); ?>
 --FILE--
 <?php
 

@@ -72,6 +72,12 @@ if test "$PHP_MEMCACHE" != "no"; then
       session_inc_path="$abs_srcdir"
     elif test -f "$phpincludedir/ext/session/php_session.h"; then
       session_inc_path="$phpincludedir"
+    else
+      for i in php php4 php5 php6; do
+        if test -f "$prefix/include/$i/ext/session/php_session.h"; then
+          session_inc_path="$prefix/include/$i"
+        fi
+      done
     fi
 
     if test "$session_inc_path" = ""; then
@@ -86,7 +92,7 @@ if test "$PHP_MEMCACHE" != "no"; then
     AC_MSG_RESULT([enabled])
     AC_DEFINE(HAVE_MEMCACHE_SESSION,1,[Whether memcache session handler is enabled])
     AC_DEFINE(HAVE_MEMCACHE,1,[Whether you want memcache support])
-    PHP_NEW_EXTENSION(memcache, memcache.c memcache_pool.c memcache_queue.c memcache_session.c memcache_standard_hash.c memcache_consistent_hash.c, $ext_shared,,-I$session_inc_path)
+    PHP_NEW_EXTENSION(memcache, memcache.c memcache_pool.c memcache_queue.c memcache_ascii_protocol.c memcache_binary_protocol.c memcache_standard_hash.c memcache_consistent_hash.c memcache_session.c, $ext_shared,,-I$session_inc_path)
     ifdef([PHP_ADD_EXTENSION_DEP],
     [
       PHP_ADD_EXTENSION_DEP(memcache, session)
@@ -94,7 +100,7 @@ if test "$PHP_MEMCACHE" != "no"; then
   else 
     AC_MSG_RESULT([disabled])
     AC_DEFINE(HAVE_MEMCACHE,1,[Whether you want memcache support])
-    PHP_NEW_EXTENSION(memcache, memcache.c memcache_pool.c memcache_queue.c memcache_standard_hash.c memcache_consistent_hash.c, $ext_shared)
+    PHP_NEW_EXTENSION(memcache, memcache.c memcache_pool.c memcache_queue.c memcache_ascii_protocol.c memcache_binary_protocol.c memcache_standard_hash.c memcache_consistent_hash.c, $ext_shared)
   fi
 
 dnl this is needed to build the extension with phpize and -Wall

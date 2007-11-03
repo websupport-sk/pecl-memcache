@@ -1,7 +1,7 @@
 --TEST--
 memcache->getStats() with arguments
 --SKIPIF--
-<?php include 'connect.inc'; ?>
+<?php include 'connect.inc'; if (ini_get('memcache.protocol') == 'binary') die('skip binary protocol does not support stats'); ?>
 --FILE--
 <?php
 
@@ -34,10 +34,8 @@ var_dump($result[key($result)][1]);
 $result = $memcache->getStats('items');
 var_dump($result['items'][$slab]['number']);
 
-$result = $memcache->getStats('sizes');
-var_dump($result['64']);
-
-print "\n";
+//$result = $memcache->getStats('sizes');
+//var_dump($result['64']);
 
 $result = $memcache->getExtendedStats('abc');
 var_dump($result["$host:$port"]);
@@ -59,8 +57,6 @@ string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
-string(%d) "%d"
-
 
 Warning: %s: Invalid stats type %s
 NULL

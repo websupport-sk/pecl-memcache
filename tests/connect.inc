@@ -16,6 +16,10 @@ $host2 = "localhost";
 $port2 = 11212;
 $udpPort2 = 11212;
 
+//ini_set('memcache.hash_strategy', 'standard');
+//ini_set('memcache.hash_function', 'fnv');
+//ini_set('memcache.protocol', 'binary');
+
 /* Start a server listening to a unix domain socket
  *
  * mkdir /var/run/memcached
@@ -30,21 +34,20 @@ $nonExistingPort = 11213;
 
 $udpPacketSize = 1400;
 
-switch (strtolower(ini_get('memcache.hash_strategy'))) {
-	case 'consistent':
-		// with preloaded buckets
-		$balanceKey1 = 'key1_abc';
-		$balanceKey2 = 'key2_abcde';
-		
-		// without preloaded buckets
-		//$balanceKey1 = 'key1_abcde';
-		//$balanceKey2 = 'key2_abcdefg';
-		break;
+$balanceKeys = array(
+	'consistent'	=> array(
+			'crc32'		=> array('key1_abc', 'key2_abcde'),
+			'fnv'		=> array('key1_a', 'key2_2534534'),
+			),
+	'standard'		=> array(
+			'crc32'		=> array('load_test_key1', 'load_test_key2'),
+			'fnv'		=> array('key1_ab', 'key2_a'),
+			),
+	);
 
-	default:
-		$balanceKey1 = 'load_test_key1';
-		$balanceKey2 = 'load_test_key2';
-}
+$strat = strtolower(ini_get('memcache.hash_strategy'));
+$func = strtolower(ini_get('memcache.hash_function'));
+list ($balanceKey1, $balanceKey2) = $balanceKeys[$strat][$func];
 
 $memcache = memcache_connect($host, $port);
 

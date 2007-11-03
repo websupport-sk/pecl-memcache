@@ -44,37 +44,42 @@
 #define MMC_SERIALIZED 1
 #define MMC_COMPRESSED 2
 
-#define MMC_BUFFER_SIZE 4096
-#define MMC_MAX_UDP_LEN 1400
-#define MMC_MAX_KEY_LEN 250
-#define MMC_VALUE_HEADER "VALUE %250s %u %lu"	/* keep in sync with MMC_MAX_KEY_LEN */
+#define MMC_BUFFER_SIZE			4096
+#define MMC_MAX_UDP_LEN			1400
+#define MMC_MAX_KEY_LEN			250
+#define MMC_VALUE_HEADER		"VALUE %250s %u %lu"	/* keep in sync with MMC_MAX_KEY_LEN */
 
-#define MMC_COMPRESSION_LEVEL Z_DEFAULT_COMPRESSION
-#define MMC_DEFAULT_SAVINGS 0.2				/* minimum 20% savings for compression to be used */
+#define MMC_COMPRESSION_LEVEL 	Z_DEFAULT_COMPRESSION
+#define MMC_DEFAULT_SAVINGS 	0.2						/* minimum 20% savings for compression to be used */
 
 #define MMC_PROTO_TCP 0
 #define MMC_PROTO_UDP 1
 
-#define MMC_STATUS_FAILED -1				/* server/stream is down */
-#define MMC_STATUS_DISCONNECTED 0			/* stream is disconnected, ie. new connection */
-#define MMC_STATUS_UNKNOWN 1				/* stream is in unknown state, ie. non-validated persistent connection */
-#define MMC_STATUS_CONNECTED 2				/* stream is connected */
+#define MMC_STATUS_FAILED		-1			/* server/stream is down */
+#define MMC_STATUS_DISCONNECTED	0			/* stream is disconnected, ie. new connection */
+#define MMC_STATUS_UNKNOWN		1			/* stream is in unknown state, ie. non-validated persistent connection */
+#define MMC_STATUS_CONNECTED	2			/* stream is connected */
 
-#define MMC_OK 0
+#define MMC_OK 					0
 
-#define MMC_REQUEST_FAILURE -1				/* operation failed, failover to other server */
-#define MMC_REQUEST_DONE 0					/* ok result, or reading/writing is done */
-#define MMC_REQUEST_MORE 1					/* more data follows in another packet, try select() again */
-#define MMC_REQUEST_AGAIN 2					/* more data follows in this packet, try read/write again */
-#define MMC_REQUEST_RETRY 3					/* retry/reschedule request */
+#define MMC_REQUEST_FAILURE 	-1			/* operation failed, failover to other server */
+#define MMC_REQUEST_DONE 		0			/* ok result, or reading/writing is done */
+#define MMC_REQUEST_MORE 		1			/* more data follows in another packet, try select() again */
+#define MMC_REQUEST_AGAIN 		2			/* more data follows in this packet, try read/write again */
+#define MMC_REQUEST_RETRY 		3			/* retry/reschedule request */
 
-#define MMC_STANDARD_HASH 1
-#define MMC_CONSISTENT_HASH 2
-#define MMC_HASH_CRC32 1					/* CRC32 hash function */
-#define MMC_HASH_FNV1A 2					/* FNV-1a hash function */
+#define MMC_RESPONSE_UNKNOWN	-2
+#define MMC_RESPONSE_ERROR		-1				
+#define MMC_RESPONSE_NOT_FOUND	1			/* same as binary protocol */
+#define MMC_RESPONSE_EXISTS		2			/* same as binary protocol */
 
-#define MMC_CONSISTENT_POINTS 160			/* points per server */
-#define MMC_CONSISTENT_BUCKETS 1024			/* number of precomputed buckets, should be power of 2 */
+#define MMC_STANDARD_HASH 		1
+#define MMC_CONSISTENT_HASH 	2
+#define MMC_HASH_CRC32 			1			/* CRC32 hash function */
+#define MMC_HASH_FNV1A 			2			/* FNV-1a hash function */
+
+#define MMC_CONSISTENT_POINTS	160			/* points per server */
+#define MMC_CONSISTENT_BUCKETS	1024		/* number of precomputed buckets, should be power of 2 */
 
 /* io buffer */
 typedef struct mmc_buffer {
@@ -84,6 +89,9 @@ typedef struct mmc_buffer {
 
 #define mmc_buffer_release(b) memset((b), 0, sizeof(*(b)))
 #define mmc_buffer_reset(b) (b)->value.len = (b)->idx = 0   
+
+inline void mmc_buffer_alloc(mmc_buffer_t *, unsigned int);
+inline void mmc_buffer_free(mmc_buffer_t *);
 
 /* stream handlers */
 typedef struct mmc_stream mmc_stream_t;
@@ -116,35 +124,35 @@ typedef struct mmc_request mmc_request_t;
 
 typedef int (*mmc_request_reader)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_parser)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
-typedef int (*mmc_request_value_handler)(mmc_t *mmc, mmc_request_t *request, void *value, unsigned int value_len, void *param TSRMLS_DC);
+typedef int (*mmc_request_value_handler)(mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, void *param TSRMLS_DC);
+typedef int (*mmc_request_response_handler)(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC);
 typedef int (*mmc_request_failover_handler)(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC);
+
+void mmc_request_reset(mmc_request_t *);
+void mmc_request_free(mmc_request_t *);
 
 /* server request */
 struct mmc_request {
-	mmc_stream_t				*io;						/* stream this request is sending on */
-	mmc_buffer_t				sendbuf;					/* the command to send to server */
-	mmc_buffer_t				readbuf;					/* used when reading values */
-	char						key[MMC_MAX_KEY_LEN + 1];	/* key buffer to use on failover of single-key requests */
-	unsigned int				key_len;
-	unsigned int				protocol;					/* protocol encoding of request */
-	mmc_queue_t					failed_servers;				/* servers this request has failed at */
-	unsigned int				failed_index;				/* last index probed on failure */
-	mmc_request_reader			read;						/* handles reading (and validating datagrams) */
-	mmc_request_parser			parse;						/* parses read values */
-	mmc_request_value_handler		value_handler;					/* called when values has been parsed */
-	void							*value_handler_param;			/* parameter to value handler */
+	mmc_stream_t					*io;							/* stream this request is sending on */
+	mmc_buffer_t					sendbuf;						/* request buffer */
+	mmc_buffer_t					readbuf;						/* response buffer */
+	char							key[MMC_MAX_KEY_LEN + 1];		/* key buffer to use on failover of single-key requests */
+	unsigned int					key_len;
+	unsigned int					protocol;						/* protocol encoding of request {tcp, udp} */
+	mmc_queue_t						failed_servers;					/* mmc_queue_t<mmc_t *>, servers this request has failed at */
+	unsigned int					failed_index;					/* last index probed on failure */
+	mmc_request_reader				read;							/* handles reading (and validating datagrams) */
+	mmc_request_parser				parse;							/* called to parse response payload */
+	mmc_request_value_handler		value_handler;					/* called when result value have been parsed */
+	void							*value_handler_param;			
+	mmc_request_response_handler	response_handler;				/* called when a non-value response has been received */
+	void							*response_handler_param;		
 	mmc_request_failover_handler	failover_handler;				/* called to perform failover of failed request */
-	void							*failover_handler_param;		/* parameter to failover handler */
-	struct {														/* stores value info while it's body is being read */
-		char			key[MMC_MAX_KEY_LEN + 1];
-		unsigned int	key_len;
-		unsigned int	flags;
-		unsigned long	bytes;
-	} value;
+	void							*failover_handler_param;		
 	struct {
-		uint16_t		reqid;					/* id of the request, increasing value set by client */
-		uint16_t		seqid;					/* next expected seqid */
-		uint16_t		total;					/* number of datagrams in response */
+		uint16_t		reqid;										/* id of the request, increasing value set by client */
+		uint16_t		seqid;										/* next expected seqid */
+		uint16_t		total;										/* number of datagrams in response */
 	} udp;
 };
 
@@ -173,12 +181,60 @@ struct mmc {
 	int					errnum;					/* last error code */
 };
 
+/* wire protocol */
+#define MMC_ASCII_PROTOCOL	1
+#define MMC_BINARY_PROTOCOL	2
+
+/* same as in binary protocol */
+#define MMC_OP_SET			1
+#define MMC_OP_ADD			2
+#define MMC_OP_REPLACE		3
+
+typedef mmc_request_t * (*mmc_protocol_create_request)();
+typedef void (*mmc_protocol_reset_request)(mmc_request_t *request);
+typedef void (*mmc_protocol_free_request)(mmc_request_t *request);
+
+typedef void (*mmc_protocol_get)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len);
+typedef void (*mmc_protocol_begin_get)(mmc_request_t *request);
+typedef void (*mmc_protocol_append_get)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len);
+typedef void (*mmc_protocol_end_get)(mmc_request_t *request);
+
+typedef int (*mmc_protocol_store)(mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, unsigned int flags, unsigned int exptime, zval *value TSRMLS_DC);
+typedef void (*mmc_protocol_delete)(mmc_request_t *request, const char *key, unsigned int key_len, unsigned int exptime);
+typedef void (*mmc_protocol_mutate)(mmc_request_t *request, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime);
+
+typedef void (*mmc_protocol_flush)(mmc_request_t *request, unsigned int exptime);
+typedef void (*mmc_protocol_stats)(mmc_request_t *request, const char *type, long slabid, long limit);
+typedef void (*mmc_protocol_version)(mmc_request_t *request);
+
+typedef struct mmc_protocol {
+	mmc_protocol_create_request	create_request;
+	mmc_protocol_reset_request	reset_request;
+	mmc_protocol_free_request	free_request;
+	
+	mmc_protocol_get		get;
+	mmc_protocol_begin_get	begin_get;
+	mmc_protocol_append_get	append_get;
+	mmc_protocol_end_get	end_get;
+	
+	mmc_protocol_store		store;
+	mmc_protocol_delete		delete;
+	mmc_protocol_mutate		mutate;
+	
+	mmc_protocol_flush		flush;
+	mmc_protocol_version	version;
+	mmc_protocol_stats		stats;
+} mmc_protocol_t;
+
+extern mmc_protocol_t mmc_ascii_protocol;
+extern mmc_protocol_t mmc_binary_protocol;
+
 /* hashing strategy */
-typedef unsigned int (*mmc_hash_function)(const char *, int);
+typedef unsigned int (*mmc_hash_function)(const char *key, unsigned int key_len);
 typedef void * (*mmc_hash_create_state)(mmc_hash_function);
-typedef void (*mmc_hash_free_state)(void *);
-typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
-typedef void (*mmc_hash_add_server)(void *, mmc_t *, unsigned int);
+typedef void (*mmc_hash_free_state)(void *state);
+typedef mmc_t * (*mmc_hash_find_server)(void *state, const char *key, unsigned int key_len TSRMLS_DC);
+typedef void (*mmc_hash_add_server)(void *state, mmc_t *mmc, unsigned int weight);
 
 typedef struct mmc_hash {
 	mmc_hash_create_state	create_state;
@@ -191,8 +247,8 @@ extern mmc_hash_t mmc_standard_hash;
 extern mmc_hash_t mmc_consistent_hash;
 
 /* 32 bit magic FNV-1a prime and init */
-#define FNV_32_PRIME 0x01000193
-#define FNV_32_INIT 0x811c9dc5 
+#define FNV_32_PRIME	0x01000193
+#define FNV_32_INIT		0x811c9dc5 
 
 /* failure callback prototype */
 typedef void (*mmc_failure_callback)(mmc_pool_t *pool, mmc_t *mmc, void *param TSRMLS_DC);
@@ -201,7 +257,8 @@ typedef void (*mmc_failure_callback)(mmc_pool_t *pool, mmc_t *mmc, void *param T
 struct mmc_pool {
 	mmc_t					**servers;
 	int						num_servers;
-	mmc_hash_t				*hash;						/* hash strategy methods */
+	mmc_protocol_t			*protocol;					/* wire protocol */
+	mmc_hash_t				*hash;						/* hash strategy */
 	void					*hash_state;				/* strategy specific state */
 	mmc_queue_t				*sending;					/* mmc_queue_t<mmc_t *>, connections that want to send */
 	mmc_queue_t				*reading;					/* mmc_queue_t<mmc_t *>, connections that want to read */
@@ -221,11 +278,7 @@ void mmc_server_free(mmc_t * TSRMLS_DC);
 void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC);
 int mmc_server_valid(mmc_t * TSRMLS_DC);
 int mmc_server_failure(mmc_t *, mmc_stream_t *, const char *, int TSRMLS_DC);
-int mmc_request_failure(mmc_t *, mmc_stream_t *, char *, unsigned int, int TSRMLS_DC);
-
-/* request functions */
-int mmc_request_parse_line(mmc_t *, mmc_request_t * TSRMLS_DC);
-int mmc_request_parse_value(mmc_t *, mmc_request_t * TSRMLS_DC);
+int mmc_request_failure(mmc_t *, mmc_stream_t *, const char *, unsigned int, int TSRMLS_DC);
 
 /* pool functions */
 mmc_pool_t *mmc_pool_new(TSRMLS_D);
@@ -239,8 +292,11 @@ mmc_t *mmc_pool_find(mmc_pool_t *, const char *, unsigned int TSRMLS_DC);
 int mmc_pool_schedule(mmc_pool_t *, mmc_t *, mmc_request_t * TSRMLS_DC);
 int mmc_pool_failover_handler(mmc_pool_t *, mmc_t *, mmc_request_t *, void * TSRMLS_DC);
 
-mmc_request_t *mmc_pool_request(mmc_pool_t *, int, mmc_request_parser, 
+mmc_request_t *mmc_pool_request(mmc_pool_t *, int,
+	mmc_request_response_handler, void *, mmc_request_failover_handler, void * TSRMLS_DC);
+mmc_request_t *mmc_pool_request_get(mmc_pool_t *, int,
 	mmc_request_value_handler, void *, mmc_request_failover_handler, void * TSRMLS_DC);
+
 #define mmc_pool_release(p, r) mmc_queue_push(&((p)->free_requests), (r))
 
 int mmc_prepare_store(
@@ -248,12 +304,13 @@ int mmc_prepare_store(
 	const char *, unsigned int, unsigned int, unsigned int, zval * TSRMLS_DC);
 
 int mmc_pool_schedule_key(mmc_pool_t *, const char *, unsigned int, mmc_request_t *, unsigned int TSRMLS_DC);
-int mmc_pool_schedule_get(mmc_pool_t *, int, const char *, unsigned int, 
+int mmc_pool_schedule_get(mmc_pool_t *, int, zval *, 
 	mmc_request_value_handler, void *, mmc_request_failover_handler, void *, mmc_request_t * TSRMLS_DC);
-int mmc_pool_schedule_command(mmc_pool_t *, mmc_t *, char *, unsigned int, 
-	mmc_request_parser, mmc_request_value_handler, void * TSRMLS_DC);
 
 /* utility functions */
+int mmc_pack_value(mmc_pool_t *, mmc_buffer_t *, zval *, unsigned int * TSRMLS_DC);
+int mmc_unpack_value(mmc_t *, mmc_request_t *, mmc_buffer_t *, const char *, unsigned int, unsigned int, unsigned int TSRMLS_DC); 
+
 inline int mmc_prepare_key_ex(const char *, unsigned int, char *, unsigned int *);
 inline int mmc_prepare_key(zval *, char *, unsigned int *);
 
@@ -263,6 +320,7 @@ inline int mmc_prepare_key(zval *, char *, unsigned int *);
 ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long default_port;
 	long chunk_size;
+	long protocol;
 	long hash_strategy;
 	long hash_function;
 	long allow_failover;

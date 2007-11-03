@@ -31,12 +31,13 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <api>3.0.0</api>
   </version>
   <stability>
-    <release>beta</release>
-    <api>beta</api>
+    <release>alpha</release>
+    <api>alpha</api>
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - UDP support
+    - Binary protocol support 
     - Non-blocking IO using select()
     - Pipelined multi-set/delete/increment/decrement
     - Key and session redundancy (values are written to N mirrors)
@@ -60,6 +61,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="memcache_pool.c" role="src" />
       <file name="memcache_queue.c" role="src" />
       <file name="memcache_session.c" role="src" />
+      <file name="memcache_ascii_protocol.c" role="src" />
+      <file name="memcache_binary_protocol.c" role="src" />
       <file name="memcache_standard_hash.c" role="src" />
       <file name="memcache_consistent_hash.c" role="src" />
       <file name="memcache.dsp" role="src" />

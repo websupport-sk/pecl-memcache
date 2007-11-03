@@ -148,20 +148,19 @@ PS_CLOSE_FUNC(memcache)
 }
 /* }}} */
 
-static mmc_request_t *php_mmc_session_read_request(mmc_pool_t *pool, const char *key, zval *result TSRMLS_DC) /* {{{ */
+static mmc_request_t *php_mmc_session_read_request(mmc_pool_t *pool, zval *zkey, zval *result TSRMLS_DC) /* {{{ */
 {
-	mmc_request_t *request = mmc_pool_request(pool, MMC_PROTO_UDP, mmc_request_parse_value, 
-		mmc_value_handler_single, result, mmc_pool_failover_handler, NULL TSRMLS_CC);
+	mmc_request_t *request = mmc_pool_request_get(
+		pool, MMC_PROTO_UDP,  
+		mmc_value_handler_single, result, 
+		mmc_pool_failover_handler, NULL TSRMLS_CC);
 
-	if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
+	if (mmc_prepare_key_ex(Z_STRVAL_P(zkey), Z_STRLEN_P(zkey), request->key, &(request->key_len)) != MMC_OK) {
 		mmc_pool_release(pool, request);
 		return NULL;
 	}
 
-	smart_str_appendl(&(request->sendbuf.value), "get ", sizeof("get ")-1);
-	smart_str_appendl(&(request->sendbuf.value), request->key, request->key_len);
-	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
-	
+	pool->protocol->get(request, zkey, request->key, request->key_len);
 	return request;
 }
 /* }}} */
@@ -173,17 +172,18 @@ PS_READ_FUNC(memcache)
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
 
 	if (pool != NULL) {
-		zval result;
+		zval result, zkey;
 		mmc_t *mmc;
 		mmc_request_t *request;
 		mmc_queue_t skip_servers;
 		unsigned int last_index = 0;
 		
 		ZVAL_FALSE(&result);
+		ZVAL_STRING(&zkey, (char *)key, 0);
 		memset(&skip_servers, 0, sizeof(skip_servers));
 
 		/* create request */
-		request = php_mmc_session_read_request(pool, key, &result TSRMLS_CC);  
+		request = php_mmc_session_read_request(pool, &zkey, &result TSRMLS_CC);  
 		if (request == NULL) {
 			return FAILURE;
 		}
@@ -199,7 +199,7 @@ PS_READ_FUNC(memcache)
 		
 		/* retry missing value (possibly due to server restart) */
 		while (Z_TYPE(result) != IS_STRING && skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers) {
-			request = php_mmc_session_read_request(pool, key, &result TSRMLS_CC);  
+			request = php_mmc_session_read_request(pool, &zkey, &result TSRMLS_CC);  
 			if (request == NULL) {
 				break;
 			}
@@ -240,14 +240,19 @@ PS_WRITE_FUNC(memcache)
 		mmc_request_t *request;
 
 		/* allocate request */
-		request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_request_parse_line, 
+		request = mmc_pool_request(pool, MMC_PROTO_TCP, 
 			mmc_stored_handler, &result, mmc_pool_failover_handler, NULL TSRMLS_CC);
+
+		if (mmc_prepare_key_ex(key, strlen(key), request->key, &(request->key_len)) != MMC_OK) {
+			mmc_pool_release(pool, request);
+			return FAILURE;
+		}
 		
 		ZVAL_NULL(&result);
 		ZVAL_STRINGL(&value, (char *)val, vallen, 0);
 
 		/* assemble command */
-		if (mmc_prepare_store(pool, request, "set", sizeof("set")-1, key, strlen(key), 0, INI_INT("session.gc_maxlifetime"), &value TSRMLS_CC) != MMC_OK) {
+		if (pool->protocol->store(pool, request, MMC_OP_SET, request->key, request->key_len, 0, INI_INT("session.gc_maxlifetime"), &value TSRMLS_CC) != MMC_OK) {
 			mmc_pool_release(pool, request);
 			return FAILURE;
 		}
@@ -269,17 +274,16 @@ PS_WRITE_FUNC(memcache)
 }
 /* }}} */
 
-static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, void *value, unsigned int value_len, void *param TSRMLS_DC) /* 
+static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC) /* 
 	parses a DELETED response line, param is a zval pointer to store result into {{{ */
 {
-	if (mmc_str_left((char *)value, "DELETED", value_len, sizeof("DELETED")-1) ||
-		mmc_str_left((char *)value, "NOT_FOUND", value_len, sizeof("NOT_FOUND")-1)) 
+	if (response == MMC_OK || response == MMC_RESPONSE_NOT_FOUND) 
 	{
 		ZVAL_TRUE((zval *)param);
 		return MMC_REQUEST_DONE;
 	}
 	
-	return mmc_request_failure(mmc, request->io, (char *)value, value_len, 0 TSRMLS_CC);
+	return mmc_request_failure(mmc, request->io, message, message_len, 0 TSRMLS_CC);
 }
 /* }}} */
 
@@ -294,7 +298,7 @@ PS_DESTROY_FUNC(memcache)
 		mmc_request_t *request;
 		
 		/* allocate request */
-		request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_request_parse_line, 
+		request = mmc_pool_request(pool, MMC_PROTO_TCP,  
 			mmc_deleted_handler, &result, mmc_pool_failover_handler, NULL TSRMLS_CC);
 		ZVAL_FALSE(&result);
 
@@ -303,10 +307,7 @@ PS_DESTROY_FUNC(memcache)
 			return FAILURE;
 		}
 
-		smart_str_appendl(&(request->sendbuf.value), "delete", sizeof("delete")-1);
-		smart_str_appendl(&(request->sendbuf.value), " ", 1);
-		smart_str_appendl(&(request->sendbuf.value), request->key, request->key_len);
-		smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+		pool->protocol->delete(request, request->key, request->key_len, 0);
 
 		/* schedule request */
 		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(session_redundancy) TSRMLS_CC) != MMC_OK) {

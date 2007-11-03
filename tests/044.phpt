@@ -7,6 +7,11 @@ ini_set('memcache.session_redundancy')
 
 include 'connect.inc';
 
+if (!isset($udpPort))
+	$udpPort = 0;
+if (!isset($udpPort2))
+	$udpPort2 = 0;
+
 ini_set('memcache.session_redundancy', 10);
 ini_set('session.save_handler', 'memcache');
 ini_set('session.save_path', "tcp://$host:$port?udp_port=$udpPort, tcp://$host2:$port2?udp_port=$udpPort2");

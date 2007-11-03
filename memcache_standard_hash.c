@@ -56,7 +56,7 @@ void mmc_standard_free_state(void *s) /* {{{ */
 }
 /* }}} */
 
-mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
+mmc_t *mmc_standard_find_server(void *s, const char *key, unsigned int key_len TSRMLS_DC) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
 

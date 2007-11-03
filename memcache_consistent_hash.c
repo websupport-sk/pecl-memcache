@@ -119,7 +119,7 @@ static void mmc_consistent_pupulate_buckets(mmc_consistent_state_t *state) /* {{
 }
 /* }}} */
 
-mmc_t *mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
+mmc_t *mmc_consistent_find_server(void *s, const char *key, unsigned int key_len TSRMLS_DC) /* {{{ */
 {
 	mmc_consistent_state_t *state = s;
 
