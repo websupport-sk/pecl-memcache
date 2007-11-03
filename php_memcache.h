@@ -50,6 +50,8 @@ PHP_FUNCTION(memcache_add);
 PHP_FUNCTION(memcache_set);
 PHP_FUNCTION(memcache_replace);
 PHP_FUNCTION(memcache_cas);
+PHP_FUNCTION(memcache_append);
+PHP_FUNCTION(memcache_prepend);
 PHP_FUNCTION(memcache_get);
 PHP_FUNCTION(memcache_delete);
 PHP_FUNCTION(memcache_debug);

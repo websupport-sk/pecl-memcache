@@ -61,6 +61,8 @@ zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_set,					NULL)
 	PHP_FE(memcache_replace,				NULL)
 	PHP_FE(memcache_cas,					NULL)
+	PHP_FE(memcache_append,					NULL)
+	PHP_FE(memcache_prepend,				NULL)
 	PHP_FE(memcache_get,					NULL)
 	PHP_FE(memcache_delete,					NULL)
 	PHP_FE(memcache_debug,					NULL)
@@ -84,6 +86,8 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(set,						memcache_set,						NULL)
 	PHP_FALIAS(replace,					memcache_replace,					NULL)
 	PHP_FALIAS(cas,						memcache_cas,						NULL)
+	PHP_FALIAS(append,					memcache_append,					NULL)
+	PHP_FALIAS(prepend,					memcache_prepend,					NULL)
 	PHP_FALIAS(get,						memcache_get,						NULL)
 	PHP_FALIAS(delete,					memcache_delete,					NULL)
 	PHP_FALIAS(getstats,				memcache_get_stats,					NULL)
@@ -1324,6 +1328,22 @@ PHP_FUNCTION(memcache_replace)
 PHP_FUNCTION(memcache_cas)
 {
 	php_mmc_store(INTERNAL_FUNCTION_PARAM_PASSTHRU, MMC_OP_CAS);
+}
+/* }}} */
+
+/* {{{ proto bool memcache_prepend(object memcache, mixed key [, mixed var [, int flag [, int exptime ] ] ])
+   Appends a value to the stored value, value must exist */
+PHP_FUNCTION(memcache_append)
+{
+	php_mmc_store(INTERNAL_FUNCTION_PARAM_PASSTHRU, MMC_OP_APPEND);
+}
+/* }}} */
+
+/* {{{ proto bool memcache_prepend(object memcache, mixed key [, mixed var [, int flag [, int exptime ] ] ])
+   Prepends a value to the stored value, value must exist */
+PHP_FUNCTION(memcache_prepend)
+{
+	php_mmc_store(INTERNAL_FUNCTION_PARAM_PASSTHRU, MMC_OP_PREPEND);
 }
 /* }}} */
 

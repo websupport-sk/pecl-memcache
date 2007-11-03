@@ -245,6 +245,12 @@ static int mmc_ascii_store(
 		case MMC_OP_CAS:
 			smart_str_appendl(&(request->sendbuf.value), "cas", sizeof("cas")-1);
 			break;
+		case MMC_OP_APPEND:
+			smart_str_appendl(&(request->sendbuf.value), "append", sizeof("append")-1);
+			break;
+		case MMC_OP_PREPEND:
+			smart_str_appendl(&(request->sendbuf.value), "prepend", sizeof("prepend")-1);
+			break;
 		default:
 			return MMC_REQUEST_FAILURE;
 	}

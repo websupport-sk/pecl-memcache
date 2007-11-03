@@ -197,6 +197,8 @@ struct mmc {
 #define MMC_OP_REPLACE		0x03
 #define MMC_OP_GETS			0x32
 #define MMC_OP_CAS			0x33
+#define MMC_OP_APPEND		0x34	/* not supported by binary protocol */ 
+#define MMC_OP_PREPEND		0x35	/* not supported by binary protocol */
 
 typedef mmc_request_t * (*mmc_protocol_create_request)();
 typedef void (*mmc_protocol_reset_request)(mmc_request_t *request);
