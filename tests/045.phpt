@@ -18,7 +18,7 @@ class testclass {
 $a1 = new testclass();
 
 $memcache->set('_test_key1', $a1);
-$memcache->set('_test_key2', 'test2');
+$memcache->set('_test_key2', array(123));
 $memcache->set('_test_key3', 'test3');
 
 $a2 = $memcache->get('_test_key1');
@@ -39,5 +39,8 @@ array(2) {
   object(testclass)%s {
   }
   ["_test_key2"]=>
-  string(5) "test2"
+  array(1) {
+    [0]=>
+    int(123)
+  }
 }

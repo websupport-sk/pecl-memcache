@@ -380,6 +380,7 @@ int mmc_unpack_value(
 		char key_tmp[MMC_MAX_KEY_LEN]; 
 		mmc_request_value_handler value_handler;
 		void *value_handler_param;
+		mmc_buffer_t buffer_tmp;
 		
 		/* make copies of data to ensure re-entrancy */
 		memcpy(key_tmp, key, key_len);
@@ -387,18 +388,38 @@ int mmc_unpack_value(
 		value_handler_param = request->value_handler_param;
 
 		if (!(flags & MMC_COMPRESSED)) {
-			data = estrndup(data, data_len);
+			buffer_tmp = *buffer;
+			mmc_buffer_release(buffer);
 		}
 		
 		PHP_VAR_UNSERIALIZE_INIT(var_hash);
 		if (!php_var_unserialize(&object, &p, p + data_len, &var_hash TSRMLS_CC)) {
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-			efree(data);
+
+			if (flags & MMC_COMPRESSED) {
+				efree(data);
+			}
+			else if (buffer->value.c == NULL) {
+				*buffer = buffer_tmp;
+			}
+			else {
+				mmc_buffer_free(&buffer_tmp);
+			}
+
 			return mmc_server_failure(mmc, request->io, "Failed to unserialize data", 0 TSRMLS_CC);
 		}
 
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-		efree(data);
+		
+		if (flags & MMC_COMPRESSED) {
+			efree(data);
+		}
+		else if (buffer->value.c == NULL) {
+			*buffer = buffer_tmp;
+		}
+		else {
+			mmc_buffer_free(&buffer_tmp);
+		}
 
 		/* delegate to value handler */
 		return value_handler(key_tmp, key_len, object, 0, flags, cas, value_handler_param TSRMLS_CC);
