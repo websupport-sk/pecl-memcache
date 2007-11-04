@@ -36,8 +36,6 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(memcache)
 
-static void mmc_pool_switch(mmc_pool_t *);
-
 inline void mmc_buffer_alloc(mmc_buffer_t *buffer, unsigned int size)  /* 
 	ensures space for an additional size bytes {{{ */
 {
@@ -377,24 +375,33 @@ int mmc_unpack_value(
 	if (flags & MMC_SERIALIZED) {
 		php_unserialize_data_t var_hash;
 		const unsigned char *p = (unsigned char *)data;
-		zval *object = &value;  
+		zval *object = &value;
+
+		char key_tmp[MMC_MAX_KEY_LEN]; 
+		mmc_request_value_handler value_handler;
+		void *value_handler_param;
+		
+		/* make copies of data to ensure re-entrancy */
+		memcpy(key_tmp, key, key_len);
+		value_handler = request->value_handler;
+		value_handler_param = request->value_handler_param;
+
+		if (!(flags & MMC_COMPRESSED)) {
+			data = estrndup(data, data_len);
+		}
 		
 		PHP_VAR_UNSERIALIZE_INIT(var_hash);
 		if (!php_var_unserialize(&object, &p, p + data_len, &var_hash TSRMLS_CC)) {
 			PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-			if (flags & MMC_COMPRESSED) {
-				efree(data);
-			}
+			efree(data);
 			return mmc_server_failure(mmc, request->io, "Failed to unserialize data", 0 TSRMLS_CC);
 		}
 
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
-		if (flags & MMC_COMPRESSED) {
-			efree(data);
-		}
+		efree(data);
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, key, key_len, object, 0, flags, cas, request->value_handler_param TSRMLS_CC);
+		return value_handler(key_tmp, key_len, object, 0, flags, cas, value_handler_param TSRMLS_CC);
 	}
 	else {
 		/* room for \0 since buffer contains trailing \r\n and uncompress allocates + 1 */
@@ -406,7 +413,7 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(mmc, request, key, key_len, &value, 0, flags, cas, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(key, key_len, &value, 0, flags, cas, request->value_handler_param TSRMLS_CC);
 	}
 }
 /* }}}*/
@@ -1135,7 +1142,7 @@ int mmc_pool_schedule_get(
 }
 /* }}} */
 
-static void mmc_pool_switch(mmc_pool_t *pool) {
+static inline void mmc_pool_switch(mmc_pool_t *pool) {
 	/* switch sending and reading queues */
 	if (pool->sending == &(pool->_sending1)) {
 		pool->sending = &(pool->_sending2);
@@ -1188,69 +1195,94 @@ static void mmc_select_retry(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reques
 void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /* 
 	runs one select() round on all scheduled requests {{{ */
 {
-	struct timeval tv;
-	fd_set wfds, rfds;
-	int i, nfds = 0, result;
-	
+	int i, fd, result;
 	mmc_t *mmc;
-	mmc_queue_t *sending = pool->sending, *reading = pool->reading;
-	mmc_pool_switch(pool);
+	mmc_queue_t *sending, *reading;
 	
-	FD_ZERO(&wfds);
-	FD_ZERO(&rfds);
-
-	tv.tv_sec = timeout;
-	tv.tv_usec = 0;
-
-	for (i=0; i < sending->len; i++) {
-		mmc = mmc_queue_item(sending, i);
-		if (mmc->sendreq->io->fd > nfds) {
-			nfds = mmc->sendreq->io->fd;
+	/* help complete previous run */
+	if (pool->in_select) {
+		if (pool->sending == &(pool->_sending1)) {
+			sending = &(pool->_sending2);
+			reading = &(pool->_reading2);
 		}
-		FD_SET(mmc->sendreq->io->fd, &wfds);
-	}
-	
-	for (i=0; i < reading->len; i++) {
-		mmc = mmc_queue_item(reading, i);
-		if (mmc->readreq->io->fd > nfds) {
-			nfds = mmc->readreq->io->fd;
+		else {
+			sending = &(pool->_sending1);
+			reading = &(pool->_reading1);
 		}
-		FD_SET(mmc->readreq->io->fd, &rfds);
 	}
+	else {
+		struct timeval tv;
+		int nfds = 0;
 
-	result = select(nfds + 1, &rfds, &wfds, NULL, &tv);
-	
-	if (result <= 0) {
+		sending = pool->sending;
+		reading = pool->reading;
+		mmc_pool_switch(pool);
+
+		FD_ZERO(&(pool->wfds));
+		FD_ZERO(&(pool->rfds));
+
+		tv.tv_sec = timeout;
+		tv.tv_usec = 0;
+
 		for (i=0; i < sending->len; i++) {
-			mmc = (mmc_t *)mmc_queue_item(sending, i);
-			if (!FD_ISSET(mmc->sendreq->io->fd, &wfds)) {
-				mmc_queue_remove(sending, mmc);
-				mmc_select_failure(pool, mmc, mmc->sendreq, result TSRMLS_CC);
+			mmc = mmc_queue_item(sending, i);
+			if (mmc->sendreq->io->fd > nfds) {
+				nfds = mmc->sendreq->io->fd;
 			}
+			FD_SET(mmc->sendreq->io->fd, &(pool->wfds));
 		}
 		
 		for (i=0; i < reading->len; i++) {
-			mmc = (mmc_t *)mmc_queue_item(reading, i);
-			if (!FD_ISSET(mmc->readreq->io->fd, &rfds)) {
-				mmc_queue_remove(reading, mmc);
-				mmc_select_failure(pool, mmc, mmc->readreq, result TSRMLS_CC);
+			mmc = mmc_queue_item(reading, i);
+			if (mmc->readreq->io->fd > nfds) {
+				nfds = mmc->readreq->io->fd;
+			}
+			FD_SET(mmc->readreq->io->fd, &(pool->rfds));
+		}
+
+		result = select(nfds + 1, &(pool->rfds), &(pool->wfds), NULL, &tv);
+
+		if (result <= 0) {
+			for (i=0; i < sending->len; i++) {
+				mmc = (mmc_t *)mmc_queue_item(sending, i);
+				if (!FD_ISSET(mmc->sendreq->io->fd, &(pool->wfds))) {
+					mmc_queue_remove(sending, mmc);
+					mmc_select_failure(pool, mmc, mmc->sendreq, result TSRMLS_CC);
+				}
+			}
+			
+			for (i=0; i < reading->len; i++) {
+				mmc = (mmc_t *)mmc_queue_item(reading, i);
+				if (!FD_ISSET(mmc->readreq->io->fd, &(pool->rfds))) {
+					mmc_queue_remove(reading, mmc);
+					mmc_select_failure(pool, mmc, mmc->readreq, result TSRMLS_CC);
+				}
 			}
 		}
+
+		pool->in_select = 1;
 	}
-	
+
 	/* until stream buffer is empty */
 	for (i=0; i < sending->len; i++) {
 		mmc = mmc_queue_item(sending, i);
 		
-		if (FD_ISSET(mmc->sendreq->io->fd, &wfds)) {
+		if (FD_ISSET(mmc->sendreq->io->fd, &(pool->wfds))) {
+			fd = mmc->sendreq->io->fd;
+			
 			do {
 				/* delegate to request parse handler */
 				result = mmc_request_send(mmc, mmc->sendreq TSRMLS_CC);
+
+				/* check if someone has helped complete our run */
+				if (!pool->in_select) {
+					return;
+				}
 				
 				switch (result) {
 					case MMC_REQUEST_FAILURE:
-						/* clear out readbit for this round */
-						FD_CLR(mmc->sendreq->io->fd, &rfds);
+						/* clear readbit for this round */
+						FD_CLR(mmc->sendreq->io->fd, &(pool->rfds));
 
 						/* take server offline and failover requests */
 						mmc_server_deactivate(pool, mmc TSRMLS_CC);
@@ -1279,6 +1311,9 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				/* add server to read queue once more */
 				mmc_queue_push(pool->sending, mmc);
 			}
+
+			/* clear bit for reentrancy reasons */
+			FD_CLR(fd, &(pool->wfds));
 		}
 		else {
 			/* add server to send queue once more */
@@ -1289,7 +1324,9 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 	for (i=0; i < reading->len; i++) {
 		mmc = mmc_queue_item(reading, i);
 
-		if (FD_ISSET(mmc->readreq->io->fd, &rfds)) {
+		if (FD_ISSET(mmc->readreq->io->fd, &(pool->rfds))) {
+			fd = mmc->readreq->io->fd;
+			
 			/* fill read buffer if needed */
 			if (mmc->readreq->read != NULL) {
 				result = mmc->readreq->read(mmc, mmc->readreq TSRMLS_CC);
@@ -1324,6 +1361,11 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				/* delegate to request response handler */
 				result = mmc->readreq->parse(mmc, mmc->readreq TSRMLS_CC);
 				
+				/* check if someone has helped complete our run */
+				if (!pool->in_select) {
+					return;
+				}
+
 				switch (result) {
 					case MMC_REQUEST_FAILURE:
 						/* take server offline and failover requests */
@@ -1367,12 +1409,17 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				/* add server to read queue once more */
 				mmc_queue_push(pool->reading, mmc);
 			}
+
+			/* clear bit for reentrancy reasons */
+			FD_CLR(fd, &(pool->rfds));
 		}
 		else {
 			/* add server to read queue once more */
 			mmc_queue_push(pool->reading, mmc);
 		}
 	}
+	
+	pool->in_select = 0;
 }
 /* }}} */
 

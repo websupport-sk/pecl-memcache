@@ -1348,7 +1348,7 @@ PHP_FUNCTION(memcache_prepend)
 /* }}} */
 
 static int mmc_value_handler_multi(
-	mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, 
+	const char *key, unsigned int key_len, void *value, unsigned int value_len, 
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC) /* 
 	receives a multiple values, param is a zval** array to store value and flags in {{{ */
 {
@@ -1384,7 +1384,7 @@ static int mmc_value_handler_multi(
 /* }}} */
 
 int mmc_value_handler_single(
-	mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, 
+	const char *key, unsigned int key_len, void *value, unsigned int value_len, 
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC) /* 
 	receives a single value, param is a zval pointer to store value to {{{ */
 {

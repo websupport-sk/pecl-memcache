@@ -144,14 +144,14 @@ static int mmc_server_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /
 
 	/* done reading? */
 	if (request->readbuf.idx >= req->value.length + 2) {
-		int result = mmc_unpack_value(
-			mmc, request, &(request->readbuf), req->value.key, strlen(req->value.key), 
-			req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
-		
 		/* allow parse_value to read next VALUE or END line */
 		request->parse = mmc_request_parse_value;
 		mmc_buffer_reset(&(request->readbuf));
 
+		int result = mmc_unpack_value(
+			mmc, request, &(request->readbuf), req->value.key, strlen(req->value.key), 
+			req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
+		
 		return result;
 	}
 	
@@ -172,22 +172,6 @@ static void mmc_ascii_reset_request(mmc_request_t *request) /* {{{ */
 	mmc_ascii_request_t *req = (mmc_ascii_request_t *)request;
 	req->value.cas = 0;
 	mmc_request_reset(request);
-}
-/* }}} */
-
-static void mmc_ascii_get(mmc_request_t *request, int op, zval *zkey, const char *key, unsigned int key_len) /* {{{ */ 
-{
-	request->parse = mmc_request_parse_value;
-
-	if (op == MMC_OP_GETS) {
-		smart_str_appendl(&(request->sendbuf.value), "gets ", sizeof("gets ")-1);		
-	}
-	else {
-		smart_str_appendl(&(request->sendbuf.value), "get ", sizeof("get ")-1);
-	}
-
-	smart_str_appendl(&(request->sendbuf.value), key, key_len);
-	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
 }
 /* }}} */
 
@@ -214,6 +198,14 @@ static void mmc_ascii_append_get(mmc_request_t *request, zval *zkey, const char 
 static void mmc_ascii_end_get(mmc_request_t *request) /* {{{ */ 
 {
 	smart_str_appendl(&(request->sendbuf.value), "\r\n", sizeof("\r\n")-1);
+}
+/* }}} */
+
+static void mmc_ascii_get(mmc_request_t *request, int op, zval *zkey, const char *key, unsigned int key_len) /* {{{ */ 
+{
+	mmc_ascii_begin_get(request, op);
+	mmc_ascii_append_get(request, zkey, key, key_len);
+	mmc_ascii_end_get(request);
 }
 /* }}} */
 

@@ -128,7 +128,7 @@ typedef struct mmc_request mmc_request_t;
 typedef int (*mmc_request_reader)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_parser)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_value_handler)(
-	mmc_t *mmc, mmc_request_t *request, const char *key, unsigned int key_len, void *value, unsigned int value_len, 
+	const char *key, unsigned int key_len, void *value, unsigned int value_len, 
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC);
 typedef int (*mmc_request_response_handler)(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC);
 typedef int (*mmc_request_failover_handler)(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC);
@@ -272,6 +272,9 @@ struct mmc_pool {
 	mmc_protocol_t			*protocol;					/* wire protocol */
 	mmc_hash_t				*hash;						/* hash strategy */
 	void					*hash_state;				/* strategy specific state */
+	fd_set					wfds;
+	fd_set					rfds;
+	int						in_select;
 	mmc_queue_t				*sending;					/* mmc_queue_t<mmc_t *>, connections that want to send */
 	mmc_queue_t				*reading;					/* mmc_queue_t<mmc_t *>, connections that want to read */
 	mmc_queue_t				_sending1, _sending2;
