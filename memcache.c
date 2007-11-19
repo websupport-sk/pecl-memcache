@@ -778,7 +778,7 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 	/* initialize pool and object if need be */
 	if (!mmc_object) {
 		int list_id;
-		mmc_pool_t *pool = mmc_pool_new(TSRMLS_CC);
+		mmc_pool_t *pool = mmc_pool_new(TSRMLS_C);
 		pool->failure_callback = &php_mmc_failure_callback;
 		list_id = zend_list_insert(pool, le_memcache_pool);
 		mmc_object = return_value;
@@ -972,8 +972,17 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 static void php_mmc_set_failure_callback(mmc_pool_t *pool, zval *mmc_object, zval *callback TSRMLS_DC)  /* {{{ */
 {
 	if (callback != NULL) {
-		add_property_zval(mmc_object, "_failureCallback", callback);
+		zval *callback_tmp;
+		ALLOC_ZVAL(callback_tmp);
+
+		*callback_tmp = *callback;
+		zval_copy_ctor(callback_tmp);
+		INIT_PZVAL(callback_tmp);
+
+		add_property_zval(mmc_object, "_failureCallback", callback_tmp);
 		pool->failure_callback_param = mmc_object;  
+
+		INIT_PZVAL(callback_tmp);
 	}
 	else {
 		add_property_null(mmc_object, "_failureCallback");

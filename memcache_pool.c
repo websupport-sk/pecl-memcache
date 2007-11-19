@@ -490,7 +490,7 @@ static void _mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io, int close_persi
 
 void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC) /* {{{ */
 {
-	_mmc_server_disconnect(mmc, io, 1);
+	_mmc_server_disconnect(mmc, io, 1 TSRMLS_CC);
 }
 /* }}} */
 
@@ -662,7 +662,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 
 	/* check connection and extract socket for select() purposes */
 	if (!io->stream || php_stream_cast(io->stream, PHP_STREAM_AS_FD_FOR_SELECT, (void **)&(io->fd), 1) != SUCCESS) {
-		mmc_server_seterror(mmc, errstr, errnum);
+		mmc_server_seterror(mmc, errstr != NULL ? errstr : "Connection failed", errnum);
 		mmc_server_deactivate(pool, mmc TSRMLS_CC);
 
 		if (errstr != NULL) {

@@ -85,15 +85,15 @@ var_dump($result9);
 string(%d) "%s"
 int(%d)
 int(%d)
-string(18) "Connection refused"
-int(111)
+string(%d) "Connection %s"
+int(%d)
 bool(false)
 bool(true)
 string(%d) "%s"
 int(%d)
 int(%d)
-string(18) "Connection refused"
-int(111)
+string(%d) "Connection %s"
+int(%d)
 bool(false)
 bool(false)
 bool(false)
