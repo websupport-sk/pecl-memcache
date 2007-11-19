@@ -74,8 +74,8 @@ session_write_close();
 
 ?>
 --EXPECTF--
-string(16) "key|s:5:"Test1";"
-string(16) "key|s:5:"Test1";"
+string(16) "key%sTest1%s"
+string(16) "key%sTest1%s"
 bool(false)
 bool(false)
 bool(true)

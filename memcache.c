@@ -25,16 +25,8 @@
 
 #include "php.h"
 #include "php_ini.h"
-#include <stdio.h>
-#include <fcntl.h>
-#ifdef HAVE_SYS_FILE_H
-#include <sys/file.h>
-#endif
-
-#include <time.h>
 #include "ext/standard/info.h"
 #include "ext/standard/php_string.h"
-#include "ext/standard/php_smart_str.h"
 #include "php_memcache.h"
 
 #ifndef ZEND_ENGINE_2
@@ -249,6 +241,7 @@ PHP_INI_END()
 static void _mmc_pool_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static void _mmc_server_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
 static void php_mmc_set_failure_callback(mmc_pool_t *, zval *, zval * TSRMLS_DC);
+static void php_mmc_failure_callback(mmc_pool_t *, mmc_t *, void * TSRMLS_DC);
 /* }}} */
 
 /* {{{ php_memcache_init_globals()
@@ -440,7 +433,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 					mmc_stored_handler, NULL, mmc_pool_failover_handler, NULL TSRMLS_CC);
 			}
 			
-			if (mmc_prepare_key_ex(key, key_len, request->key, &(request->key_len)) != MMC_OK) {
+			if (mmc_prepare_key_ex(ZSTR_VAL(key), key_len, request->key, &(request->key_len)) != MMC_OK) {
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 				mmc_pool_release(pool, request);
 				continue;
@@ -465,7 +458,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 		/* allocate request */
 		request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_stored_handler, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
 
-		if (mmc_prepare_key_ex(Z_STRVAL_P(keys), Z_STRLEN_P(keys), request->key, &(request->key_len)) != MMC_OK) {
+		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 			mmc_pool_release(pool, request);
 			RETURN_FALSE;
@@ -746,6 +739,7 @@ static mmc_t *php_mmc_pool_addserver(
 	/* initialize pool if need be */
 	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
 		pool = mmc_pool_new(TSRMLS_C);
+		pool->failure_callback = &php_mmc_failure_callback;
 		list_id = zend_list_insert(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_id);
 	}
@@ -764,7 +758,6 @@ static mmc_t *php_mmc_pool_addserver(
 	}
 	
 	return mmc;
-	
 }
 /* }}} */
 
@@ -784,7 +777,10 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 
 	/* initialize pool and object if need be */
 	if (!mmc_object) {
-		int list_id = zend_list_insert(mmc_pool_new(TSRMLS_C), le_memcache_pool);
+		int list_id;
+		mmc_pool_t *pool = mmc_pool_new(TSRMLS_CC);
+		pool->failure_callback = &php_mmc_failure_callback;
+		list_id = zend_list_insert(pool, le_memcache_pool);
 		mmc_object = return_value;
 		object_init_ex(mmc_object, memcache_ce);
 		add_property_resource(mmc_object, "connection", list_id);
@@ -928,13 +924,12 @@ static int mmc_stats_parse_generic(char *start, char *end, zval *result TSRMLS_D
 }
 /* }}} */
 
-static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param TSRMLS_DC)  /* {{{ */ 
+static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param TSRMLS_DC) /* {{{ */ 
 {
-	zval *mmc_object = (zval *)param;
 	zval **callback;
 	
 	/* check for userspace callback */
-	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "failed", sizeof("failed"), (void **)&callback) == SUCCESS && Z_TYPE_PP(callback) != IS_NULL) {
+	if (param != NULL && zend_hash_find(Z_OBJPROP_P((zval *)param), "_failureCallback", sizeof("_failureCallback"), (void **)&callback) == SUCCESS && Z_TYPE_PP(callback) != IS_NULL) {
 		if (zend_is_callable(*callback, 0, NULL)) {
 			zval *retval;
 			zval *host, *tcp_port, *udp_port, *error, *errnum;
@@ -963,7 +958,7 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 			zval_ptr_dtor(&retval);
 		}
 		else {
-			php_mmc_set_failure_callback(pool, mmc_object, NULL TSRMLS_CC);
+			php_mmc_set_failure_callback(pool, (zval *)param, NULL TSRMLS_CC);
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 		}
 	}
@@ -977,13 +972,11 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 static void php_mmc_set_failure_callback(mmc_pool_t *pool, zval *mmc_object, zval *callback TSRMLS_DC)  /* {{{ */
 {
 	if (callback != NULL) {
-		add_property_zval(mmc_object, "failed", callback);	
-		pool->failure_callback = &php_mmc_failure_callback;
+		add_property_zval(mmc_object, "_failureCallback", callback);
 		pool->failure_callback_param = mmc_object;  
 	}
 	else {
-		add_property_null(mmc_object, "failed");	
-		pool->failure_callback = NULL;
+		add_property_null(mmc_object, "_failureCallback");
 		pool->failure_callback_param = NULL;  
 	}
 }

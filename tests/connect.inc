@@ -4,6 +4,8 @@ if (!extension_loaded("memcache")) {
 	die("skip");
 }
 
+error_reporting(E_ALL);
+
 /*
 * Please change host & port to match your configuration 
 */

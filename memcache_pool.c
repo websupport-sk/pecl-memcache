@@ -468,13 +468,15 @@ mmc_t *mmc_server_new(
 }
 /* }}} */
 
-void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC) /* {{{ */
+static void _mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io, int close_persistent_stream TSRMLS_DC) /* {{{ */
 {
 	mmc_buffer_free(&(io->buffer));	
 
 	if (io->stream != NULL) {
 		if (mmc->persistent) {
-			php_stream_pclose(io->stream);
+			if (close_persistent_stream) {
+				php_stream_pclose(io->stream);
+			}
 		}
 		else {
 			php_stream_close(io->stream);
@@ -483,6 +485,12 @@ void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC) /* {{{ */
 	}
 
 	io->status = MMC_STATUS_DISCONNECTED;
+}
+/* }}} */
+
+void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC) /* {{{ */
+{
+	_mmc_server_disconnect(mmc, io, 1);
 }
 /* }}} */
 
@@ -622,7 +630,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 #else
 
 	if (mmc->persistent) {
-		switch(php_stream_from_persistent_id(hash_key, &(io->stream) TSRMLS_CC)) {
+		switch (php_stream_from_persistent_id(hash_key, &(io->stream) TSRMLS_CC)) {
 			case PHP_STREAM_PERSISTENT_SUCCESS:
 				if (php_stream_eof(io->stream)) {
 					php_stream_pclose(io->stream);
@@ -634,7 +642,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 		}
 	}
 
-	if (!io->stream) {
+	if (io->stream == NULL) {
 		if (io->port) {
 			io->stream = php_stream_sock_open_host(mmc->host, io->port, udp ? SOCK_DGRAM : SOCK_STREAM, &tv, hash_key);
 		}
@@ -734,8 +742,8 @@ void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
 	mmc_server_sleep(mmc TSRMLS_CC);
-	mmc_server_disconnect(mmc, &(mmc->tcp) TSRMLS_CC);
-	mmc_server_disconnect(mmc, &(mmc->udp) TSRMLS_CC);
+	_mmc_server_disconnect(mmc, &(mmc->tcp), 0 TSRMLS_CC);
+	_mmc_server_disconnect(mmc, &(mmc->udp), 0 TSRMLS_CC);
 	
 	pefree(mmc->host, mmc->persistent);
 	pefree(mmc, mmc->persistent);
