@@ -988,7 +988,7 @@ void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /*
 	mmc->failed = (long)time(NULL);
 
 	if (mmc->failure_callback != NULL) {
-		zval *retval;
+		zval *retval = NULL;
 		zval *host, *tcp_port, *udp_port, *error, *errnum;
 		zval **params[5] = {&host, &tcp_port, &udp_port, &error, &errnum};
 
@@ -1012,7 +1012,10 @@ void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /*
 		zval_ptr_dtor(&host);
 		zval_ptr_dtor(&tcp_port); zval_ptr_dtor(&udp_port);
 		zval_ptr_dtor(&error); zval_ptr_dtor(&errnum);
-		zval_ptr_dtor(&retval);
+		
+		if (retval != NULL) {
+			zval_ptr_dtor(&retval);
+		}
 	}
 	else {
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Server %s (tcp %d) failed with: %s (%d)", 
