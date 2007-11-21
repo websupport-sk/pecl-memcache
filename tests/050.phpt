@@ -1,7 +1,7 @@
 --TEST--
 failure callback throws exception
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
+<?php include 'connect.inc'; if (version_compare(phpversion(), '5.0.0', '<')) die('skip requires PHP >= 5.0.0'); ?>
 --FILE--
 <?php
 
