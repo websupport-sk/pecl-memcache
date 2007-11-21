@@ -931,7 +931,7 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 	/* check for userspace callback */
 	if (param != NULL && zend_hash_find(Z_OBJPROP_P((zval *)param), "_failureCallback", sizeof("_failureCallback"), (void **)&callback) == SUCCESS && Z_TYPE_PP(callback) != IS_NULL) {
 		if (zend_is_callable(*callback, 0, NULL)) {
-			zval *retval;
+			zval *retval = NULL;
 			zval *host, *tcp_port, *udp_port, *error, *errnum;
 			zval **params[5] = {&host, &tcp_port, &udp_port, &error, &errnum};
 
@@ -955,7 +955,10 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 			zval_ptr_dtor(&host);
 			zval_ptr_dtor(&tcp_port); zval_ptr_dtor(&udp_port);
 			zval_ptr_dtor(&error); zval_ptr_dtor(&errnum);
-			zval_ptr_dtor(&retval);
+			
+			if (retval != NULL) {
+				zval_ptr_dtor(&retval);
+			}
 		}
 		else {
 			php_mmc_set_failure_callback(pool, (zval *)param, NULL TSRMLS_CC);
