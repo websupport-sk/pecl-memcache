@@ -80,6 +80,25 @@ $result9 = @$memcache->set('test_key', 'test-032-01');
 var_dump($result8);
 var_dump($result9);
 
+// Test MemcachePool::setFailureCallback()
+function _callback_server_failure2($host, $tcp_port, $udp_port, $error, $errnum) {
+	var_dump($error);
+}
+
+$memcache = new MemcachePool();
+$memcache->addServer($nonExistingHost, $nonExistingPort);
+$result8 = $memcache->setFailureCallback('_callback_server_failure2');
+$result9 = @$memcache->set('test_key', 'test-032-01');
+
+var_dump($result8);
+var_dump($result9);
+
+$result8 = $memcache->setFailureCallback(null);
+$result9 = @$memcache->set('test_key', 'test-032-01');
+
+var_dump($result8);
+var_dump($result9);
+
 ?>
 --EXPECTF--
 string(%d) "%s"
@@ -96,6 +115,11 @@ string(%d) "Connection %s"
 int(%d)
 bool(false)
 bool(false)
+bool(false)
+string(%d) "%s"
+bool(true)
+bool(false)
+bool(true)
 bool(false)
 string(%d) "%s"
 bool(true)

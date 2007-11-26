@@ -47,6 +47,7 @@ zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_pconnect,				NULL)
 	PHP_FE(memcache_add_server,				NULL)
 	PHP_FE(memcache_set_server_params,		NULL)
+	PHP_FE(memcache_set_failure_callback,	NULL)
 	PHP_FE(memcache_get_server_status,		NULL)
 	PHP_FE(memcache_get_version,			NULL)
 	PHP_FE(memcache_add,					NULL)
@@ -72,6 +73,7 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_NAMED_FE(connect,				zif_memcache_pool_connect,			NULL)
 	PHP_NAMED_FE(addserver,				zif_memcache_pool_addserver,		NULL)
 	PHP_FALIAS(setserverparams,			memcache_set_server_params,			NULL)
+	PHP_FALIAS(setfailurecallback,		memcache_set_failure_callback,		NULL)
 	PHP_FALIAS(getserverstatus,			memcache_get_server_status,			NULL)
 	PHP_FALIAS(getversion,				memcache_get_version,				NULL)
 	PHP_FALIAS(add,						memcache_add,						NULL)
@@ -1199,6 +1201,48 @@ PHP_FUNCTION(memcache_set_server_params)
 		else {
 			php_mmc_set_failure_callback(pool, mmc_object, NULL TSRMLS_CC);
 		}
+	}
+
+	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto bool memcache_set_failure_callback( callback failure_callback )
+   Changes the failover callback */
+PHP_FUNCTION(memcache_set_failure_callback)
+{
+	zval *mmc_object = getThis(), *failure_callback;
+	mmc_pool_t *pool;
+
+	if (mmc_object) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", 
+			&failure_callback) == FAILURE) {
+			return;
+		}
+	}
+	else {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz", &mmc_object, memcache_pool_ce, 
+			&failure_callback) == FAILURE) {
+			return;
+		}
+	}
+
+	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC)) {
+		RETURN_FALSE;
+	}
+
+	if (Z_TYPE_P(failure_callback) != IS_NULL) {
+		if (!zend_is_callable(failure_callback, 0, NULL)) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
+			RETURN_FALSE;
+		}
+	}
+
+	if (Z_TYPE_P(failure_callback) != IS_NULL) {
+		php_mmc_set_failure_callback(pool, mmc_object, failure_callback TSRMLS_CC);
+	}
+	else {
+		php_mmc_set_failure_callback(pool, mmc_object, NULL TSRMLS_CC);
 	}
 
 	RETURN_TRUE;

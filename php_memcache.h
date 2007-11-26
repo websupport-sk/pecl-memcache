@@ -44,6 +44,7 @@ PHP_FUNCTION(memcache_connect);
 PHP_FUNCTION(memcache_pconnect);
 PHP_FUNCTION(memcache_add_server);
 PHP_FUNCTION(memcache_set_server_params);
+PHP_FUNCTION(memcache_set_failure_callback);
 PHP_FUNCTION(memcache_get_server_status);
 PHP_FUNCTION(memcache_get_version);
 PHP_FUNCTION(memcache_add);

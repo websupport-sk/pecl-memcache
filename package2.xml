@@ -25,7 +25,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2007-xx-xx</date>
+  <date>2007-11-26</date>
   <version>
     <release>3.0.0</release>
     <api>3.0.0</api>
@@ -36,6 +36,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
+    See README for details on new API and INI directives.
+
     - UDP support
     - Binary protocol support 
     - Non-blocking IO using select()
