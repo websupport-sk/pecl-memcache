@@ -25,9 +25,9 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2007-11-26</date>
+  <date>2008-xx-xx</date>
   <version>
-    <release>3.0.0</release>
+    <release>3.0.1</release>
     <api>3.0.0</api>
   </version>
   <stability>
@@ -36,24 +36,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    See README for details on new API and INI directives.
-
-    - UDP support
-    - Binary protocol support 
-    - Non-blocking IO using select()
-    - Pipelined multi-set/delete/increment/decrement
-    - CAS (Compare-And-Swap) support
-    - Append/prepend support
-    - Key and session redundancy (values are written to N mirrors)
-    - Improved error reporting and failover handling
-    - Added class "MemcachePool" implementing the new API
-    - New INI directives
-       memcache.protocol = {ascii, binary}
-       memcache.redundancy = 1
-       memcache.session_redundancy = 2
-    - Changed INI defaults 
-       memcache.hash_strategy = consistent
-       memcache.chunk_size = 32768
+    - Added configure option for PEAR installer to disable session handler support
   </notes>
   <contents>
     <dir name="/">
@@ -88,8 +71,42 @@ http://pear.php.net/dtd/package-2.0.xsd">
     </required>
   </dependencies>
   <providesextension>memcache</providesextension>
-  <extsrcrelease />
+  <extsrcrelease>
+    <configureoption name="enable-memcache-session" default="yes" prompt="Enable memcache session handler support?" />
+  </extsrcrelease>
   <changelog>
+    <release>
+      <date>2007-11-26</date>
+      <version>
+        <release>3.0.0</release>
+        <api>3.0.0</api>
+      </version>
+      <stability>
+        <release>alpha</release>
+        <api>alpha</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        See README for details on new API and INI directives.
+    
+        - UDP support
+        - Binary protocol support 
+        - Non-blocking IO using select()
+        - Pipelined multi-set/delete/increment/decrement
+        - CAS (Compare-And-Swap) support
+        - Append/prepend support
+        - Key and session redundancy (values are written to N mirrors)
+        - Improved error reporting and failover handling
+        - Added class "MemcachePool" implementing the new API
+        - New INI directives
+           memcache.protocol = {ascii, binary}
+           memcache.redundancy = 1
+           memcache.session_redundancy = 2
+        - Changed INI defaults 
+           memcache.hash_strategy = consistent
+           memcache.chunk_size = 32768
+      </notes>
+    </release>
     <release>
       <date>2007-11-01</date>
       <version>
