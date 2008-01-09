@@ -1304,8 +1304,14 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 						zval *result;
 						MAKE_STD_ZVAL(result);
 						ZVAL_STRINGL(result, value, value_len, 0);
-						add_assoc_zval_ex(*return_value, result_key, result_key_len + 1, result);
-						mmc_queue_push(&serialized, result);
+
+						/* don't store duplicate values */
+						if (zend_hash_add(Z_ARRVAL_PP(return_value), result_key, result_key_len + 1, &result, sizeof(result), NULL) == SUCCESS) {
+							mmc_queue_push(&serialized, result);
+						}
+						else {
+							zval_ptr_dtor(&result);
+						}
 					}
 					else {
 						add_assoc_stringl_ex(*return_value, result_key, result_key_len + 1, value, value_len, 0);
