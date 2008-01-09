@@ -36,6 +36,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
+    - Fixed PECL bug #12866 (Ignore memcache.default_port in memcache_connect)
     - Added configure option for PEAR installer to disable session handler support
   </notes>
   <contents>
