@@ -37,6 +37,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Fixed PECL bug 12494 (Segmentation fault when Exception thrown in the callback function)
+    - Fixed PECL bug #12834 (segfault when getting duplicate array values on 64-bit system)
     - Added configure option for PEAR installer to disable session handler support
   </notes>
   <contents>
