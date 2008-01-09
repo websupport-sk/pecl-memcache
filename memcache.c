@@ -1801,13 +1801,7 @@ PHP_FUNCTION(memcache_close)
 		RETURN_FALSE;
 	}
 
-	for (i=0; i<pool->num_servers; i++) {
-		if (!pool->servers[i]->persistent) {
-			mmc_server_disconnect(pool->servers[i], &(pool->servers[i]->tcp) TSRMLS_CC);
-			mmc_server_disconnect(pool->servers[i], &(pool->servers[i]->udp) TSRMLS_CC);
-		}
-	}
-
+	mmc_pool_close(pool TSRMLS_CC);
 	RETURN_TRUE;
 }
 /* }}} */

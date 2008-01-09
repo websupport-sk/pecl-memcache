@@ -299,6 +299,7 @@ int mmc_request_failure(mmc_t *, mmc_stream_t *, const char *, unsigned int, int
 mmc_pool_t *mmc_pool_new(TSRMLS_D);
 void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
 void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
+void mmc_pool_close(mmc_pool_t * TSRMLS_DC);
 int mmc_pool_open(mmc_pool_t *, mmc_t *, mmc_stream_t *, int TSRMLS_DC);
 void mmc_pool_select(mmc_pool_t *, long TSRMLS_DC);
 void mmc_pool_run(mmc_pool_t * TSRMLS_DC);

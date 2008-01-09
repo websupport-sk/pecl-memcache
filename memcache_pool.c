@@ -750,20 +750,10 @@ void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
+static void mmc_pool_init_hash(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 {
 	mmc_hash_function hash;
-	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
-	memset(pool, 0, sizeof(*pool));
 
-	switch (MEMCACHE_G(protocol)) {
-		case MMC_BINARY_PROTOCOL:
-			pool->protocol = &mmc_binary_protocol;
-			break;
-		default:
-			pool->protocol = &mmc_ascii_protocol;
-	}
-	
 	switch (MEMCACHE_G(hash_strategy)) {
 		case MMC_CONSISTENT_HASH:
 			pool->hash = &mmc_consistent_hash;
@@ -781,8 +771,25 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 	}
 	
 	pool->hash_state = pool->hash->create_state(hash);
-	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
+}
+/* }}} */
+
+mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
+{
+	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
+	memset(pool, 0, sizeof(*pool));
+
+	switch (MEMCACHE_G(protocol)) {
+		case MMC_BINARY_PROTOCOL:
+			pool->protocol = &mmc_binary_protocol;
+			break;
+		default:
+			pool->protocol = &mmc_ascii_protocol;
+	}
 	
+	mmc_pool_init_hash(pool TSRMLS_CC);
+	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
+
 	pool->sending = &(pool->_sending1);
 	pool->reading = &(pool->_reading1);
 
@@ -835,6 +842,31 @@ void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /*
 	pool->servers = erealloc(pool->servers, sizeof(*pool->servers) * (pool->num_servers + 1));
 	pool->servers[pool->num_servers] = mmc;
 	pool->num_servers++;
+}
+/* }}} */
+
+void mmc_pool_close(mmc_pool_t *pool TSRMLS_DC) /* 
+	disconnects and removes all servers in the pool {{{ */
+{
+	if (pool->num_servers) {
+		int i;
+		
+		for (i=0; i<pool->num_servers; i++) {
+			if (pool->servers[i]->persistent) {
+				mmc_server_sleep(pool->servers[i] TSRMLS_CC);
+			} else {
+				mmc_server_free(pool->servers[i] TSRMLS_CC);
+			}
+		}
+
+		efree(pool->servers);
+		pool->servers = NULL;
+		pool->num_servers = 0;
+		
+		/* reallocate the hash strategy state */
+		pool->hash->free_state(pool->hash_state);
+		mmc_pool_init_hash(pool TSRMLS_CC);
+	}
 }
 /* }}} */
 

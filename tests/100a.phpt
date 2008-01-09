@@ -37,7 +37,7 @@ echo "Done\n";
 bool(true)
 bool(false)
 bool(false)
-bool(false)
+bool(true)
 
 Warning: memcache_flush() expects parameter 1 to be MemcachePool, object given in %s on line %d
 NULL
