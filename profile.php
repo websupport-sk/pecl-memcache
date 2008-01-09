@@ -111,6 +111,8 @@ for ($i=0; $i<$count; $i++) {
 	$objects[$key3.$i] = new TestClass(new TestClass(new TestClass()));
 }
 
+print "Measures are in keys-per-second, higher is better.\n";
+
 // Configuration
 printf("memcache.hash_strategy:     %s\n", ini_get('memcache.hash_strategy'));
 printf("memcache.chunk_size:        %u\n", ini_get('memcache.chunk_size'));
@@ -132,7 +134,7 @@ printf("total time: %d minutes, %d seconds\n", floor(($ts2 - $ts)/60), ($ts2 - $
 // Tests
 class TestClass {
 	function __construct($obj = null) {
-		$this->v1 = 'abc';
+		$this->v1 = str_repeat('abc', 250);
 		$this->v2 = 123;
 		$this->v3 = 123.123;
 		$this->v4 = array('abc', 123);

@@ -771,7 +771,7 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 
 	char *host;
 	int host_len;
-	long tcp_port = 0, timeout = MMC_DEFAULT_TIMEOUT;
+	long tcp_port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|ll", &host, &host_len, &tcp_port, &timeout) == FAILURE) {
 		return;
@@ -1010,7 +1010,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_connect)
 
 	char *host;
 	int host_len;
-	long tcp_port = 0, udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long tcp_port = MEMCACHE_G(default_port), udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool persistent = 1;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|llblll", 
@@ -1067,7 +1067,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_addserver)
 
 	char *host;
 	int host_len;
-	long tcp_port = 0, udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long tcp_port = MEMCACHE_G(default_port), udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool persistent = 1, status = 1;
 	
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|llblllb", 

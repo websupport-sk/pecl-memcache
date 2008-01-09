@@ -29,6 +29,23 @@ var_dump($result3);
 var_dump($result4);
 var_dump(count($result5));
 
+// Test default port
+$memcache = new Memcache();
+
+ini_set('memcache.default_port', $port);
+$result1 = $memcache->addServer($host);
+
+ini_set('memcache.default_port', $port2);
+$result2 = $memcache->connect($host2);
+
+$result3 = $memcache->set($balanceKey1, 'a');
+$result4 = $memcache->set($balanceKey2, 'b');
+
+var_dump($result1);
+var_dump($result2);
+var_dump($result3);
+var_dump($result4);
+
 ?>
 --EXPECT--
 bool(false)
@@ -38,3 +55,7 @@ bool(true)
 bool(true)
 string(4) "test"
 int(2)
+bool(true)
+bool(true)
+bool(true)
+bool(true)
