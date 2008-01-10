@@ -36,8 +36,6 @@ bool(true)
 
 Notice: memcache_flush(): Server %s failed with: Connection %s
 bool(false)
-
-Notice: memcache_flush(): Server %s failed with: Connection %s
 bool(true)
 
 Warning: memcache_flush() expects parameter 1 to be Memcache, object given %s

@@ -209,7 +209,6 @@ static int mmc_server_store(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_compress(char **, unsigned long *, const char *, int TSRMLS_DC);
 static int mmc_uncompress(char **, unsigned long *, const char *, int);
 static int mmc_get_pool(zval *, mmc_pool_t ** TSRMLS_DC);
-static int mmc_close(mmc_t * TSRMLS_DC);
 static int mmc_readline(mmc_t * TSRMLS_DC);
 static char * mmc_get_version(mmc_t * TSRMLS_DC);
 static int mmc_str_left(char *, char *, int, int);
@@ -585,14 +584,9 @@ static unsigned int mmc_hash_fnv1a(const char *key, int key_len) /*
 }
 /* }}} */
 
-mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
+static void mmc_pool_init_hash(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 {
 	mmc_hash_function hash;
-	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
-	pool->num_servers = 0;
-	pool->compress_threshold = 0;
-	pool->in_free = 0;
-	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
 
 	switch (MEMCACHE_G(hash_strategy)) {
 		case MMC_CONSISTENT_HASH:
@@ -601,7 +595,7 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 		default:
 			pool->hash = &mmc_standard_hash;
 	}
-	
+
 	switch (MEMCACHE_G(hash_function)) {
 		case MMC_HASH_FNV1A:
 			hash = &mmc_hash_fnv1a;
@@ -611,6 +605,18 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 	}
 	
 	pool->hash_state = pool->hash->create_state(hash);
+}
+/* }}} */
+
+mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
+{
+	mmc_pool_t *pool = emalloc(sizeof(mmc_pool_t));
+	pool->num_servers = 0;
+	pool->compress_threshold = 0;
+	pool->in_free = 0;
+	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
+
+	mmc_pool_init_hash(pool TSRMLS_CC);
 
 	return pool;
 }
@@ -664,6 +670,36 @@ void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* {{{ */
 	pool->num_servers++;
 
 	pool->hash->add_server(pool->hash_state, mmc, weight);
+}
+/* }}} */
+
+static int mmc_pool_close(mmc_pool_t *pool TSRMLS_DC) /* 
+	disconnects and removes all servers in the pool {{{ */
+{
+	if (pool->num_servers) {
+		int i;
+		
+		for (i=0; i<pool->num_servers; i++) {
+			if (pool->servers[i]->persistent == 0 && pool->servers[i]->host != NULL) {
+				mmc_server_free(pool->servers[i] TSRMLS_CC);
+			} else {
+				mmc_server_sleep(pool->servers[i] TSRMLS_CC);
+			}
+		}
+
+		efree(pool->servers);
+		pool->servers = NULL;
+		pool->num_servers = 0;
+
+		efree(pool->requests);
+		pool->requests = NULL;
+		
+		/* reallocate the hash strategy state */
+		pool->hash->free_state(pool->hash_state);
+		mmc_pool_init_hash(pool TSRMLS_CC);
+	}
+	
+	return 1;
 }
 /* }}} */
 
@@ -1021,16 +1057,6 @@ void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /*
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Server %s (tcp %d) failed with: %s (%d)", 
 			mmc->host, mmc->port, mmc->error, mmc->errnum);
 	}
-}
-/* }}} */
-
-static int mmc_close(mmc_t *mmc TSRMLS_DC) /* {{{ */
-{
-	MMC_DEBUG(("mmc_close: closing connection to server"));
-	if (!mmc->persistent) {
-		mmc_server_disconnect(mmc TSRMLS_CC);
-	}
-	return 1;
 }
 /* }}} */
 
@@ -2500,7 +2526,6 @@ PHP_FUNCTION(memcache_decrement)
 PHP_FUNCTION(memcache_close)
 {
 	mmc_pool_t *pool;
-	int i, failures = 0;
 	zval *mmc_object = getThis();
 
 	if (mmc_object == NULL) {
@@ -2513,14 +2538,7 @@ PHP_FUNCTION(memcache_close)
 		RETURN_FALSE;
 	}
 
-	for (i=0; i<pool->num_servers; i++) {
-		if (mmc_close(pool->servers[i] TSRMLS_CC) < 0) {
-			mmc_server_failure(pool->servers[i] TSRMLS_CC);
-			failures++;
-		}
-	}
-
-	if (failures && failures >= pool->num_servers) {
+	if (!mmc_pool_close(pool TSRMLS_CC)) {
 		RETURN_FALSE;
 	}
 	RETURN_TRUE;

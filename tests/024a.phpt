@@ -15,11 +15,11 @@ var_dump($result1);
 
 $memcache = new Memcache();
 $result2 = $memcache->connect($host, $port);
-$result3 = memcache_set($memcache, 'non_existing_test_key', 'test', false, 1);
+$result3 = memcache_set($memcache, 'test_key', 'test', false, 1);
 $result4 = memcache_close($memcache);
 
-// This additional get() will transparently reconnect
-$result5 = memcache_get($memcache, 'non_existing_test_key');
+// This will fail since all servers have been removed
+$result5 = memcache_get($memcache, 'test_key');
 
 var_dump($result2);
 var_dump($result3);
@@ -40,7 +40,7 @@ bool(true)
 bool(true)
 bool(true)
 bool(true)
-string(4) "test"
+bool(false)
 bool(true)
 bool(true)
 
