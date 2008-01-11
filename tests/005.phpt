@@ -89,6 +89,18 @@ print "\n";
 test_key_proc($memcache, $key);
 print "\n";
 
+// Test UTF-8 key
+$key = 'abcÿabc';
+
+$result = $memcache->set($key, 'test1');
+var_dump($result);
+
+$result = $memcache->get($key);
+var_dump($result);
+
+$result = $memcache->get(array($key));
+var_dump($result);
+
 ?>
 --EXPECTF--
 string(4) "test"
@@ -145,3 +157,10 @@ string(9) "test test"
 string(9) "test test"
 string(9) "test test"
 string(9) "test test"
+
+bool(true)
+string(5) "test1"
+array(1) {
+  ["abcÿabc"]=>
+  string(5) "test1"
+}
