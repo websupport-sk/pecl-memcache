@@ -28,7 +28,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <date>2008-xx-xx</date>
   <version>
     <release>2.2.3</release>
-    <api>2.2.2</api>
+    <api>2.2.3</api>
   </version>
   <stability>
     <release>stable</release>
@@ -51,8 +51,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="memcache_standard_hash.c" role="src" />
       <file name="memcache_consistent_hash.c" role="src" />
       <file name="memcache.dsp" role="src" />
-      <file name="php_memcache.h" role="doc" />
-      <file name="memcache_queue.h" role="doc" />
+      <file name="php_memcache.h" role="src" />
+      <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />
     </dir>
   </contents>
