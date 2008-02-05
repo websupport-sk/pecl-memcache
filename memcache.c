@@ -46,6 +46,8 @@
 #define OnUpdateLong OnUpdateInt
 #endif
 
+#define PHP_MEMCACHE_VERSION "2.2.3-dev"
+
 /* True global resources - no need for thread safety here */
 static int le_memcache_pool, le_pmemcache;
 static zend_class_entry *memcache_class_entry_ptr;
@@ -115,7 +117,7 @@ zend_module_entry memcache_module_entry = {
 	NULL,
 	PHP_MINFO(memcache),
 #if ZEND_MODULE_API_NO >= 20010901
-	NO_VERSION_YET, 			/* Replace with version number for your extension */
+	PHP_MEMCACHE_VERSION,
 #endif
 	STANDARD_MODULE_PROPERTIES
 };
@@ -301,6 +303,7 @@ PHP_MINFO_FUNCTION(memcache)
 	php_info_print_table_start();
 	php_info_print_table_header(2, "memcache support", "enabled");
 	php_info_print_table_row(2, "Active persistent connections", buf);
+	php_info_print_table_row(2, "Version", PHP_MEMCACHE_VERSION);
 	php_info_print_table_row(2, "Revision", "$Revision$");
 	php_info_print_table_end();
 
@@ -408,6 +411,7 @@ static void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 		mmc->error = NULL;
 	}
 }
+/* }}} */
 
 static void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
