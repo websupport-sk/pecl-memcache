@@ -62,6 +62,8 @@ PHP_FUNCTION(memcache_decrement);
 PHP_FUNCTION(memcache_close);
 PHP_FUNCTION(memcache_flush);
 
+#define PHP_MEMCACHE_VERSION "@PACKAGE-VERSION@"
+
 #define MMC_BUF_SIZE 4096
 #define MMC_SERIALIZED 1
 #define MMC_COMPRESSED 2

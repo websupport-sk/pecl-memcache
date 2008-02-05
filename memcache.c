@@ -46,8 +46,6 @@
 #define OnUpdateLong OnUpdateInt
 #endif
 
-#define PHP_MEMCACHE_VERSION "2.2.3-dev"
-
 /* True global resources - no need for thread safety here */
 static int le_memcache_pool, le_pmemcache;
 static zend_class_entry *memcache_class_entry_ptr;
