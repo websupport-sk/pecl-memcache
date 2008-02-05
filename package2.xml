@@ -25,21 +25,23 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2008-xx-xx</date>
+  <date>2008-02-05</date>
   <version>
     <release>3.0.1</release>
     <api>3.0.1</api>
   </version>
   <stability>
-    <release>alpha</release>
-    <api>alpha</api>
+    <release>beta</release>
+    <api>beta</api>
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Fixed PECL bug #12866 (Ignore memcache.default_port in memcache_connect)
     - Fixed PECL bug #12883 (Breaks UTF-8 in keys)
+    - Fixed PECL bug #13060 (make problems, due to role="doc" instead of role="src")
     - Changed behaviour of close() to actually remove all servers from pool (PECL bug #12555)
     - Added configure option for PEAR installer to disable session handler support
+    - Added package version to phpinfo()
   </notes>
   <contents>
     <dir name="/">
@@ -57,7 +59,9 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="memcache_standard_hash.c" role="src" />
       <file name="memcache_consistent_hash.c" role="src" />
       <file name="memcache.dsp" role="src" />
-      <file name="php_memcache.h" role="src" />
+      <file name="php_memcache.h" role="src">
+        <tasks:replace from="@PACKAGE-VERSION@" to="version" type="package-info"/>
+      </file>
       <file name="memcache_pool.h" role="src" />
       <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />
@@ -108,6 +112,23 @@ http://pear.php.net/dtd/package-2.0.xsd">
         - Changed INI defaults 
            memcache.hash_strategy = consistent
            memcache.chunk_size = 32768
+      </notes>
+    </release>
+    <release>
+      <date>2008-02-05</date>
+      <version>
+        <release>2.2.3</release>
+        <api>2.2.3</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fixed PECL bug #12883 (Breaks UTF-8 in keys)
+        - Fixed PECL bug #13060 (make problems, due to role="doc" instead of role="src")
+        - Added package version to phpinfo()
       </notes>
     </release>
     <release>
