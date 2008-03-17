@@ -936,7 +936,13 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 		if (zend_is_callable(*callback, 0, NULL)) {
 			zval *retval = NULL;
 			zval *host, *tcp_port, *udp_port, *error, *errnum;
-			zval **params[5] = {&host, &tcp_port, &udp_port, &error, &errnum};
+			zval **params[5];
+
+			params[0] = &host;
+			params[1] = &tcp_port;
+			params[2] = &udp_port;
+			params[3] = &error;
+			params[4] = &errnum;
 
 			MAKE_STD_ZVAL(host);
 			MAKE_STD_ZVAL(tcp_port); MAKE_STD_ZVAL(udp_port);
@@ -1790,7 +1796,6 @@ PHP_FUNCTION(memcache_close)
 {
 	mmc_pool_t *pool;
 	zval *mmc_object = getThis();
-	int i;
 
 	if (mmc_object == NULL) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O", &mmc_object, memcache_pool_ce) == FAILURE) {
