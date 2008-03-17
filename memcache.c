@@ -1028,7 +1028,13 @@ void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /*
 	if (mmc->failure_callback != NULL) {
 		zval *retval = NULL;
 		zval *host, *tcp_port, *udp_port, *error, *errnum;
-		zval **params[5] = {&host, &tcp_port, &udp_port, &error, &errnum};
+		zval **params[5];
+
+		params[0] = &host;
+		params[1] = &tcp_port;
+		params[2] = &udp_port;
+		params[3] = &error;
+		params[4] = &errnum;
 
 		MAKE_STD_ZVAL(host);
 		MAKE_STD_ZVAL(tcp_port); MAKE_STD_ZVAL(udp_port);

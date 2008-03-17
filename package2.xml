@@ -25,10 +25,10 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2008-02-05</date>
+  <date>2008-xx-xx</date>
   <version>
-    <release>2.2.3</release>
-    <api>2.2.3</api>
+    <release>2.2.4</release>
+    <api>2.2.4</api>
   </version>
   <stability>
     <release>stable</release>
@@ -36,9 +36,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    - Fixed PECL bug #12883 (Breaks UTF-8 in keys)
-    - Fixed PECL bug #13060 (make problems, due to role="doc" instead of role="src")
-    - Added package version to phpinfo()
+    - Fixed PECL bug #13343 (compilation breaks with CodeWarrior compiler)
   </notes>
   <contents>
     <dir name="/">
@@ -75,6 +73,23 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <configureoption name="enable-memcache-session" default="yes" prompt="Enable memcache session handler support?" />
   </extsrcrelease>
   <changelog>
+    <release>
+      <date>2008-02-05</date>
+      <version>
+        <release>2.2.3</release>
+        <api>2.2.3</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fixed PECL bug #12883 (Breaks UTF-8 in keys)
+        - Fixed PECL bug #13060 (make problems, due to role="doc" instead of role="src")
+        - Added package version to phpinfo()
+      </notes>
+    </release>
     <release>
       <date>2008-01-10</date>
       <version>
