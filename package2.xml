@@ -37,6 +37,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Fixed PECL bug #13343 (compilation breaks with CodeWarrior compiler)
+    - Fixed PECL bug #13546 (Session handler through unix socket)
   </notes>
   <contents>
     <dir name="/">
