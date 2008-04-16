@@ -37,6 +37,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Fixed PECL bug #13343 (compilation breaks with CodeWarrior compiler)
+    - Fixed PECL bug #13546 (Session handler through unix socket)
   </notes>
   <contents>
     <dir name="/">
@@ -54,9 +55,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="memcache_standard_hash.c" role="src" />
       <file name="memcache_consistent_hash.c" role="src" />
       <file name="memcache.dsp" role="src" />
-      <file name="php_memcache.h" role="src">
-        <tasks:replace from="@PACKAGE-VERSION@" to="version" type="package-info"/>
-      </file>
+      <file name="php_memcache.h" role="src" />
       <file name="memcache_pool.h" role="src" />
       <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />

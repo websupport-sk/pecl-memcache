@@ -66,7 +66,29 @@ PS_OPEN_FUNC(memcache)
 
 		if (i < j) {
 			int persistent = 0, udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
-			url = php_url_parse_ex(save_path+i, j-i);
+
+			/* translate unix: into file: */
+			if (!strncmp(save_path+i, "unix:", sizeof("unix:")-1)) {
+				int len = j-i;
+				char *path = estrndup(save_path+i, len);
+				memcpy(path, "file:", sizeof("file:")-1);
+				url = php_url_parse_ex(path, len);
+				efree(path);
+			}
+			else {
+				url = php_url_parse_ex(save_path+i, j-i);
+			}
+
+			if (!url) {
+				char *path = estrndup(save_path+i, j-i);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, 
+					"Failed to parse session.save_path (error at offset %d, url was '%s')", i, path);
+				efree(path);
+				
+				mmc_pool_free(pool TSRMLS_CC);
+				PS_SET_MOD_DATA(NULL);
+				return FAILURE;
+			}
 
 			/* parse parameters */
 			if (url->query != NULL) {
@@ -103,18 +125,38 @@ PS_OPEN_FUNC(memcache)
 				zval_ptr_dtor(&params);
 			}
 
-			if (url->host == NULL || weight <= 0 || timeout <= 0) {
-				php_url_free(url);
-				mmc_pool_free(pool TSRMLS_CC);
-				PS_SET_MOD_DATA(NULL);
-				return FAILURE;
-			}
+			if (url->scheme && url->path && !strcmp(url->scheme, "file")) {
+				char *host;
+				int host_len = spprintf(&host, 0, "unix://%s", url->path);
 
-			if (persistent) {
-				mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval TSRMLS_CC);
+				/* chop off trailing :0 port specifier */
+				if (!strcmp(host + host_len - 2, ":0")) {
+					host_len -= 2;
+				}
+				
+				if (persistent) {
+					mmc = mmc_find_persistent(host, host_len, 0, 0, timeout, retry_interval TSRMLS_CC);
+				}
+				else {
+					mmc = mmc_server_new(host, host_len, 0, 0, 0, timeout, retry_interval TSRMLS_CC);
+				}
+				
+				efree(host);
 			}
 			else {
-				mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval TSRMLS_CC);
+				if (url->host == NULL || weight <= 0 || timeout <= 0) {
+					php_url_free(url);
+					mmc_pool_free(pool TSRMLS_CC);
+					PS_SET_MOD_DATA(NULL);
+					return FAILURE;
+				}
+
+				if (persistent) {
+					mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval TSRMLS_CC);
+				}
+				else {
+					mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval TSRMLS_CC);
+				}
 			}
 
 			mmc_pool_add(pool, mmc, 1);
