@@ -106,7 +106,7 @@ static mmc_t *mmc_consistent_find(mmc_consistent_state_t *state, unsigned int po
 }
 /* }}} */
 
-static void mmc_consistent_pupulate_buckets(mmc_consistent_state_t *state) /* {{{ */
+static void mmc_consistent_populate_buckets(mmc_consistent_state_t *state) /* {{{ */
 {
 	unsigned int i, step = 0xffffffff / MMC_CONSISTENT_BUCKETS;
 
@@ -125,7 +125,7 @@ mmc_t *mmc_consistent_find_server(void *s, const char *key, unsigned int key_len
 
 	if (state->num_servers > 1) {
 		if (!state->buckets_populated) {
-			mmc_consistent_pupulate_buckets(state);
+			mmc_consistent_populate_buckets(state);
 		}
 		return state->buckets[state->hash(key, key_len) % MMC_CONSISTENT_BUCKETS];
 	}

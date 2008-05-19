@@ -1332,7 +1332,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 			fd = mmc->sendreq->io->fd;
 			
 			do {
-				/* delegate to request parse handler */
+				/* delegate to request send handler */
 				result = mmc_request_send(mmc, mmc->sendreq TSRMLS_CC);
 
 				/* check if someone has helped complete our run */
