@@ -10,7 +10,7 @@ include 'connect.inc';
 $var = 'test';
 $key = "test\r\n\0 - really strange key";
 
-memcache_set($memcache, $key, $var, false, 10);
+memcache_set($memcache, $key, $var, false);
 $result = memcache_get($memcache, $key);
 var_dump($result);
 
@@ -106,7 +106,7 @@ var_dump($result);
 string(4) "test"
 bool(false)
 int(1)
-string(28) "test____-_really_strange_key"
+string(28) "%s"
 
 Warning: memcache_set(): %s
 bool(false)

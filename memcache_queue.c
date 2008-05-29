@@ -92,10 +92,10 @@ inline void mmc_queue_free(mmc_queue_t *queue) {
 	memset(queue, 0, sizeof(*queue));
 }
 
-inline void mmc_queue_copy(mmc_queue_t *source, mmc_queue_t *target) {
+inline void mmc_queue_copy(mmc_queue_t *target, mmc_queue_t *source) {
 	if (target->alloc != source->alloc) {
 		target->alloc = source->alloc;
-		erealloc(target->items, sizeof(*target->items) * target->alloc);
+		target->items = erealloc(target->items, sizeof(*target->items) * target->alloc);
 	}
 	
 	memcpy(target->items, source->items, sizeof(*source->items) * source->alloc);

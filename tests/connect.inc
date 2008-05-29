@@ -22,6 +22,11 @@ $udpPort2 = 11212;
 //ini_set('memcache.hash_function', 'fnv');
 //ini_set('memcache.protocol', 'binary');
 
+if (ini_get('memcache.protocol') == 'binary') {
+	$udpPort = 0;
+	$udpPort2 = 0;
+}
+
 /* Start a server listening to a unix domain socket
  *
  * mkdir /var/run/memcached
@@ -50,6 +55,11 @@ $balanceKeys = array(
 $strat = strtolower(ini_get('memcache.hash_strategy'));
 $func = strtolower(ini_get('memcache.hash_function'));
 list ($balanceKey1, $balanceKey2) = $balanceKeys[$strat][$func];
+
+if (!isset($udpPort))
+	$udpPort = 0;
+if (!isset($udpPort2))
+	$udpPort2 = 0;
 
 $memcache = memcache_connect($host, $port);
 

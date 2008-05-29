@@ -1,7 +1,7 @@
 --TEST--
 memcache->get() over multi-datagram UDP
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($udpPort)) print 'skip UDP is not enabled in connect.inc'; ?>
+<?php include 'connect.inc'; if (empty($udpPort)) print 'skip UDP is not enabled in connect.inc'; ?>
 --FILE--
 <?php
 

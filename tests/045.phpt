@@ -10,8 +10,8 @@ include 'connect.inc';
 class testclass {
 	function __wakeup() {
 		global $memcache;
-		$result = $memcache->get('_test_key3');
-		var_dump($result);
+		$this->result = $memcache->get('_test_key3');
+		var_dump($this->result);
 	}
 }
 
@@ -25,18 +25,23 @@ $a2 = $memcache->get('_test_key1');
 var_dump($a2);
 
 $result = $memcache->get(array('_test_key1', '_test_key2'));
-ksort($result);
+if (is_array($result))
+	ksort($result);
 var_dump($result);
 
 ?>
 --EXPECTF--
 string(5) "test3"
 object(testclass)%s {
+  ["result"]=>
+  string(5) "test3"
 }
 string(5) "test3"
 array(2) {
   ["_test_key1"]=>
   object(testclass)%s {
+    ["result"]=>
+    string(5) "test3"
   }
   ["_test_key2"]=>
   array(1) {

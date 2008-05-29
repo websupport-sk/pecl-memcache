@@ -1,7 +1,7 @@
 --TEST--
-memcache->flush()
+memcache->flush() with time in future
 --SKIPIF--
-<?php include 'connect.inc'; ?>
+<?php include 'connect.inc'; if (ini_get('memcache.protocol') == 'binary') die('skip binary protocol doesn\'t support append/prepend'); ?>
 --FILE--
 <?php
 
@@ -19,6 +19,19 @@ $result1 = $memcache->set('test_key', 'abc');
 $result2 = $memcache->get('test_key');
 var_dump($result1);
 var_dump($result2);
+
+$result = $memcache->flush(time()+3);
+var_dump($result);
+
+sleep(1);
+
+$result = $memcache->get('test_key');
+var_dump($result);
+
+sleep(2);
+
+$result = $memcache->get('test_key');
+var_dump($result);
 
 // Test partly failing flush
 $memcache = new Memcache();
@@ -39,5 +52,8 @@ var_dump($result);
 --EXPECT--
 bool(true)
 string(3) "abc"
+bool(true)
+string(3) "abc"
+bool(false)
 bool(false)
 bool(false)

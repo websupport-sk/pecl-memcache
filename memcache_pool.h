@@ -74,6 +74,7 @@
 #define MMC_RESPONSE_EXISTS			0x02			/* same as binary protocol */
 #define MMC_RESPONSE_TOO_LARGE		0x03			/* same as binary protocol */
 #define MMC_RESPONSE_NOT_STORED		0x05			/* same as binary protocol */
+#define MMC_RESPONSE_UNKNOWN_CMD	0x81			/* same as binary protocol */
 #define MMC_RESPONSE_OUT_OF_MEMORY	0x82			/* same as binary protocol */
 
 #define MMC_STANDARD_HASH 		1
@@ -128,10 +129,12 @@ typedef struct mmc_request mmc_request_t;
 typedef int (*mmc_request_reader)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_parser)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_value_handler)(
-	const char *key, unsigned int key_len, void *value, unsigned int value_len, 
+	const char *key, unsigned int key_len, zval *value, 
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC);
-typedef int (*mmc_request_response_handler)(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC);
-typedef int (*mmc_request_failover_handler)(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC);
+typedef int (*mmc_request_response_handler)(
+	mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC);
+typedef int (*mmc_request_failover_handler)(
+	mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, void *param TSRMLS_DC);
 
 void mmc_request_reset(mmc_request_t *);
 void mmc_request_free(mmc_request_t *);
@@ -201,6 +204,7 @@ struct mmc {
 #define MMC_OP_PREPEND		0x35	/* not supported by binary protocol */
 
 typedef mmc_request_t * (*mmc_protocol_create_request)();
+typedef void (*mmc_protocol_clone_request)(mmc_request_t *clone, mmc_request_t *request);
 typedef void (*mmc_protocol_reset_request)(mmc_request_t *request);
 typedef void (*mmc_protocol_free_request)(mmc_request_t *request);
 
@@ -213,7 +217,7 @@ typedef int (*mmc_protocol_store)(
 	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, 
 	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC);
 typedef void (*mmc_protocol_delete)(mmc_request_t *request, const char *key, unsigned int key_len, unsigned int exptime);
-typedef void (*mmc_protocol_mutate)(mmc_request_t *request, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime);
+typedef void (*mmc_protocol_mutate)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime);
 
 typedef void (*mmc_protocol_flush)(mmc_request_t *request, unsigned int exptime);
 typedef void (*mmc_protocol_stats)(mmc_request_t *request, const char *type, long slabid, long limit);
@@ -221,6 +225,7 @@ typedef void (*mmc_protocol_version)(mmc_request_t *request);
 
 typedef struct mmc_protocol {
 	mmc_protocol_create_request	create_request;
+	mmc_protocol_clone_request	clone_request;
 	mmc_protocol_reset_request	reset_request;
 	mmc_protocol_free_request	free_request;
 	

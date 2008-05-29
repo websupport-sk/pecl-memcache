@@ -422,10 +422,9 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return value_handler(key_tmp, key_len, object, 0, flags, cas, value_handler_param TSRMLS_CC);
+		return value_handler(key_tmp, key_len, object, flags, cas, value_handler_param TSRMLS_CC);
 	}
 	else {
-		/* room for \0 since buffer contains trailing \r\n and uncompress allocates + 1 */
 		data[data_len] = '\0';
 		ZVAL_STRINGL(&value, data, data_len, 0);
 		
@@ -434,7 +433,7 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(key, key_len, &value, 0, flags, cas, request->value_handler_param TSRMLS_CC);
+		return request->value_handler(key, key_len, &value, flags, cas, request->value_handler_param TSRMLS_CC);
 	}
 }
 /* }}}*/
@@ -577,11 +576,8 @@ int mmc_server_failure(mmc_t *mmc, mmc_stream_t *io, const char *error, int errn
 int mmc_request_failure(mmc_t *mmc, mmc_stream_t *io, const char *message, unsigned int message_len, int errnum TSRMLS_DC) /* 
 	 checks for a valid server generated error message and calls mmc_server_failure() {{{ */
 {
-	if (mmc_str_left(message, "ERROR", message_len, sizeof("ERROR")-1) ||
-		mmc_str_left(message, "CLIENT_ERROR", message_len, sizeof("CLIENT_ERROR")-1) ||
-		mmc_str_left(message, "SERVER_ERROR", message_len, sizeof("SERVER_ERROR")-1)) 
-	{
-		return mmc_server_failure(mmc, io, message, errnum TSRMLS_CC);
+	if (message_len) {
+		return mmc_server_failure(mmc, io, message, errnum TSRMLS_CC);;
 	}
 	
 	return mmc_server_failure(mmc, io, "Malformed server response", errnum TSRMLS_CC);
@@ -1018,7 +1014,7 @@ mmc_request_t *mmc_pool_clone_request(mmc_pool_t *pool, mmc_request_t *request T
 	
 	/* copy payload parser */
 	clone->parse = request->parse;
-	
+
 	/* copy key */
 	memcpy(clone->key, request->key, request->key_len); 
 	clone->key_len = request->key_len;
@@ -1027,6 +1023,9 @@ mmc_request_t *mmc_pool_clone_request(mmc_pool_t *pool, mmc_request_t *request T
 	mmc_buffer_alloc(&(clone->sendbuf), request->sendbuf.value.len);
 	memcpy(clone->sendbuf.value.c, request->sendbuf.value.c, request->sendbuf.value.len);
 	clone->sendbuf.value.len = request->sendbuf.value.len;
+	
+	/* copy protocol specific values */
+	pool->protocol->clone_request(clone, request);
 	
 	return clone;
 }
@@ -1172,7 +1171,7 @@ int mmc_pool_schedule_get(
 			failover_handler, failover_handler_param TSRMLS_CC);
 		
 		if (failed_request != NULL) {
-			mmc_queue_copy(&(failed_request->failed_servers), &(mmc->buildreq->failed_servers));
+			mmc_queue_copy(&(mmc->buildreq->failed_servers), &(failed_request->failed_servers));
 			mmc->buildreq->failed_index = failed_request->failed_index;
 		}
 
@@ -1191,7 +1190,7 @@ int mmc_pool_schedule_get(
 			failover_handler, failover_handler_param TSRMLS_CC);
 
 		if (failed_request != NULL) {
-			mmc_queue_copy(&(failed_request->failed_servers), &(mmc->buildreq->failed_servers));
+			mmc_queue_copy(&(mmc->buildreq->failed_servers), &(failed_request->failed_servers));
 			mmc->buildreq->failed_index = failed_request->failed_index;
 		}
 
@@ -1525,19 +1524,15 @@ inline int mmc_prepare_key(zval *key, char *result, unsigned int *result_len)  /
 		return mmc_prepare_key_ex(Z_STRVAL_P(key), Z_STRLEN_P(key), result, result_len);
 	} else {
 		int res;
-		zval *keytmp;
-		ALLOC_ZVAL(keytmp);
-
-		*keytmp = *key;
-		zval_copy_ctor(keytmp);
-		INIT_PZVAL(keytmp);
-		convert_to_string(keytmp);
-
-		res = mmc_prepare_key_ex(Z_STRVAL_P(keytmp), Z_STRLEN_P(keytmp), result, result_len);
-
-		zval_dtor(keytmp);
-		FREE_ZVAL(keytmp);
+		zval keytmp = *key;
 		
+		zval_copy_ctor(&keytmp);
+		INIT_PZVAL(&keytmp);
+		convert_to_string(&keytmp);
+
+		res = mmc_prepare_key_ex(Z_STRVAL(keytmp), Z_STRLEN(keytmp), result, result_len);
+
+		zval_dtor(&keytmp);
 		return res;
 	}
 }

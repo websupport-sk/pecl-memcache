@@ -22,7 +22,9 @@ $memcache2->set($balanceKey2, '', false, 2);
 $result1 = $memcache->set($balanceKey1, $var1, false, 2);	// hashes to $host2
 $result2 = $memcache->set($balanceKey2, $var2, false, 2);	// hashes to $host1
 $result3 = $memcache->get(array($balanceKey1, $balanceKey2));
-sort($result3);
+
+if (is_array($result3))
+	sort($result3);
 
 var_dump($result1);
 var_dump($result2);

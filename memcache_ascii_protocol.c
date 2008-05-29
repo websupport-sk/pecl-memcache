@@ -29,7 +29,7 @@
 typedef struct mmc_ascii_request {
 	mmc_request_t	base;							/* enable cast to mmc_request_t */
 	struct {										/* stores value info while the body is being read */
-		char			key[MMC_MAX_KEY_LEN + 1];	/* key buffer to use on failover of single-key requests */
+		char			key[MMC_MAX_KEY_LEN + 1];
 		unsigned int	flags;
 		unsigned long	length;
 		unsigned long	cas;						/* CAS counter */
@@ -104,8 +104,32 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 }
 /* }}}*/
 
+static int mmc_request_parse_mutate(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
+	reads and parses the <long-value> response header {{{ */
+{
+	char *line;
+	int line_len;
+	
+	line_len = mmc_stream_get_line(request->io, &line TSRMLS_CC);
+	if (line_len > 0) {
+		long lval;
+		zval value;
+		
+		if (sscanf(line, "%lu", &lval) < 1) {
+			return mmc_server_failure(mmc, request->io, "Malformed VALUE header", 0 TSRMLS_CC);
+		}
+		
+		INIT_PZVAL(&value);
+		ZVAL_LONG(&value, lval);
+		return request->value_handler(request->key, request->key_len, &value, 0, 0, request->value_handler_param TSRMLS_CC);
+	}
+	
+	return MMC_REQUEST_MORE;
+}
+/* }}}*/
+
 static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
-	reads and parses the VALUE <key> <flags> <size> <cas> header and then reads the value body {{{ */
+	reads and parses the VALUE <key> <flags> <size> <cas> response header and then reads the value body {{{ */
 {
 	char *line;
 	int line_len;
@@ -152,6 +176,11 @@ static int mmc_server_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /
 			mmc, request, &(request->readbuf), req->value.key, strlen(req->value.key), 
 			req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
 		
+		/* request more data (END line) */
+		if (result == MMC_REQUEST_DONE) {
+			return MMC_REQUEST_AGAIN;
+		}
+		
 		return result;
 	}
 	
@@ -165,6 +194,10 @@ static mmc_request_t *mmc_ascii_create_request() /* {{{ */
 	memset(request, 0, sizeof(*request));
 	return (mmc_request_t *)request;
 }
+/* }}} */
+
+static void mmc_ascii_clone_request(mmc_request_t *clone, mmc_request_t *request) /* {{{ */ 
+{}
 /* }}} */
 
 static void mmc_ascii_reset_request(mmc_request_t *request) /* {{{ */ 
@@ -287,9 +320,9 @@ static void mmc_ascii_delete(mmc_request_t *request, const char *key, unsigned i
 }
 /* }}} */
 
-static void mmc_ascii_mutate(mmc_request_t *request, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime) /* {{{ */
+static void mmc_ascii_mutate(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime) /* {{{ */
 {
-	request->parse = mmc_request_parse_response;
+	request->parse = mmc_request_parse_mutate;
 	
 	if (value >= 0) {
 		smart_str_appendl(&(request->sendbuf.value), "incr", sizeof("incr")-1);
@@ -350,6 +383,7 @@ static void mmc_ascii_stats(mmc_request_t *request, const char *type, long slabi
 
 mmc_protocol_t mmc_ascii_protocol = {
 	mmc_ascii_create_request,
+	mmc_ascii_clone_request,
 	mmc_ascii_reset_request,
 	mmc_request_free,
 	mmc_ascii_get,

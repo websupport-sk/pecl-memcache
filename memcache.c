@@ -509,35 +509,6 @@ static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, int response,
 }
 /* }}} */
 
-static int mmc_numeric_handler(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC) /* 
-	parses a numeric response line, param is a zval pointer to store result into {{{ */
-{
-	/* must contain digit(s) */
-	if (message_len < 1) {
-		return mmc_request_failure(mmc, request->io, message, message_len, 0 TSRMLS_CC);
-	}
-	
-	/* append return value to result array */
-	if (param != NULL) {
-		if (Z_TYPE_P((zval *)param) == IS_NULL) {
-			array_init((zval *)param);
-		}
-		
-		if (Z_TYPE_P((zval *)param) == IS_ARRAY) {
-			zval *result;
-			MAKE_STD_ZVAL(result);
-			ZVAL_LONG(result, atol(message));
-			add_assoc_zval_ex((zval *)param, request->key, request->key_len + 1, result);
-		}
-		else {
-			ZVAL_LONG((zval *)param, atol(message));
-		}
-	}
-	
-	return MMC_REQUEST_DONE;
-}
-/* }}} */
-
 static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int invert) /* 
 	sends one or several commands which have a single optional numeric parameter (incr, decr, delete) {{{ */
 {
@@ -548,7 +519,8 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 	long value = 1, defval = 0, exptime = 0;
 	mmc_request_t *request;
 	mmc_request_response_handler response_handler;
-
+	void *value_handler_param[3];
+	                          
 	if (mmc_object == NULL) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz|lll", &mmc_object, memcache_pool_ce, &keys, &value, &defval, &exptime) == FAILURE) {
 			return;
@@ -567,16 +539,16 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 	if (deleted) {
 		response_handler = mmc_deleted_handler;
 	}
-	else {
-		response_handler = mmc_numeric_handler;
-	}
 
+	ZVAL_NULL(return_value);
+	value_handler_param[0] = return_value;
+	value_handler_param[1] = NULL;
+	value_handler_param[2] = NULL;
+	
 	if (Z_TYPE_P(keys) == IS_ARRAY) {
 		zval **key;
 		HashPosition pos;
 		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(keys), &pos);
-
-		RETVAL_NULL();
 		
 		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(keys), (void **)&key, &pos) == SUCCESS) {
 			zend_hash_move_forward_ex(Z_ARRVAL_P(keys), &pos);
@@ -593,6 +565,9 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 					mmc_pool_failover_handler, NULL TSRMLS_CC);
 			}
 
+			request->value_handler = mmc_value_handler_multi;
+			request->value_handler_param = value_handler_param;
+			
 			if (mmc_prepare_key(*key, request->key, &(request->key_len)) != MMC_OK) {
 				mmc_pool_release(pool, request);
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
@@ -603,7 +578,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 				pool->protocol->delete(request, request->key, request->key_len, value);
 			}
 			else {
-				pool->protocol->mutate(request, request->key, request->key_len, invert ? -value : value, defval, exptime);
+				pool->protocol->mutate(request, *key, request->key, request->key_len, invert ? -value : value, defval, exptime);
 			}
 
 			/* schedule request */
@@ -627,6 +602,9 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 		request = mmc_pool_request(pool, MMC_PROTO_TCP, 
 			response_handler, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
 
+		request->value_handler = mmc_value_handler_single;
+		request->value_handler_param = value_handler_param;
+		
 		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {
 			mmc_pool_release(pool, request);
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
@@ -637,7 +615,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 			pool->protocol->delete(request, request->key, request->key_len, value);
 		}
 		else {
-			pool->protocol->mutate(request, request->key, request->key_len, invert ? -value : value, defval, exptime);
+			pool->protocol->mutate(request, keys, request->key, request->key_len, invert ? -value : value, defval, exptime);
 		}
 		
 		/* schedule request */
@@ -725,20 +703,6 @@ static mmc_t *php_mmc_pool_addserver(
 		return NULL;
 	}
 
-	/* lazy initialization of server struct */
-	if (persistent && status) {
-		mmc = mmc_find_persistent(host, host_len, tcp_port, udp_port, timeout, retry_interval TSRMLS_CC);
-	}
-	else {
-		mmc = mmc_server_new(host, host_len, tcp_port, udp_port, 0, timeout, retry_interval TSRMLS_CC);
-	}
-
-	/* add server in failed mode */
-	if (!status) {
-		mmc->tcp.status = MMC_STATUS_FAILED;
-		mmc->udp.status = MMC_STATUS_FAILED;
-	}
-
 	/* initialize pool if need be */
 	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
 		pool = mmc_pool_new(TSRMLS_C);
@@ -752,6 +716,26 @@ static mmc_t *php_mmc_pool_addserver(
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown connection identifier");
 			return NULL;
 		}
+	}
+	
+	/* binary protocol isn't support over UDP yet */
+	if (udp_port && pool->protocol == &mmc_binary_protocol) {
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "binary protocol isn't support over UDP, defaulting to TCP");
+		udp_port = 0;
+	}
+	
+	/* lazy initialization of server struct */
+	if (persistent && status) {
+		mmc = mmc_find_persistent(host, host_len, tcp_port, udp_port, timeout, retry_interval TSRMLS_CC);
+	}
+	else {
+		mmc = mmc_server_new(host, host_len, tcp_port, udp_port, 0, timeout, retry_interval TSRMLS_CC);
+	}
+
+	/* add server in failed mode */
+	if (!status) {
+		mmc->tcp.status = MMC_STATUS_FAILED;
+		mmc->udp.status = MMC_STATUS_FAILED;
 	}
 
 	mmc_pool_add(pool, mmc, weight);
@@ -1403,14 +1387,14 @@ PHP_FUNCTION(memcache_prepend)
 }
 /* }}} */
 
-static int mmc_value_handler_multi(
-	const char *key, unsigned int key_len, void *value, unsigned int value_len, 
+int mmc_value_handler_multi(
+	const char *key, unsigned int key_len, zval *value, 
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC) /* 
 	receives a multiple values, param is a zval** array to store value and flags in {{{ */
 {
 	zval *arrval, **result = (zval **)param;
 	ALLOC_ZVAL(arrval);
-	*((zval *)arrval) = *((zval *)value);
+	*((zval *)arrval) = *value;
 	
 	/* add value to result */
 	if (Z_TYPE_P(result[0]) != IS_ARRAY) {
@@ -1434,18 +1418,17 @@ static int mmc_value_handler_multi(
 		add_assoc_long_ex(result[2], (char *)key, key_len + 1, cas);
 	}
 	
-	/* request more data (more values or END line) */
-	return MMC_REQUEST_AGAIN;
+	return MMC_REQUEST_DONE;
 }
 /* }}} */
 
 int mmc_value_handler_single(
-	const char *key, unsigned int key_len, void *value, unsigned int value_len, 
+	const char *key, unsigned int key_len, zval *value, 
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC) /* 
 	receives a single value, param is a zval pointer to store value to {{{ */
 {
 	zval **result = (zval **)param;
-	*(result[0]) = *((zval *)value);
+	*(result[0]) = *value;
 	
 	if (result[1] != NULL) {
 		ZVAL_LONG(result[1], flags);
@@ -1455,8 +1438,7 @@ int mmc_value_handler_single(
 		ZVAL_LONG(result[2], cas);
 	}
 
-	/* request more data (END line) */
-	return MMC_REQUEST_AGAIN;
+	return MMC_REQUEST_DONE;
 }
 /* }}} */
 
@@ -1573,6 +1555,10 @@ static int mmc_stats_handler(mmc_t *mmc, mmc_request_t *request, int response, c
 	if (response != MMC_RESPONSE_ERROR) 
 	{
 		char *line = (char *)message;
+		
+		if(!message_len) {
+			return MMC_REQUEST_DONE;
+		}
 		
 		if (mmc_str_left(line, "RESET", message_len, sizeof("RESET")-1)) {
 			ZVAL_TRUE((zval *)param);

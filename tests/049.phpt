@@ -1,7 +1,7 @@
 --TEST--
 memcache->append(), memcache->prepend()
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
+<?php include 'connect.inc'; if (ini_get('memcache.protocol') == 'binary') die('skip binary protocol doesn\'t support append/prepend'); ?>
 --FILE--
 <?php
 
