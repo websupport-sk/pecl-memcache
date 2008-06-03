@@ -149,7 +149,7 @@ PS_OPEN_FUNC(memcache)
 				}
 			}
 
-			mmc_pool_add(pool, mmc, 1);
+			mmc_pool_add(pool, mmc, weight);
 			php_url_free(url);
 		}
 	}
