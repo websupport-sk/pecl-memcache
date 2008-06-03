@@ -37,6 +37,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Updated binary protocol to be compatible with memcached 1.3.0
+    - Added memcached stats script from Harun Yayli (http://livebookmark.net/memcachephp)
     - Fixed PECL bug #13343 (compilation breaks with CodeWarrior compiler)
     - Fixed PECL bug #13546 (Session handler through unix socket)
     - Fixed PECL bug #13592 (error in opcode)
@@ -62,6 +63,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="memcache_pool.h" role="src" />
       <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />
+      <file name="memcache.php" role="doc" />
     </dir>
   </contents>
   <dependencies>
