@@ -149,20 +149,30 @@ void mmc_request_free(mmc_request_t *request)  /* {{{ */
 static inline int mmc_request_send(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* {{{ */
 {
 	/* send next chunk of buffer */
-	request->sendbuf.idx += php_stream_write(
-		request->io->stream, request->sendbuf.value.c + request->sendbuf.idx, 
-		request->sendbuf.value.len - request->sendbuf.idx);
+	int count = request->sendbuf.value.len - request->sendbuf.idx;
+	if (count > request->io->stream->chunk_size) {
+		count = request->io->stream->chunk_size;
+	}
+
+	int bytes = send(request->io->fd, request->sendbuf.value.c + request->sendbuf.idx, count, 0);
 	
-	/* done sending? */
-	if (request->sendbuf.idx >= request->sendbuf.value.len) {
-		return MMC_REQUEST_DONE;
+	if (bytes >= 0) {
+		request->sendbuf.idx += bytes;
+		
+		/* done sending? */
+		if (request->sendbuf.idx >= request->sendbuf.value.len) {
+			return MMC_REQUEST_DONE;
+		}
+		
+		return MMC_REQUEST_MORE;
+	}
+
+	long err = php_socket_errno();
+	if (err == EAGAIN) {
+		return MMC_REQUEST_MORE;
 	}
 	
-	if (php_stream_eof(request->io->stream)) {
-		return mmc_server_failure(mmc, request->io, "Write failed (socket was unexpectedly closed)", 0 TSRMLS_CC);
-	}
-	
-	return MMC_REQUEST_MORE;
+	return mmc_server_failure(mmc, request->io, "Write failed (socket unexpectedly closed)", err TSRMLS_CC);
 }
 /* }}} */
 
