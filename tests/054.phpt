@@ -8,7 +8,6 @@ memcache->set() with value larger than MTU
 include 'connect.inc';
 
 ini_set('memcache.chunk_size', 32768);
-$memcache = memcache_connect('192.168.0.5', 11211);
 $memcache->setCompressThreshold(1000000, 1.0);
 
 $value = str_repeat('a', 64 * 1024);
