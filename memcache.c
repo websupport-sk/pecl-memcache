@@ -544,7 +544,6 @@ int mmc_prepare_key(zval *key, char *result, unsigned int *result_len TSRMLS_DC)
 
 		*keytmp = *key;
 		zval_copy_ctor(keytmp);
-		INIT_PZVAL(keytmp);
 		convert_to_string(keytmp);
 
 		res = mmc_prepare_key_ex(Z_STRVAL_P(keytmp), Z_STRLEN_P(keytmp), result, result_len TSRMLS_CC);
@@ -1738,24 +1737,24 @@ static int mmc_incr_decr(mmc_t *mmc, int cmd, char *key, int key_len, int value,
 static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int command_len) /* {{{ */
 {
 	mmc_pool_t *pool;
-	zval *var, *mmc_object = getThis();
+	zval *value, *mmc_object = getThis();
 
-	int result, value_len, key_len;
-	char *value, *key;
+	int result, key_len;
+	char *key;
 	long flags = 0, expire = 0;
 	char key_tmp[MMC_KEY_MAX_SIZE];
 	unsigned int key_tmp_len;
 
-	php_serialize_data_t var_hash;
+	php_serialize_data_t value_hash;
 	smart_str buf = {0};
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Osz|ll", &mmc_object, memcache_class_entry_ptr, &key, &key_len, &var, &flags, &expire) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Osz|ll", &mmc_object, memcache_class_entry_ptr, &key, &key_len, &value, &flags, &expire) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|ll", &key, &key_len, &var, &flags, &expire) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|ll", &key, &key_len, &value, &flags, &expire) == FAILURE) {
 			return;
 		}
 	}
@@ -1768,48 +1767,58 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 		RETURN_FALSE;
 	}
 
-	switch (Z_TYPE_P(var)) {
+	switch (Z_TYPE_P(value)) {
 		case IS_STRING:
-			value = Z_STRVAL_P(var);
-			value_len = Z_STRLEN_P(var);
+			result = mmc_pool_store(
+				pool, command, command_len, key_tmp, key_tmp_len, flags, expire, 
+				Z_STRVAL_P(value), Z_STRLEN_P(value) TSRMLS_CC);
 			break;
 
 		case IS_LONG:
 		case IS_DOUBLE:
-		case IS_BOOL:
-			convert_to_string(var);
-			value = Z_STRVAL_P(var);
-			value_len = Z_STRLEN_P(var);
-			break;
-
-		default: {
-			zval var_copy, *var_copy_ptr;
+		case IS_BOOL: {
+			zval value_copy;
 
 			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
-			var_copy = *var;
-			zval_copy_ctor(&var_copy);
+			value_copy = *value;
+			zval_copy_ctor(&value_copy);
+			convert_to_string(&value_copy);
 
-			var_copy_ptr = &var_copy;
+			result = mmc_pool_store(
+				pool, command, command_len, key_tmp, key_tmp_len, flags, expire, 
+				Z_STRVAL(value_copy), Z_STRLEN(value_copy) TSRMLS_CC);
 
-			PHP_VAR_SERIALIZE_INIT(var_hash);
-			php_var_serialize(&buf, &var_copy_ptr, &var_hash TSRMLS_CC);
-			PHP_VAR_SERIALIZE_DESTROY(var_hash);
+			zval_dtor(&value_copy);
+			break;
+		}
+
+		default: {
+			zval value_copy, *value_copy_ptr;
+
+			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
+			value_copy = *value;
+			zval_copy_ctor(&value_copy);
+			value_copy_ptr = &value_copy;
+
+			PHP_VAR_SERIALIZE_INIT(value_hash);
+			php_var_serialize(&buf, &value_copy_ptr, &value_hash TSRMLS_CC);
+			PHP_VAR_SERIALIZE_DESTROY(value_hash);
 
 			if (!buf.c) {
 				/* something went really wrong */
-				zval_dtor(&var_copy);
+				zval_dtor(&value_copy);
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to serialize value");
 				RETURN_FALSE;
 			}
 
-			value = buf.c;
-			value_len = buf.len;
 			flags |= MMC_SERIALIZED;
-			zval_dtor(&var_copy);
-		}
-			break;
-	}
+			zval_dtor(&value_copy);
 
-	result = mmc_pool_store(pool, command, command_len, key_tmp, key_tmp_len, flags, expire, value, value_len TSRMLS_CC);
+			result = mmc_pool_store(
+				pool, command, command_len, key_tmp, key_tmp_len, flags, expire, 
+				buf.c, buf.len TSRMLS_CC);
+		}
+	}
 
 	if (flags & MMC_SERIALIZED) {
 		smart_str_free(&buf);

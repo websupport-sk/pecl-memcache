@@ -40,6 +40,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     - Fixed server weight not being used in the session handler
     - Fixed PECL bug #13343 (compilation breaks with CodeWarrior compiler)
     - Fixed PECL bug #13546 (Session handler through unix socket)
+    - Fixed PECL bug #14239 (Memcache::set() modifies value parameter)
   </notes>
   <contents>
     <dir name="/">
