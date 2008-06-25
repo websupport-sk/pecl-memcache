@@ -44,6 +44,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     - Fixed PECL bug #13592 (error in opcode)
     - Fixed PECL req #13588 (minor inefficiency in binary protocol implementation)
     - Fixed PECL bug #14044 (send of 32768 bytes failed with errno=11 Resource temporarily unavailable)
+    - Fixed PECL bug #14239 (Memcache::set() modifies value parameter)
   </notes>
   <contents>
     <dir name="/">

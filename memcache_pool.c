@@ -323,11 +323,20 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 
 		case IS_LONG:
 		case IS_DOUBLE:
-		case IS_BOOL:
+		case IS_BOOL: {
+			zval value_copy;
 			*flags &= ~MMC_SERIALIZED;
-			convert_to_string(value);
-			mmc_compress(pool, buffer, Z_STRVAL_P(value), Z_STRLEN_P(value), flags, 0 TSRMLS_CC); 
+			
+			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
+			value_copy = *value;
+			zval_copy_ctor(&value_copy);
+			convert_to_string(&value_copy);
+			
+			mmc_compress(pool, buffer, Z_STRVAL(value_copy), Z_STRLEN(value_copy), flags, 0 TSRMLS_CC); 
+			
+			zval_dtor(&value_copy);
 			break;
+		}
 
 		default: {
 			php_serialize_data_t value_hash;
@@ -1537,7 +1546,6 @@ inline int mmc_prepare_key(zval *key, char *result, unsigned int *result_len)  /
 		zval keytmp = *key;
 		
 		zval_copy_ctor(&keytmp);
-		INIT_PZVAL(&keytmp);
 		convert_to_string(&keytmp);
 
 		res = mmc_prepare_key_ex(Z_STRVAL(keytmp), Z_STRLEN(keytmp), result, result_len);
