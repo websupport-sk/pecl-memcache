@@ -376,7 +376,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 {
 	mmc_pool_t *pool;
 	mmc_request_t *request;
-	zval *keys, *value, *mmc_object = getThis();
+	zval *keys, *value = 0, *mmc_object = getThis();
 	long flags = 0, exptime = 0, cas = 0;
 
 	if (mmc_object == NULL) {
@@ -457,7 +457,8 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 			mmc_pool_select(pool, 0 TSRMLS_CC);
 		}
 	}
-	else {
+	else if (value) {
+		
 		/* allocate request */
 		request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_stored_handler, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
 
@@ -477,6 +478,9 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(redundancy) TSRMLS_CC) != MMC_OK) {
 			RETURN_FALSE;
 		}
+	}
+	else {
+		WRONG_PARAM_COUNT;
 	}
 	
 	/* execute all requests */

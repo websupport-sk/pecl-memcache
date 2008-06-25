@@ -19,10 +19,17 @@ memcache_set($memcache, $key, $value, false, 10);
 var_dump($key);
 var_dump($value);
 
+memcache_set($memcache, $key);
+$memcache->set($key);
+
 echo "Done\n";
 
 ?>
---EXPECT--
+--EXPECTF--
 int(123)
 int(123)
+
+Warning: %s parameter%s
+
+Warning: %s parameter%s
 Done
