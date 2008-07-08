@@ -725,7 +725,7 @@ int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const
 		unsigned long data_len;
 
 		if (!mmc_compress(&data, &data_len, value, value_len TSRMLS_CC)) {
-			mmc_server_seterror(mmc, "Failed to compress data", 0);
+			/* mmc_server_seterror(mmc, "Failed to compress data", 0); */
 			return -1;
 		}
 
