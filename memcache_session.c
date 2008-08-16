@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Authors: Antony Dovgal <tony2001@phpclub.net>                        |
+  | Authors: Antony Dovgal <tony@daylessday.org>                         |
   |          Mikael Johansson <mikael AT synd DOT info>                  |
   +----------------------------------------------------------------------+
 */
