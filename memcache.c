@@ -405,7 +405,7 @@ static void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 	mmc->failure_callback = NULL;
 	
 	if (mmc->error != NULL) {
-		efree(mmc->error);
+		pefree(mmc->error, mmc->persistent);
 		mmc->error = NULL;
 	}
 }
@@ -440,10 +440,10 @@ static void mmc_server_seterror(mmc_t *mmc, const char *error, int errnum) /* {{
 {
 	if (error != NULL) {
 		if (mmc->error != NULL) {
-			efree(mmc->error);
+			pefree(mmc->error, mmc->persistent);
 		}
 		
-		mmc->error = estrdup(error);
+		mmc->error = pestrdup(error, mmc->persistent);
 		mmc->errnum = errnum;
 	}
 }
@@ -959,7 +959,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	mmc->status = MMC_STATUS_CONNECTED;
 
 	if (mmc->error != NULL) {
-		efree(mmc->error);
+		pefree(mmc->error, mmc->persistent);
 		mmc->error = NULL;
 	}
 
