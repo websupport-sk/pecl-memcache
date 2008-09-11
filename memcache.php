@@ -25,15 +25,16 @@ define('DATE_FORMAT','Y/m/d H:i:s');
 define('GRAPH_SIZE',200);
 define('MAX_ITEM_DUMP',50);
 
-$MEMCACHE_SERVERS[] = 'mymemcache-server:11211'; // add more as an array
+$MEMCACHE_SERVERS[] = 'mymemcache-server1:11211'; // add more as an array
 $MEMCACHE_SERVERS[] = 'mymemcache-server2:11211'; // add more as an array
+
 
 ////////// END OF DEFAULT CONFIG AREA /////////////////////////////////////////////////////////////
 
 ///////////////// Password protect ////////////////////////////////////////////////////////////////
 if (!isset($_SERVER['PHP_AUTH_USER']) || !isset($_SERVER['PHP_AUTH_PW']) ||
            $_SERVER['PHP_AUTH_USER'] != ADMIN_USERNAME ||$_SERVER['PHP_AUTH_PW'] != ADMIN_PASSWORD) {
-			Header("WWW-Authenticate: Basic realm=\"APC Login\"");
+			Header("WWW-Authenticate: Basic realm=\"Memcache Login\"");
 			Header("HTTP/1.0 401 Unauthorized");
 
 			echo <<<EOB
@@ -61,7 +62,7 @@ function sendMemcacheCommands($command){
 }
 function sendMemcacheCommand($server,$port,$command){
 
-	$s = fsockopen($server,$port);
+	$s = @fsockopen($server,$port);
 	if (!$s){
 		die("Cant connect to:".$server.':'.$port);
 	}
@@ -69,13 +70,23 @@ function sendMemcacheCommand($server,$port,$command){
 	fwrite($s, $command."\r\n");
 
 	$buf='';
-	while (!feof($s) && strpos($buf,"END\r\n")===false) {
+	while ((!feof($s))) {
 		$buf .= fgets($s, 256);
+		if (strpos($buf,"END\r\n")!==false){ // stat says end
+		    break;
+		}
+		if (strpos($buf,"DELETED\r\n")!==false || strpos($buf,"NOT_FOUND\r\n")!==false){ // delete says these
+		    break;
+		}
+		if (strpos($buf,"OK\r\n")!==false){ // flush_all says ok
+		    break;
+		}
 	}
     fclose($s);
     return parseMemcacheResults($buf);
 }
 function parseMemcacheResults($str){
+    
 	$res = array();
 	$lines = explode("\r\n",$str);
 	$cnt = count($lines);
@@ -90,6 +101,8 @@ function parseMemcacheResults($str){
 			    $res[$l[0]][$l[1]]['stat']=array('flag'=>$flag,'size'=>$size);
 			    $res[$l[0]][$l[1]]['value']=$lines[++$i];
 			}
+		}elseif($line=='DELETED' || $line=='NOT_FOUND' || $line=='OK'){
+		    return $line;
 		}
 	}
 	return $res;
@@ -102,6 +115,12 @@ function dumpCacheSlab($server,$slabId,$limit){
 
    return $resp;
 
+}
+
+function flushServer($server){
+    list($host,$port) = explode(':',$server);
+    $resp = sendMemcacheCommand($host,$port,'flush_all');
+    return $resp;
 }
 function getCacheItems(){
  $items = sendMemcacheCommands('stats items');
@@ -463,7 +482,8 @@ EOB;
     return $header;
 }
 function getFooter(){
-    $footer = '</div><!-- Based on apc.php --></body>
+    global $VERSION;
+    $footer = '</div><!-- Based on apc.php '.$VERSION.'--></body>
 </html>
 ';
 
@@ -608,7 +628,6 @@ if (isset($_GET['IMG'])){
     		$fuzz = 0.000001;
 
             foreach($memcacheStatsSingle as $serv=>$mcs) {
-//    		    print_r($mcs);
     			$free = $mcs['STAT']['limit_maxbytes']-$mcs['STAT']['bytes'];
     			$used = $mcs['STAT']['bytes'];
 
@@ -625,7 +644,6 @@ if (isset($_GET['IMG'])){
     			// draw used
         			$angle_to = ($used*360)/$tsize;
         			$perc =sprintf("%.2f%%", ($used *100) / $tsize) ;
-//        			echo 'Used:(',$used,'/',$tsize,')',$angle_from,':',$angle_from + $angle_to,"\n";
         			fill_arc($image,$x,$y,$size,$angle_from,$angle_from + $angle_to ,$col_black,$col_red, '('.$perc.')' );
                     $angle_from = $angle_from+ $angle_to ;
     			}
@@ -642,7 +660,7 @@ if (isset($_GET['IMG'])){
 	       	fill_box($image, 30,$size,50,-$hits*($size-21)/$total,$col_black,$col_green,sprintf("%.1f%%",$hits*100/$total));
 		    fill_box($image,130,$size,50,-max(4,($total-$hits)*($size-21)/$total),$col_black,$col_red,sprintf("%.1f%%",$misses*100/$total));
 		break;
-
+		
     }
     header("Content-type: image/png");
 	imagepng($image);
@@ -675,11 +693,7 @@ switch ($_GET['op']) {
 	    $miss_rate = sprintf("%.2f",($misses)/($time-$startTime));
 	    $set_rate = sprintf("%.2f",($sets)/($time-$startTime));
 
-
-
-
-
-    	echo <<< EOB
+	    echo <<< EOB
 		<div class="info div1"><h2>General Cache Information</h2>
 		<table cellspacing=0><tbody>
 		<tr class=tr-1><td class=td-0>PHP Version</td><td>$phpversion</td></tr>
@@ -708,7 +722,7 @@ EOB;
 EOB;
         foreach($MEMCACHE_SERVERS as $server){
             echo '<table cellspacing=0><tbody>';
-            echo '<tr class=tr-1><td class=td-1 colspan="2">'.$server.'</td></tr>';
+            echo '<tr class=tr-1><td class=td-1>'.$server.'</td><td><a href="'.$PHP_SELF.'&server='.array_search($server,$MEMCACHE_SERVERS).'&op=6">[<b>Flush this server</b>]</a></td></tr>';
     		echo '<tr class=tr-0><td class=td-0>Start Time</td><td>',date(DATE_FORMAT,$memcacheStatsSingle[$server]['STAT']['time']-$memcacheStatsSingle[$server]['STAT']['uptime']),'</td></tr>';
     		echo '<tr class=tr-1><td class=td-0>Uptime</td><td>',duration($memcacheStatsSingle[$server]['STAT']['time']-$memcacheStatsSingle[$server]['STAT']['uptime']),'</td></tr>';
     		echo '<tr class=tr-0><td class=td-0>Memcached Server Version</td><td>'.$memcacheStatsSingle[$server]['STAT']['version'].'</td></tr>';
@@ -785,7 +799,7 @@ EOB;
 				echo
 					"<tr class=tr-$m>",
 					"<td class=td-0><center>",'<a href="',$dumpUrl,'">',$slabId,'</a>',"</center></td>",
-					"<td class=td-last><b>Item count:</b> ",$slab['number'],'<br/><b>Age:</b>',duration($time-$slab['age']),'<br/> <b>Evicted:</b>',($slab['evicted']==1? 'Yes':'No');
+					"<td class=td-last><b>Item count:</b> ",$slab['number'],'<br/><b>Age:</b>',duration($time-$slab['age']),'<br/> <b>Evicted:</b>',((isset($slab['evicted']) && $slab['evicted']==1)? 'Yes':'No');
 					if ((isset($_GET['dumpslab']) && $_GET['dumpslab']==$slabId) &&  (isset($_GET['server']) && $_GET['server']==array_search($server,$MEMCACHE_SERVERS))){
 					    echo "<br/><b>Items: item</b><br/>";
 					    $items = dumpCacheSlab($server,$slabId,$slab['number']);
@@ -832,17 +846,35 @@ EOB;
         $r = sendMemcacheCommand($h,$p,'get '.$theKey);
         echo <<<EOB
         <div class="info"><table cellspacing=0><tbody>
-			<tr><th>Server<th>Key</th><th>Value</th></tr>
+			<tr><th>Server<th>Key</th><th>Value</th><th>Delete</th></tr>
 EOB;
         echo "<tr><td class=td-0>",$theserver,"</td><td class=td-0>",$theKey,
              " <br/>flag:",$r['VALUE'][$theKey]['stat']['flag'],
              " <br/>Size:",bsize($r['VALUE'][$theKey]['stat']['size']),
-             "</td><td>",chunk_split($r['VALUE'][$theKey]['value'],40),"</td></tr>";
+             "</td><td>",chunk_split($r['VALUE'][$theKey]['value'],40),"</td>",
+             '<td><a href="',$PHP_SELF,'&op=5&server=',(int)$_GET['server'],'&key=',base64_encode($theKey),"\">Delete</a></td>","</tr>";
         echo <<<EOB
 			</tbody></table>
 			</div><hr/>
 EOB;
     break;
+    case 5: // item delete
+    	if (!isset($_GET['key']) || !isset($_GET['server'])){
+			echo "No key set!";
+			break;
+        }
+        $theKey = htmlentities(base64_decode($_GET['key']));
+		$theserver = $MEMCACHE_SERVERS[(int)$_GET['server']];
+		list($h,$p) = explode(':',$theserver);
+        $r = sendMemcacheCommand($h,$p,'delete '.$theKey);
+        echo 'Deleting '.$theKey.':'.$r;
+	break;
+    
+   case 6: // flush server
+        $theserver = $MEMCACHE_SERVERS[(int)$_GET['server']];
+        $r = flushServer($theserver);
+        echo 'Flush  '.$theserver.":".$r;
+   break;
 }
 echo getFooter();
 
