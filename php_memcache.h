@@ -64,7 +64,7 @@ PHP_FUNCTION(memcache_decrement);
 PHP_FUNCTION(memcache_close);
 PHP_FUNCTION(memcache_flush);
 
-#define PHP_MEMCACHE_VERSION "3.0.2-dev"
+#define PHP_MEMCACHE_VERSION "3.0.2"
 
 #define MMC_DEFAULT_TIMEOUT 1				/* seconds */
 #define MMC_DEFAULT_RETRY 15 				/* retry failed server after x seconds */

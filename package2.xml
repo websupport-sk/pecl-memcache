@@ -25,7 +25,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2008-xx-xx</date>
+  <date>2008-09-11</date>
   <version>
     <release>3.0.2</release>
     <api>3.0.2</api>
@@ -49,6 +49,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     - Fixed PECL bug #14458 (off-by-one causes corrupted arrays in 3.0.x)
     - Fixed PECL bug #14104 (Malformed VALUE header (0))
     - Fixed PECL request #13725 (unnecessary allocations in mmc_consistent_add_server)
+    - Changed behaviour when unserialize/uncompress fail to return false instead of failing the server
   </notes>
   <contents>
     <dir name="/">
