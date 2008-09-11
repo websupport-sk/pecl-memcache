@@ -383,7 +383,8 @@ int mmc_unpack_value(
 	
 	if (flags & MMC_COMPRESSED) {
 		if (mmc_uncompress(buffer->value.c, bytes, &data, &data_len) != MMC_OK) {
-			return mmc_server_failure(mmc, request->io, "Failed to uncompress data", 0 TSRMLS_CC);
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Failed to uncompress data");
+			return MMC_REQUEST_DONE;
 		}
 	}
 	else {
@@ -425,7 +426,8 @@ int mmc_unpack_value(
 				mmc_buffer_free(&buffer_tmp);
 			}
 
-			return mmc_server_failure(mmc, request->io, "Failed to unserialize data", 0 TSRMLS_CC);
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Failed to unserialize data");
+			return MMC_REQUEST_DONE;
 		}
 
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
