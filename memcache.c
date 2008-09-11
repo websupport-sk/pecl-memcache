@@ -1217,7 +1217,8 @@ static int mmc_postprocess_value(zval **return_value, char *value, int value_len
 		ZVAL_FALSE(*return_value);
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 		efree(value);
-		return -1;
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "unable to unserialize data");
+		return 0;
 	}
 
 	PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
@@ -1431,7 +1432,8 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, char **value, in
 				efree(*key);
 			}
 			efree(data);
-			return -1;
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "unable to uncompress data");
+			return 0;
 		}
 
 		efree(data);
