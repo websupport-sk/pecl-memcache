@@ -104,7 +104,10 @@ var_dump($result);
 // Array keys
 $memcache->set('test_key', 'value');
 $v = $memcache->get(array('test_key'));
-print_r($v['test_key']);
+var_dump($v['test_key']);
+
+// Long keys
+var_dump(memcache_increment($memcache, 'forum_thread.php_55461ANDis_show=1ORDERBYis_topDESC,update_timeDESC_0', 1));
 
 ?>
 --EXPECTF--
@@ -169,4 +172,5 @@ array(1) {
   ["abcÿabc"]=>
   string(5) "test1"
 }
-value
+string(5) "value"
+bool(false)

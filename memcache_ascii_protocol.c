@@ -56,6 +56,46 @@ static int mmc_stream_get_line(mmc_stream_t *io, char **line TSRMLS_DC) /*
 }	
 /* }}} */
 
+static int mmc_request_check_response(const char *line, int line_len) /* 
+	checks for response status and error codes {{{ */
+{
+	int response;
+
+	if (mmc_str_left(line, "OK", line_len, sizeof("OK")-1) ||
+		mmc_str_left(line, "STORED", line_len, sizeof("STORED")-1) ||
+		mmc_str_left(line, "DELETED", line_len, sizeof("DELETED")-1)) 
+	{
+		response = MMC_OK;
+	}
+	else if (mmc_str_left(line, "NOT_FOUND", line_len, sizeof("NOT_FOUND")-1)) {
+		response = MMC_RESPONSE_NOT_FOUND;
+	}
+	else if (
+		mmc_str_left(line, "NOT_STORED", line_len, sizeof("NOT_STORED")-1) ||
+		mmc_str_left(line, "EXISTS", line_len, sizeof("EXISTS")-1)) 
+	{
+		response = MMC_RESPONSE_EXISTS;
+	}
+	else if (mmc_str_left(line, "SERVER_ERROR out of memory", line_len, sizeof("SERVER_ERROR out of memory")-1)) {
+		response = MMC_RESPONSE_OUT_OF_MEMORY;
+	}
+	else if (mmc_str_left(line, "SERVER_ERROR object too large", line_len, sizeof("SERVER_ERROR object too large")-1)) {
+		response = MMC_RESPONSE_TOO_LARGE;
+	}
+	else if (
+		mmc_str_left(line, "ERROR", line_len, sizeof("ERROR")-1) ||
+		mmc_str_left(line, "SERVER_ERROR", line_len, sizeof("SERVER_ERROR")-1) ||
+		mmc_str_left(line, "CLIENT_ERROR", line_len, sizeof("CLIENT_ERROR")-1)) 
+	{
+		response = MMC_RESPONSE_ERROR;
+	}
+	else {
+		response = MMC_RESPONSE_UNKNOWN;
+	}
+	
+	return response;
+}
+
 static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
 	reads a generic response header and delegates it to response_handler {{{ */
 {
@@ -63,40 +103,7 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 	int line_len = mmc_stream_get_line(request->io, &line TSRMLS_CC);
 	
 	if (line_len > 0) {
-		int response;
-		
-		if (mmc_str_left(line, "OK", line_len, sizeof("OK")-1) ||
-			mmc_str_left(line, "STORED", line_len, sizeof("STORED")-1) ||
-			mmc_str_left(line, "DELETED", line_len, sizeof("DELETED")-1)) 
-		{
-			response = MMC_OK;
-		}
-		else if (mmc_str_left(line, "NOT_FOUND", line_len, sizeof("NOT_FOUND")-1)) {
-			response = MMC_RESPONSE_NOT_FOUND;
-		}
-		else if (
-			mmc_str_left(line, "NOT_STORED", line_len, sizeof("NOT_STORED")-1) ||
-			mmc_str_left(line, "EXISTS", line_len, sizeof("EXISTS")-1)) 
-		{
-			response = MMC_RESPONSE_EXISTS;
-		}
-		else if (mmc_str_left(line, "SERVER_ERROR out of memory", line_len, sizeof("SERVER_ERROR out of memory")-1)) {
-			response = MMC_RESPONSE_OUT_OF_MEMORY;
-		}
-		else if (mmc_str_left(line, "SERVER_ERROR object too large", line_len, sizeof("SERVER_ERROR object too large")-1)) {
-			response = MMC_RESPONSE_TOO_LARGE;
-		}
-		else if (
-			mmc_str_left(line, "ERROR", line_len, sizeof("ERROR")-1) ||
-			mmc_str_left(line, "SERVER_ERROR", line_len, sizeof("SERVER_ERROR")-1) ||
-			mmc_str_left(line, "CLIENT_ERROR", line_len, sizeof("CLIENT_ERROR")-1)) 
-		{
-			response = MMC_RESPONSE_ERROR;
-		}
-		else {
-			response = MMC_RESPONSE_UNKNOWN;
-		}
-		
+		int response = mmc_request_check_response(line, line_len);
 		return request->response_handler(mmc, request, response, line, line_len - (sizeof("\r\n")-1), request->response_handler_param TSRMLS_CC);
 	}
 	
@@ -114,7 +121,12 @@ static int mmc_request_parse_mutate(mmc_t *mmc, mmc_request_t *request TSRMLS_DC
 	if (line_len > 0) {
 		long lval;
 		zval value;
-		
+
+		int response = mmc_request_check_response(line, line_len);
+		if (response != MMC_RESPONSE_UNKNOWN) {
+			return request->response_handler(mmc, request, response, line, line_len - (sizeof("\r\n")-1), request->response_handler_param TSRMLS_CC);
+		}
+
 		if (sscanf(line, "%lu", &lval) < 1) {
 			return mmc_server_failure(mmc, request->io, "Malformed VALUE header", 0 TSRMLS_CC);
 		}

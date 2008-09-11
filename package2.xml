@@ -47,6 +47,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     - Fixed PECL bug #14239 (Memcache::set() modifies value parameter)
     - Fixed PECL bug #14156 (No check for parameter count in php_mmc_store)
     - Fixed PECL bug #14458 (off-by-one causes corrupted arrays in 3.0.x)
+    - Fixed PECL bug #14104 (Malformed VALUE header (0))
   </notes>
   <contents>
     <dir name="/">

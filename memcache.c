@@ -492,8 +492,8 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 }
 /* }}} */
 
-static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC) /* 
-	parses a DELETED response line, param is a zval pointer to store result into {{{ */
+static int mmc_numeric_response_handler(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC) /* 
+	handles a mutate response line, param is a zval pointer to store result into {{{ */
 {
 	if (response == MMC_OK) {
 		if (param != NULL && Z_TYPE_P((zval *)param) == IS_NULL) {
@@ -522,7 +522,6 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 	zval *keys;
 	long value = 1, defval = 0, exptime = 0;
 	mmc_request_t *request;
-	mmc_request_response_handler response_handler;
 	void *value_handler_param[3];
 	                          
 	if (mmc_object == NULL) {
@@ -540,10 +539,6 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 		RETURN_FALSE;
 	}
 	
-	if (deleted) {
-		response_handler = mmc_deleted_handler;
-	}
-
 	ZVAL_NULL(return_value);
 	value_handler_param[0] = return_value;
 	value_handler_param[1] = NULL;
@@ -560,12 +555,12 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 			/* allocate request */
 			if (return_value_used) {
 				request = mmc_pool_request(
-					pool, MMC_PROTO_TCP, response_handler, return_value, 
+					pool, MMC_PROTO_TCP, mmc_numeric_response_handler, return_value, 
 					mmc_pool_failover_handler, NULL TSRMLS_CC);
 			}
 			else {
 				request = mmc_pool_request(
-					pool, MMC_PROTO_TCP, response_handler, NULL, 
+					pool, MMC_PROTO_TCP, mmc_numeric_response_handler, NULL, 
 					mmc_pool_failover_handler, NULL TSRMLS_CC);
 			}
 
@@ -604,7 +599,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 		
 		/* allocate request */
 		request = mmc_pool_request(pool, MMC_PROTO_TCP, 
-			response_handler, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
+				mmc_numeric_response_handler, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
 
 		request->value_handler = mmc_value_handler_single;
 		request->value_handler_param = value_handler_param;
