@@ -25,7 +25,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2008-xx-xx</date>
+  <date>2008-09-11</date>
   <version>
     <release>2.2.4</release>
     <api>2.2.4</api>
@@ -42,6 +42,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     - Fixed PECL bug #13546 (Session handler through unix socket)
     - Fixed PECL bug #14239 (Memcache::set() modifies value parameter)
     - Fixed PECL request #13725 (unnecessary allocations in mmc_consistent_add_server)
+    - Changed behaviour when unserialize/uncompress fail to return false instead of failing the server
   </notes>
   <contents>
     <dir name="/">
