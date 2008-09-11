@@ -101,6 +101,11 @@ var_dump($result);
 $result = $memcache->get(array($key));
 var_dump($result);
 
+// Array keys
+$memcache->set('test_key', 'value');
+$v = $memcache->get(array('test_key'));
+print_r($v['test_key']);
+
 ?>
 --EXPECTF--
 string(4) "test"
@@ -164,3 +169,4 @@ array(1) {
   ["abcÿabc"]=>
   string(5) "test1"
 }
+value

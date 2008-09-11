@@ -396,13 +396,13 @@ int mmc_unpack_value(
 		const unsigned char *p = (unsigned char *)data;
 		zval *object = &value;
 
-		char key_tmp[MMC_MAX_KEY_LEN]; 
+		char key_tmp[MMC_MAX_KEY_LEN + 1]; 
 		mmc_request_value_handler value_handler;
 		void *value_handler_param;
 		mmc_buffer_t buffer_tmp;
 		
 		/* make copies of data to ensure re-entrancy */
-		memcpy(key_tmp, key, key_len);
+		memcpy(key_tmp, key, key_len + 1);
 		value_handler = request->value_handler;
 		value_handler_param = request->value_handler_param;
 
