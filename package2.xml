@@ -17,7 +17,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <name>Antony Dovgal</name>
     <user>tony2001</user>
     <email>tony@daylessday.org</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
   <lead>
     <name>Mikael Johansson</name>
