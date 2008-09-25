@@ -741,23 +741,7 @@ int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const
 		}
 	}
 
-	request = emalloc(
-		command_len
-		+ 1				/* space */
-		+ key_len
-		+ 1				/* space */
-		+ MAX_LENGTH_OF_LONG
-		+ 1 			/* space */
-		+ MAX_LENGTH_OF_LONG
-		+ 1 			/* space */
-		+ MAX_LENGTH_OF_LONG
-		+ sizeof("\r\n") - 1
-		+ value_len
-		+ sizeof("\r\n") - 1
-		+ 1
-		);
-
-	request_len = sprintf(request, "%s %s %d %d %d\r\n", command, key, flags, expire, value_len);
+	request_len = spprintf(&request, 0, "%s %s %d %d %d\r\n", command, key, flags, expire, value_len);
 
 	memcpy(request + request_len, value, value_len);
 	request_len += value_len;
@@ -2157,8 +2141,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 	int hash_key_len;
 
 	MMC_DEBUG(("mmc_find_persistent: seeking for persistent connection"));
-	hash_key = emalloc(sizeof("mmc_connect___") - 1 + host_len + MAX_LENGTH_OF_LONG + 1);
-	hash_key_len = sprintf(hash_key, "mmc_connect___%s:%d", host, port);
+	hash_key_len = spprintf(&hash_key, 0, "mmc_connect___%s:%d", host, port);
 
 	if (zend_hash_find(&EG(persistent_list), hash_key, hash_key_len+1, (void **) &le) == FAILURE) {
 		zend_rsrc_list_entry new_le;
@@ -2460,8 +2443,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 	for (i=0; i<pool->num_servers; i++) {
 		MAKE_STD_ZVAL(stats);
 
-		hostname = emalloc(strlen(pool->servers[i]->host) + MAX_LENGTH_OF_LONG + 1 + 1);
-		hostname_len = sprintf(hostname, "%s:%d", pool->servers[i]->host, pool->servers[i]->port);
+		hostname_len = spprintf(&hostname, 0, "%s:%d", pool->servers[i]->host, pool->servers[i]->port);
 
 		if (mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC)) {
 			if (mmc_get_stats(pool->servers[i], type, slabid, limit, stats TSRMLS_CC) < 0) {
