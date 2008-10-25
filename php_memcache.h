@@ -151,6 +151,12 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long hash_function;
 ZEND_END_MODULE_GLOBALS(memcache)
 
+#if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION >= 3)
+#   define IS_CALLABLE(cb_zv, flags, cb_sp) zend_is_callable((cb_zv), (flags), (cb_sp) TSRMLS_CC)
+#else
+#   define IS_CALLABLE(cb_zv, flags, cb_sp) zend_is_callable((cb_zv), (flags), (cb_sp))
+#endif
+
 /* internal functions */
 mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int TSRMLS_DC);
 mmc_t *mmc_find_persistent(char *, int, int, int, int TSRMLS_DC);

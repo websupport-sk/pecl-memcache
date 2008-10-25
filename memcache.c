@@ -1965,7 +1965,7 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!zend_is_callable(failure_callback, 0, NULL)) {
+		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -2049,7 +2049,7 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!zend_is_callable(failure_callback, 0, NULL)) {
+		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
