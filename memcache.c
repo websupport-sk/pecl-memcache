@@ -741,15 +741,7 @@ int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const
 		}
 	}
 
-	request_len = spprintf(&request, 0, "%s %s %d %d %d\r\n", command, key, flags, expire, value_len);
-
-	memcpy(request + request_len, value, value_len);
-	request_len += value_len;
-
-	memcpy(request + request_len, "\r\n", sizeof("\r\n") - 1);
-	request_len += sizeof("\r\n") - 1;
-
-	request[request_len] = '\0';
+	request_len = spprintf(&request, 0, "%s %s %d %d %d\r\n%s\r\n", command, key, flags, expire, value_len, value);
 
 	while (result < 0 && (mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC)) != NULL) {
 		if ((result = mmc_server_store(mmc, request, request_len TSRMLS_CC)) < 0) {
