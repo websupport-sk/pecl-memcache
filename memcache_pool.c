@@ -638,7 +638,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 
 	io->stream = php_stream_xport_create(
 		host, host_len,
-		ENFORCE_SAFE_MODE | (mmc->persistent ? STREAM_OPEN_PERSISTENT : 0), 
+		ENFORCE_SAFE_MODE | REPORT_ERRORS | (mmc->persistent ? STREAM_OPEN_PERSISTENT : 0), 
 		STREAM_XPORT_CLIENT | STREAM_XPORT_CONNECT,
 		hash_key, &tv, NULL, &errstr, &errnum);
 

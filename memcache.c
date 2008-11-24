@@ -319,7 +319,14 @@ PHP_MINFO_FUNCTION(memcache)
 
 static void _mmc_pool_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
-	mmc_pool_free((mmc_pool_t *)rsrc->ptr TSRMLS_CC);
+	mmc_pool_t *pool = (mmc_pool_t *)rsrc->ptr;
+	
+	if (pool->failure_callback_param) {
+		zval_ptr_dtor((zval **)&pool->failure_callback_param);
+		pool->failure_callback_param = NULL;  
+	}
+	
+	mmc_pool_free(pool TSRMLS_CC);
 }
 /* }}} */
 
@@ -966,6 +973,11 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 
 static void php_mmc_set_failure_callback(mmc_pool_t *pool, zval *mmc_object, zval *callback TSRMLS_DC)  /* {{{ */
 {
+	// Decrease refcount of old mmc_object
+	if (pool->failure_callback_param) {
+		zval_ptr_dtor((zval **)&pool->failure_callback_param);
+	}
+	
 	if (callback != NULL) {
 		zval *callback_tmp;
 		ALLOC_ZVAL(callback_tmp);
@@ -975,7 +987,8 @@ static void php_mmc_set_failure_callback(mmc_pool_t *pool, zval *mmc_object, zva
 		INIT_PZVAL(callback_tmp);
 
 		add_property_zval(mmc_object, "_failureCallback", callback_tmp);
-		pool->failure_callback_param = mmc_object;  
+		pool->failure_callback_param = mmc_object;
+		zval_add_ref(&mmc_object);
 
 		INIT_PZVAL(callback_tmp);
 	}
