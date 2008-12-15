@@ -61,6 +61,7 @@ PHP_FUNCTION(memcache_increment);
 PHP_FUNCTION(memcache_decrement);
 PHP_FUNCTION(memcache_close);
 PHP_FUNCTION(memcache_flush);
+PHP_FUNCTION(memcache_setoptimeout);
 
 #define PHP_MEMCACHE_VERSION "2.2.4"
 
@@ -96,6 +97,8 @@ typedef struct mmc {
 	char					*host;
 	unsigned short			port;
 	long					timeout;
+	long					timeoutms; /* takes precedence over timeout */
+	long					connect_timeoutms; /* takes precedence over timeout */
 	long					failed;
 	long					retry_interval;
 	int						persistent;
@@ -149,6 +152,7 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long max_failover_attempts;
 	long hash_strategy;
 	long hash_function;
+	long default_timeout_ms;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION >= 3)
