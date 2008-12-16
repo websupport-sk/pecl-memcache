@@ -198,8 +198,8 @@ static PHP_INI_MH(OnUpdateDefaultTimeout) /* {{{ */
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.default_timeout must be a positive number greater than or equal to 1 ('%s' given)", new_value);
 		return FAILURE;
 	}
-    MEMCACHE_G(default_timeout_ms) = lval;
-    return SUCCESS;
+	MEMCACHE_G(default_timeout_ms) = lval;
+	return SUCCESS;
 }
 /* }}} */
 
@@ -211,7 +211,7 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.chunk_size",		"8192",		PHP_INI_ALL, OnUpdateChunkSize,	chunk_size,		zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.hash_strategy",		"standard",	PHP_INI_ALL, OnUpdateHashStrategy,	hash_strategy,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.hash_function",		"crc32",	PHP_INI_ALL, OnUpdateHashFunction,	hash_function,	zend_memcache_globals,	memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.default_timeout_ms",	"1000",	    PHP_INI_ALL, OnUpdateDefaultTimeout,    default_timeout_ms,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.default_timeout_ms",	"1000",	PHP_INI_ALL, OnUpdateDefaultTimeout,	default_timeout_ms,	zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -255,7 +255,7 @@ static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p 
 	MEMCACHE_G(compression_level) = Z_DEFAULT_COMPRESSION;
 	MEMCACHE_G(hash_strategy)	  = MMC_STANDARD_HASH;
 	MEMCACHE_G(hash_function)	  = MMC_HASH_CRC32;
-	MEMCACHE_G(default_timeout_ms)    = (MMC_DEFAULT_TIMEOUT) * 1000;
+	MEMCACHE_G(default_timeout_ms)= (MMC_DEFAULT_TIMEOUT) * 1000;
 }
 /* }}} */
 
@@ -350,14 +350,17 @@ void mmc_debug(const char *format, ...) /* {{{ */
 /* }}} */
 #endif
 
-static struct timeval _convert_timeoutms_to_ts(long msecs) {
+static struct timeval _convert_timeoutms_to_ts(long msecs) /* {{{ */
+{
 	struct timeval tv;
-    int secs = 0;
-    secs = msecs / 1000;
-    tv.tv_sec = secs;
-    tv.tv_usec = ((msecs - (secs * 1000)) * 1000) % 1000000;
-    return tv;
+	int secs = 0;
+
+	secs = msecs / 1000;
+	tv.tv_sec = secs;
+	tv.tv_usec = ((msecs - (secs * 1000)) * 1000) % 1000000;
+	return tv;
 }
+/* }}} */
 
 static void _mmc_pool_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
 {
@@ -491,8 +494,7 @@ static void mmc_server_received_error(mmc_t *mmc, int response_len)  /* {{{ */
 }
 /* }}} */
 
-int mmc_server_failure(mmc_t *mmc TSRMLS_DC) /*
-	determines if a request should be retried or is a hard network failure {{{ */
+int mmc_server_failure(mmc_t *mmc TSRMLS_DC) /*determines if a request should be retried or is a hard network failure {{{ */
 {
 	switch (mmc->status) {
 		case MMC_STATUS_DISCONNECTED:
@@ -509,19 +511,20 @@ int mmc_server_failure(mmc_t *mmc TSRMLS_DC) /*
 }
 /* }}} */
 
-static int mmc_server_store(mmc_t *mmc, const char *request, int request_len TSRMLS_DC) { /* {{{ */
+static int mmc_server_store(mmc_t *mmc, const char *request, int request_len TSRMLS_DC) /* {{{ */
+{
 	int response_len;
-    php_netstream_data_t *sock = (php_netstream_data_t*)mmc->stream->abstract;
+	php_netstream_data_t *sock = (php_netstream_data_t*)mmc->stream->abstract;
 
-    if(mmc->timeoutms>1) {
-       sock->timeout = _convert_timeoutms_to_ts(mmc->timeoutms);
-    }
+	if (mmc->timeoutms > 1) {
+		sock->timeout = _convert_timeoutms_to_ts(mmc->timeoutms);
+	}
 
 	if (php_stream_write(mmc->stream, request, request_len) != request_len) {
 		mmc_server_seterror(mmc, "Failed sending command and value to stream", 0);
 		return -1;
 	}
-	
+
 	if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0) {
 		return -1;
 	}
@@ -588,8 +591,7 @@ int mmc_prepare_key(zval *key, char *result, unsigned int *result_len TSRMLS_DC)
 }
 /* }}} */
 
-static unsigned int mmc_hash_crc32(const char *key, int key_len) /* 
-	CRC32 hash {{{ */
+static unsigned int mmc_hash_crc32(const char *key, int key_len) /* CRC32 hash {{{ */
 {
 	unsigned int crc = ~0;
 	int i;
@@ -602,8 +604,7 @@ static unsigned int mmc_hash_crc32(const char *key, int key_len) /*
 }
 /* }}} */
 
-static unsigned int mmc_hash_fnv1a(const char *key, int key_len) /* 
-	FNV-1a hash {{{ */
+static unsigned int mmc_hash_fnv1a(const char *key, int key_len) /* FNV-1a hash {{{ */
 {
 	unsigned int hval = FNV_32_INIT;
 	int i;
@@ -611,9 +612,9 @@ static unsigned int mmc_hash_fnv1a(const char *key, int key_len) /*
 	for (i=0; i<key_len; i++) {
 		hval ^= (unsigned int)key[i];
 		hval *= FNV_32_PRIME;
-    }
+	}
 
-    return hval;
+	return hval;
 }
 /* }}} */
 
@@ -706,8 +707,7 @@ void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /* {{{ */
 }
 /* }}} */
 
-static int mmc_pool_close(mmc_pool_t *pool TSRMLS_DC) /* 
-	disconnects and removes all servers in the pool {{{ */
+static int mmc_pool_close(mmc_pool_t *pool TSRMLS_DC) /* disconnects and removes all servers in the pool {{{ */
 {
 	if (pool->num_servers) {
 		int i;
@@ -888,18 +888,18 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	struct timeval tv;
 	char *hostname = NULL, *hash_key = NULL, *errstr = NULL;
 	int	hostname_len, err = 0;
-    int secs = 0;
+	int secs = 0;
 
 	/* close open stream */
 	if (mmc->stream != NULL) {
 		mmc_server_disconnect(mmc TSRMLS_CC);
 	}
 
-    if(mmc->connect_timeoutms>0) {
-        tv = _convert_timeoutms_to_ts(mmc->connect_timeoutms);
-    } else {
-        tv.tv_sec = mmc->timeout;
-    }
+	if (mmc->connect_timeoutms > 0) {
+		tv = _convert_timeoutms_to_ts(mmc->connect_timeoutms);
+	} else {
+		tv.tv_sec = mmc->timeout;
+	}
 
 	if (mmc->port) {
 		hostname_len = spprintf(&hostname, 0, "%s:%d", mmc->host, mmc->port);
@@ -1029,8 +1029,7 @@ static void mmc_server_disconnect(mmc_t *mmc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /* 
-	disconnect and marks the server as down {{{ */
+void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /* 	disconnect and marks the server as down {{{ */
 {
 	mmc_server_disconnect(mmc TSRMLS_CC);
 	mmc->status = MMC_STATUS_FAILED;
@@ -1142,7 +1141,7 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC) /* {{{
 {
 	char *command;
 	int command_len;
-    php_netstream_data_t *sock = (php_netstream_data_t*)mmc->stream->abstract;
+	php_netstream_data_t *sock = (php_netstream_data_t*)mmc->stream->abstract;
 
 	if (!mmc || !cmd) {
 		return -1;
@@ -1156,9 +1155,9 @@ static int mmc_sendcmd(mmc_t *mmc, const char *cmd, int cmdlen TSRMLS_DC) /* {{{
 	command_len = cmdlen + sizeof("\r\n") - 1;
 	command[command_len] = '\0';
 
-    if(mmc->timeoutms>1) {
-       sock->timeout = _convert_timeoutms_to_ts(mmc->timeoutms);
-    }
+	if (mmc->timeoutms > 1) {
+		sock->timeout = _convert_timeoutms_to_ts(mmc->timeoutms);
+	}
 
 	if (php_stream_write(mmc->stream, command, command_len) != command_len) {
 		mmc_server_seterror(mmc, "Failed writing command to stream", 0);
@@ -1906,9 +1905,11 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lll", &host, &host_len, &port, &timeout, &timeoutms) == FAILURE) {
 		return;
 	}
-    if(timeoutms<1) { 
-        timeoutms = MEMCACHE_G(default_timeout_ms);
-    }
+
+	if (timeoutms < 1) { 
+		timeoutms = MEMCACHE_G(default_timeout_ms);
+	}
+
 	/* initialize and connect server struct */
 	if (persistent) {
 		mmc = mmc_find_persistent(host, host_len, port, timeout, MMC_DEFAULT_RETRY TSRMLS_CC);
@@ -1918,8 +1919,8 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 		mmc = mmc_server_new(host, host_len, port, 0, timeout, MMC_DEFAULT_RETRY TSRMLS_CC);
 	}
 
-    mmc->timeout = timeout;
-    mmc->connect_timeoutms = timeoutms;
+	mmc->timeout = timeout;
+	mmc->connect_timeoutms = timeoutms;
 
 	if (!mmc_open(mmc, 1, &error_string, &errnum TSRMLS_CC)) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%ld, %s (%d)", host, port, error_string ? error_string : "Unknown error", errnum);
@@ -2005,9 +2006,9 @@ PHP_FUNCTION(memcache_add_server)
 		}
 	}
 
-    if(timeoutms<1) { 
-        timeoutms = MEMCACHE_G(default_timeout_ms);
-    }
+	if (timeoutms < 1) { 
+		timeoutms = MEMCACHE_G(default_timeout_ms);
+	}
 
 	if (weight < 0) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "weight must be a positive integer");
@@ -2030,7 +2031,7 @@ PHP_FUNCTION(memcache_add_server)
 		mmc = mmc_server_new(host, host_len, port, 0, timeout, retry_interval TSRMLS_CC);
 	}
 
-    mmc->connect_timeoutms = timeoutms;
+	mmc->connect_timeoutms = timeoutms;
 
 	/* add server in failed mode */
 	if (!status) {
@@ -2654,18 +2655,18 @@ PHP_FUNCTION(memcache_setoptimeout)
 		}
 	}
 
-    if(timeoutms<1) {
+	if (timeoutms < 1) {
 		timeoutms = MEMCACHE_G(default_timeout_ms);
-    }
+	}
 
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC)) {
 		RETURN_FALSE;
 	}
 
-	for (i=0; i<pool->num_servers; i++) {
-        mmc = pool->servers[i];
-        mmc->timeoutms = timeoutms;
-    }
+	for (i = 0; i < pool->num_servers; i++) {
+		mmc = pool->servers[i];
+		mmc->timeoutms = timeoutms;
+	}
 	RETURN_TRUE;
 }
 /* }}} */
