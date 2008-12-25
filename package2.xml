@@ -37,6 +37,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Fixed PECL bug #14157 (Segmentation fault with errorcallback handler)
+    - Fixed PECL bug #15342 (memcache keys whitespaces replace issue)
     - Added REPORT_ERRORS to php stream open
   </notes>
   <contents>

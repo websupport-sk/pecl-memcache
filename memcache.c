@@ -450,7 +450,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 			}
 			
 			/* assemble command */
-			if (pool->protocol->store(pool, request, op, ZSTR_VAL(key), key_len, flags, exptime, cas, *arrval TSRMLS_CC) != MMC_OK) {
+			if (pool->protocol->store(pool, request, op, request->key, request->key_len, flags, exptime, cas, *arrval TSRMLS_CC) != MMC_OK) {
 				mmc_pool_release(pool, request);
 				continue;
 			}

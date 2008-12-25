@@ -103,11 +103,21 @@ var_dump($result);
 
 // Array keys
 $memcache->set('test_key', 'value');
-$v = $memcache->get(array('test_key'));
-var_dump($v['test_key']);
+$result = $memcache->get(array('test_key'));
+var_dump($result['test_key']);
 
 // Long keys
 var_dump(memcache_increment($memcache, 'forum_thread.php_55461ANDis_show=1ORDERBYis_topDESC,update_timeDESC_0', 1));
+
+// Whitespace key
+$values = array(' ' => 'value', 'test test' => 'value2');
+$result = $memcache->set($values);
+var_dump($result);
+
+$keys = array_keys($values);
+$result = $memcache->get($keys);
+var_dump($keys);
+var_dump($result);
 
 ?>
 --EXPECTF--
@@ -174,3 +184,16 @@ array(1) {
 }
 string(5) "value"
 bool(false)
+bool(true)
+array(2) {
+  [0]=>
+  string(1) " "
+  [1]=>
+  string(9) "test test"
+}
+array(2) {
+  ["_"]=>
+  string(5) "value"
+  ["test_test"]=>
+  string(6) "value2"
+}
