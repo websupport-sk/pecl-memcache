@@ -805,6 +805,7 @@ mmc_pool_t *mmc_pool_new(TSRMLS_D) /* {{{ */
 	}
 	
 	mmc_pool_init_hash(pool TSRMLS_CC);
+	pool->compress_threshold = MEMCACHE_G(compress_threshold);
 	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
 
 	pool->sending = &(pool->_sending1);
@@ -1459,6 +1460,20 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 						break;
 
 					case MMC_REQUEST_DONE:
+						/* might have completed without having sent all data (e.g. object too large errors) */
+						if (mmc->sendreq == mmc->readreq) {
+							/* disconnect stream since data may have been sent before we received the SERVER_ERROR */
+							mmc_server_disconnect(mmc, mmc->readreq->io TSRMLS_CC);
+							
+							/* shift next request into send slot */
+							mmc_pool_slot_send(pool, mmc, mmc_queue_pop(&(mmc->sendqueue)), 1 TSRMLS_CC);
+							
+							/* clear out connection from send queue if no new request was slotted */
+							if (!mmc->sendreq) {
+								mmc_queue_remove(pool->sending, mmc);
+							}
+						}
+						
 						/* release completed request */
 						mmc_pool_release(pool, mmc->readreq);
 

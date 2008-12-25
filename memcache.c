@@ -220,6 +220,20 @@ static PHP_INI_MH(OnUpdateRedundancy) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdateCompressThreshold) /* {{{ */
+{
+	long int lval;
+
+	lval = strtol(new_value, NULL, 10);
+	if (lval < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.compress_threshold must be a positive integer ('%s' given)", new_value);
+		return FAILURE;
+	}
+
+	return OnUpdateLong(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.allow_failover",		"1",			PHP_INI_ALL, OnUpdateLong,			allow_failover,	zend_memcache_globals,	memcache_globals)
@@ -231,6 +245,7 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.hash_function",			"crc32",		PHP_INI_ALL, OnUpdateHashFunction,	hash_function,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.redundancy",			"1",			PHP_INI_ALL, OnUpdateRedundancy,	redundancy,			zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.session_redundancy",	"2",			PHP_INI_ALL, OnUpdateRedundancy,	session_redundancy,	zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.compress_threshold",	"20000",		PHP_INI_ALL, OnUpdateCompressThreshold,		compress_threshold,	zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -364,6 +379,7 @@ int mmc_stored_handler(mmc_t *mmc, mmc_request_t *request, int response, const c
 		if (param != NULL && Z_TYPE_P((zval *)param) == IS_NULL) {
 			ZVAL_TRUE((zval *)param);
 		}
+		
 		return MMC_REQUEST_DONE;
 	}
 
@@ -372,6 +388,12 @@ int mmc_stored_handler(mmc_t *mmc, mmc_request_t *request, int response, const c
 		if (param != NULL) {
 			ZVAL_FALSE((zval *)param);
 		}
+		
+		if (response != MMC_RESPONSE_EXISTS) {
+			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Server %s (tcp %d, udp %d) failed with: %s (%d)", 
+				mmc->host, mmc->tcp.port, mmc->udp.port, message, response);
+		}
+		
 		return MMC_REQUEST_DONE;
 	}
 

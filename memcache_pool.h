@@ -50,6 +50,7 @@
 #define MMC_VALUE_HEADER		"VALUE %250s %u %lu %lu"	/* keep in sync with MMC_MAX_KEY_LEN */
 
 #define MMC_COMPRESSION_LEVEL 	Z_DEFAULT_COMPRESSION
+#define MMC_DEFAULT_COMPRESS 	20000						/* minimum 20k byte values for auto compression to be used */
 #define MMC_DEFAULT_SAVINGS 	0.2							/* minimum 20% savings for compression to be used */
 
 #define MMC_PROTO_TCP 0
@@ -107,9 +108,9 @@ typedef char *(*mmc_stream_readline)(mmc_stream_t *stream, char *buf, size_t max
 struct mmc_stream {
 	php_stream				*stream;
 	int						fd;							/* file descriptor for select() */
-	unsigned short			port;
+	unsigned short			port;						/* tcp/udp port stream is connected to */
 	int						chunk_size;					/* stream chunk size */
-	int						status;
+	int						status;						/* stream status in MMC_STATUS_* status codes */
 	long					failed;						/* the timestamp the stream was marked as failed */
 	long					retry_interval;				/* seconds to wait before automatic reconnect */
 	mmc_buffer_t			buffer;						/* read buffer (when using udp) */
@@ -348,6 +349,7 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long max_failover_attempts;
 	long redundancy;
 	long session_redundancy;
+	long compress_threshold;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #ifdef ZTS

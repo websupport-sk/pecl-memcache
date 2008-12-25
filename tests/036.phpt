@@ -11,6 +11,7 @@ $session_save_path = "tcp://$host:$port?persistent=1&udp_port=0&weight=2&timeout
 ini_set('session.save_handler', 'memcache');
 ini_set('session.save_path', $session_save_path);
 
+
 $result1 = session_start();
 $id = session_id();
 
@@ -25,6 +26,21 @@ $result4 = session_start();
 $result5 = session_destroy();
 $result6 = $memcache->get($id);
 
+// Test large session
+$session_save_path = "tcp://$host:$port";
+ini_set('session.save_path', $session_save_path);
+
+session_start();
+$largeval = str_repeat('a', 1024*2048);
+$_SESSION['_test_key']= $largeval;
+session_write_close();
+
+ini_set('memcache.compress_threshold', 0);
+session_start();
+$largeval = str_repeat('a', 1024*2048);
+$_SESSION['_test_key']= $largeval;
+session_write_close();
+
 var_dump($result1);
 var_dump($id);
 var_dump($result2);
@@ -35,6 +51,10 @@ var_dump($result6);
 
 ?>
 --EXPECTF--
+%s: SERVER_ERROR object too large for cache
+ (3) in %s
+
+Warning: session_write_close(): Failed to write session data (memcache). %s
 bool(true)
 string(%d) "%s"
 bool(false)
