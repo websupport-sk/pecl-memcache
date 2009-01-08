@@ -1259,15 +1259,28 @@ static void mmc_select_failure(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *requ
 static void mmc_select_retry(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* 
 	removes request from send/read queues and calls failover {{{ */
 {
+	/* clear out failed request from queues */
 	mmc_queue_remove(&(mmc->sendqueue), request);
 	mmc_queue_remove(&(mmc->readqueue), request);
 
+	/* shift next request into send slot */
 	if (mmc->sendreq == request) {
 		mmc_pool_slot_send(pool, mmc, mmc_queue_pop(&(mmc->sendqueue)), 1 TSRMLS_CC);
+
+		/* clear out connection from send queue if no new request was slotted */
+		if (!mmc->sendreq) {
+			mmc_queue_remove(pool->sending, mmc);
+		}
 	}
 	
+	/* shift next request into read slot */
 	if (mmc->readreq == request) {
 		mmc->readreq = mmc_queue_pop(&(mmc->readqueue));
+
+		/* clear out connection from read queue if no new request was slotted */
+		if (!mmc->readreq) {
+			mmc_queue_remove(pool->reading, mmc);
+		}
 	}
 
 	request->failover_handler(pool, mmc, request, request->failover_handler_param TSRMLS_CC);
@@ -1349,6 +1362,11 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 	for (i=0; i < sending->len; i++) {
 		mmc = mmc_queue_item(sending, i);
 		
+		/* skip servers which have failed */
+		if (!mmc->sendreq) {
+			continue;
+		}
+
 		if (FD_ISSET(mmc->sendreq->io->fd, &(pool->wfds))) {
 			fd = mmc->sendreq->io->fd;
 			
@@ -1405,6 +1423,11 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 
 	for (i=0; i < reading->len; i++) {
 		mmc = mmc_queue_item(reading, i);
+
+		/* skip servers which have failed */
+		if (!mmc->readreq) {
+			continue;
+		}
 
 		if (FD_ISSET(mmc->readreq->io->fd, &(pool->rfds))) {
 			fd = mmc->readreq->io->fd;

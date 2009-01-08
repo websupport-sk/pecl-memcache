@@ -1,8 +1,12 @@
 <?php
+/*
+ * Runs a series of benchmarks and prints the results
+ */
+
 error_reporting(E_ALL);
 
 $count = 50;	// Keys per interation (multi-key operations do $count keys at a time)
-$reps = 15000;	// Number of iterations
+$reps = 1000;	// Number of iterations
 
 // hostname, tcp_port, udp_port
 $hosts = array(
@@ -62,7 +66,7 @@ function run_tests($pools, $tests) {
 			
 			$ts2 = microtime(true);
 
-			printf('%-15u', round(($count*$reps) / ($ts2-$ts)));
+			printf('%-15s', sprintf('%u (%.2fs)', round(($count*$reps) / ($ts2-$ts)), round($ts2-$ts,2)));
 		}
 
 		print "\n";
@@ -111,7 +115,7 @@ for ($i=0; $i<$count; $i++) {
 	$objects[$key3.$i] = new TestClass(new TestClass(new TestClass()));
 }
 
-print "Measures are in keys-per-second, higher is better.\n";
+print "Measures are in keys-per-second (higher is better) with number of seconds\nspent in test within parentheses (lower is better).\n\n";
 
 // Configuration
 printf("memcache.hash_strategy:     %s\n", ini_get('memcache.hash_strategy'));
