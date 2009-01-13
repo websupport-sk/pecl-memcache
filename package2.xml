@@ -25,10 +25,10 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2008-xx-xx</date>
+  <date>2009-01-13</date>
   <version>
-    <release>3.0.3-dev</release>
-    <api>3.0.3-dev</api>
+    <release>3.0.3</release>
+    <api>3.0.3</api>
   </version>
   <stability>
     <release>beta</release>
