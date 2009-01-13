@@ -7,8 +7,8 @@ memcache->get() with flags
 
 include 'connect.inc';
 
-$flag1 = 0x100;
-$flag2 = 0x200;
+$flag1 = 0x10000;
+$flag2 = 0x20000;
 
 $memcache->set('test_key1', 'test1', $flag1);
 $memcache->set('test_key2', 'test2', $flag2);
@@ -57,13 +57,13 @@ var_dump($result5);
 
 ?>
 --EXPECT--
-int(256)
+int(65536)
 string(5) "test1"
 array(2) {
   ["test_key1"]=>
-  int(256)
+  int(65536)
   ["test_key2"]=>
-  int(512)
+  int(131072)
 }
 array(2) {
   ["test_key1"]=>
@@ -72,13 +72,13 @@ array(2) {
   string(5) "test2"
 }
 string(5) "test1"
-int(256)
+int(65536)
 string(5) "test1"
 array(2) {
   ["test_key1"]=>
-  int(256)
+  int(65536)
   ["test_key2"]=>
-  int(512)
+  int(131072)
 }
 array(2) {
   ["test_key1"]=>

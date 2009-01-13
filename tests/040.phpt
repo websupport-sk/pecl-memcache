@@ -36,8 +36,8 @@ array(2) {
   ["%s"]=>
   int(3)
 }
-string(1) "2"
-string(1) "3"
+int(2)
+int(3)
 array(2) {
   ["%s"]=>
   int(1)

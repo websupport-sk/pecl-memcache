@@ -315,28 +315,35 @@ static int mmc_uncompress(const char *data, unsigned long data_len, char **resul
 int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned int *flags TSRMLS_DC) /* 
 	does serialization and compression to pack a zval into the buffer {{{ */
 {
+	if (*flags & 0xffff & ~MMC_COMPRESSED) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "The lowest two bytes of the flags array is reserved for pecl/memcache internal use");
+		return MMC_REQUEST_FAILURE;
+	}
+
+	*flags &= ~MMC_SERIALIZED;
 	switch (Z_TYPE_P(value)) {
 		case IS_STRING:
-			*flags &= ~MMC_SERIALIZED;
+			*flags |= MMC_TYPE_STRING;
 			mmc_compress(pool, buffer, Z_STRVAL_P(value), Z_STRLEN_P(value), flags, 0 TSRMLS_CC);
 			break;
 
 		case IS_LONG:
-		case IS_DOUBLE:
-		case IS_BOOL: {
-			zval value_copy;
-			*flags &= ~MMC_SERIALIZED;
-			
-			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
-			value_copy = *value;
-			zval_copy_ctor(&value_copy);
-			convert_to_string(&value_copy);
-			
-			mmc_compress(pool, buffer, Z_STRVAL(value_copy), Z_STRLEN(value_copy), flags, 0 TSRMLS_CC); 
-			
-			zval_dtor(&value_copy);
+			*flags |= MMC_TYPE_LONG;
+			smart_str_append_long(&(buffer->value), Z_LVAL_P(value));
+			break;
+		
+		case IS_DOUBLE: {
+			char buf[256];
+			int len = snprintf(buf, 256, "%.14g", Z_DVAL_P(value));
+			*flags |= MMC_TYPE_DOUBLE;
+			smart_str_appendl(&(buffer->value), buf, len);
 			break;
 		}
+		
+		case IS_BOOL:
+			*flags |= MMC_TYPE_BOOL;
+			smart_str_appendc(&(buffer->value), Z_BVAL_P(value) ? '1' : '0');
+			break;
 
 		default: {
 			php_serialize_data_t value_hash;
@@ -446,13 +453,37 @@ int mmc_unpack_value(
 		return value_handler(key_tmp, key_len, object, flags, cas, value_handler_param TSRMLS_CC);
 	}
 	else {
-		data[data_len] = '\0';
-		ZVAL_STRINGL(&value, data, data_len, 0);
-		
-		if (!(flags & MMC_COMPRESSED)) {
-			mmc_buffer_release(buffer);
-		}
+		switch (flags & 0x0f00) {
+			case MMC_TYPE_LONG: {
+				long val;
+				data[data_len] = '\0';
+				val = strtol(data, NULL, 10);
+				ZVAL_LONG(&value, val);
+				break;
+			}
+				
+			case MMC_TYPE_DOUBLE: {
+				double val = 0;
+				data[data_len] = '\0';
+				sscanf(data, "%lg", &val);
+				ZVAL_DOUBLE(&value, val);
+				break;
+			}
 
+			case MMC_TYPE_BOOL:
+				ZVAL_BOOL(&value, data_len == 1 && data[0] == '1');
+				break;
+				
+			default:
+				data[data_len] = '\0';
+				ZVAL_STRINGL(&value, data, data_len, 0);
+				
+				if (!(flags & MMC_COMPRESSED)) {
+					/* release buffer because it's now owned by the zval */
+					mmc_buffer_release(buffer);
+				}
+		}
+		
 		/* delegate to value handler */
 		return request->value_handler(key, key_len, &value, flags, cas, request->value_handler_param TSRMLS_CC);
 	}

@@ -41,8 +41,20 @@
 #define ZSTR_VAL(v) (v).s
 #endif
 
-#define MMC_SERIALIZED 1
-#define MMC_COMPRESSED 2
+/* use lowest byte for flags */
+#define MMC_SERIALIZED	0x0001
+#define MMC_COMPRESSED	0x0002
+
+/* use second lowest byte to indicate data type */
+#define MMC_TYPE_STRING	0x0000
+#define MMC_TYPE_BOOL	0x0100
+/*#define MMC_TYPE_INT	0x0200*/
+#define MMC_TYPE_LONG	0x0300
+/*#define MMC_TYPE_DATE	0x0400*/
+/*#define MMC_TYPE_BYTE	0x0500*/
+/*#define MMC_TYPE_FLOAT	0x0600*/
+#define MMC_TYPE_DOUBLE	0x0700
+/*#define MMC_TYPE_BLOB	0x0800*/
 
 #define MMC_BUFFER_SIZE			4096
 #define MMC_MAX_UDP_LEN			1400

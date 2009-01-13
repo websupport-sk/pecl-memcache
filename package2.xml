@@ -37,10 +37,13 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Enabled compression by default for values larger than 20kb
+    - Scalar data types (int, bool, double) are preserved by get/set
+    - Reserved the lowest 2 bytes of the flags for internal use 
     - Fixed PECL bug #14157 (Segmentation fault with errorcallback handler)
     - Fixed PECL bug #15342 (memcache keys whitespaces replace issue)
     - Fixed PECL bug #15447 (Persistent Connections Cause Segfaults if One Server Drops)
     - Fixed PECL bug #15529 (memcache object loses port information)
+    - Fixed PECL bug #14730 (Types lost during get/set)
     - Fixed PECL request #14801 (Session handler and large sessions)
     - Added REPORT_ERRORS to php stream open
     - New INI directive
