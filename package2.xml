@@ -27,8 +27,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </lead>
   <date>2009-xx-xx</date>
   <version>
-    <release>2.2.5</release>
-    <api>2.2.5</api>
+    <release>2.2.5-dev</release>
+    <api>2.2.5-dev</api>
   </version>
   <stability>
     <release>stable</release>
@@ -37,6 +37,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
     - Improved performance of consistent hash strategy
+    - Fixed PECL request #13758 (Failed to extract 'connection' variable from object)
   </notes>
   <contents>
     <dir name="/">

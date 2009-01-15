@@ -892,14 +892,14 @@ static int mmc_get_pool(zval *id, mmc_pool_t **pool TSRMLS_DC) /* {{{ */
 	int resource_type;
 
 	if (Z_TYPE_P(id) != IS_OBJECT || zend_hash_find(Z_OBJPROP_P(id), "connection", sizeof("connection"), (void **) &connection) == FAILURE) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to extract 'connection' variable from object");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "No servers added to memcache connection");
 		return 0;
 	}
 
 	*pool = (mmc_pool_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
 
 	if (!*pool || resource_type != le_memcache_pool) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown connection identifier");
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid Memcache->connection member variable");
 		return 0;
 	}
 

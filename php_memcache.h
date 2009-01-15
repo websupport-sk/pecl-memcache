@@ -63,7 +63,7 @@ PHP_FUNCTION(memcache_close);
 PHP_FUNCTION(memcache_flush);
 PHP_FUNCTION(memcache_setoptimeout);
 
-#define PHP_MEMCACHE_VERSION "2.2.4"
+#define PHP_MEMCACHE_VERSION "2.2.5-dev"
 
 #define MMC_BUF_SIZE 4096
 #define MMC_SERIALIZED 1
