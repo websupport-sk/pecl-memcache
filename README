@@ -45,6 +45,11 @@ New API in 3.0
 
 	memcache.hash_strategy = {standard, consistent}	# default consistent
 	memcache.hash_function = {crc32, fnv}			# default crc32
+	
+	# Compression is enabled by default, the threshold which control the minimum 
+	# string length which triggers compresssion can be changed as
+	
+	memcache.compress_threshold = <int>		# default 20000
 
 
  The directives are used by the MemcachePool constructor so you can instantiate 

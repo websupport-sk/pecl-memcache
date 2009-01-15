@@ -260,21 +260,35 @@ extern mmc_protocol_t mmc_ascii_protocol;
 extern mmc_protocol_t mmc_binary_protocol;
 
 /* hashing strategy */
-typedef unsigned int (*mmc_hash_function)(const char *key, unsigned int key_len);
-typedef void * (*mmc_hash_create_state)(mmc_hash_function);
+typedef unsigned int (*mmc_hash_function_init)();
+typedef unsigned int (*mmc_hash_function_combine)(unsigned int seed, const void *key, unsigned int key_len);
+typedef unsigned int (*mmc_hash_function_finish)(unsigned int seed);
+
+typedef struct mmc_hash_function {
+	mmc_hash_function_init		init;
+	mmc_hash_function_combine	combine;
+	mmc_hash_function_finish	finish;
+} mmc_hash_function_t;
+
+extern mmc_hash_function_t mmc_hash_crc32;
+extern mmc_hash_function_t mmc_hash_fnv1a;
+
+#define mmc_hash(hash, key, key_len) ((hash)->finish((hash)->combine((hash)->init(), (key), (key_len))))
+
+typedef void * (*mmc_hash_create_state)(mmc_hash_function_t *);
 typedef void (*mmc_hash_free_state)(void *state);
 typedef mmc_t * (*mmc_hash_find_server)(void *state, const char *key, unsigned int key_len TSRMLS_DC);
 typedef void (*mmc_hash_add_server)(void *state, mmc_t *mmc, unsigned int weight);
 
-typedef struct mmc_hash {
+typedef struct mmc_hash_strategy {
 	mmc_hash_create_state	create_state;
 	mmc_hash_free_state		free_state;
 	mmc_hash_find_server	find_server;
 	mmc_hash_add_server		add_server;
-} mmc_hash_t;
+} mmc_hash_strategy_t;
 
-extern mmc_hash_t mmc_standard_hash;
-extern mmc_hash_t mmc_consistent_hash;
+extern mmc_hash_strategy_t mmc_standard_hash;
+extern mmc_hash_strategy_t mmc_consistent_hash;
 
 /* 32 bit magic FNV-1a prime and init */
 #define FNV_32_PRIME	0x01000193
@@ -288,7 +302,7 @@ struct mmc_pool {
 	mmc_t					**servers;
 	int						num_servers;
 	mmc_protocol_t			*protocol;					/* wire protocol */
-	mmc_hash_t				*hash;						/* hash strategy */
+	mmc_hash_strategy_t		*hash;						/* hash strategy */
 	void					*hash_state;				/* strategy specific state */
 	fd_set					wfds;
 	fd_set					rfds;

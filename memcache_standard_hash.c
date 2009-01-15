@@ -32,10 +32,10 @@ typedef struct mmc_standard_state {
 	int						num_servers;
 	mmc_t					**buckets;
 	int						num_buckets;
-	mmc_hash_function		hash;
+	mmc_hash_function_t		*hash;
 } mmc_standard_state_t;
 
-void *mmc_standard_create_state(mmc_hash_function hash) /* {{{ */
+void *mmc_standard_create_state(mmc_hash_function_t *hash) /* {{{ */
 {
 	mmc_standard_state_t *state = emalloc(sizeof(mmc_standard_state_t));
 	memset(state, 0, sizeof(mmc_standard_state_t));
@@ -62,7 +62,7 @@ mmc_t *mmc_standard_find_server(void *s, const char *key, unsigned int key_len T
 
 	if (state->num_servers > 1) {
 		/* "new-style" hash */
-		unsigned int hash = (state->hash(key, key_len) >> 16) & 0x7fff; 
+		unsigned int hash = (mmc_hash(state->hash, key, key_len) >> 16) & 0x7fff; 
 		return state->buckets[(hash ? hash : 1) % state->num_buckets];
 	}
 
@@ -87,7 +87,7 @@ void mmc_standard_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ */
 }
 /* }}} */
 
-mmc_hash_t mmc_standard_hash = {
+mmc_hash_strategy_t mmc_standard_hash = {
 	mmc_standard_create_state,
 	mmc_standard_free_state,
 	mmc_standard_find_server,

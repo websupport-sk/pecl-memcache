@@ -4,6 +4,7 @@
  */
 
 error_reporting(E_ALL);
+ini_set('memcache.hash_strategy', 'consistent');
 
 $count = 50;	// Keys per interation (multi-key operations do $count keys at a time)
 $reps = 1000;	// Number of iterations
@@ -34,6 +35,10 @@ $tests3 = array(
 	array('test_set_multi_obj', 'MulSet-Object'),
 	array('test_incr_multi', 'Multi-Incr'),
 	array('test_delete_multi', 'Multi-Del'),
+	);
+
+$tests4 = array(
+	array('test_hash_strategy', 'Hash-Strat'),
 	);
 
 function run_tests($pools, $tests) {
@@ -131,6 +136,9 @@ run_tests($pools, $tests2);
 
 if (class_exists('MemcachePool'))
 	run_tests($pools, $tests3);
+
+//run_tests($pools, $tests4);
+
 $ts2 = time();
 
 printf("total time: %d minutes, %d seconds\n", floor(($ts2 - $ts)/60), ($ts2 - $ts)%60);
@@ -210,4 +218,12 @@ function test_incr_single($memcache) {
 function test_incr_multi($memcache) {
 	global $ints;
 	$memcache->increment(array_keys($ints));
+}
+
+function test_hash_strategy($memcache) {
+	global $hosts;
+	$mc = new Memcache();
+	foreach ($hosts as $h)
+		$mc->addServer($h[0], $h[1], false, 100);
+	$mc->set('test_key', '1');
 }

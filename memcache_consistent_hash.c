@@ -41,10 +41,10 @@ typedef struct mmc_consistent_state {
 	int						num_points;
 	mmc_t					*buckets[MMC_CONSISTENT_BUCKETS];
 	int						buckets_populated;
-	mmc_hash_function		hash;
+	mmc_hash_function_t		*hash;
 } mmc_consistent_state_t;
 
-void *mmc_consistent_create_state(mmc_hash_function hash) /* {{{ */
+void *mmc_consistent_create_state(mmc_hash_function_t *hash) /* {{{ */
 {
 	mmc_consistent_state_t *state = emalloc(sizeof(mmc_consistent_state_t));
 	memset(state, 0, sizeof(mmc_consistent_state_t));
@@ -87,8 +87,8 @@ static mmc_t *mmc_consistent_find(mmc_consistent_state_t *state, unsigned int po
 			return state->points[lo].server;
 		}
 
-		/* best guess with random distribution, distance between lowpoint and point scaled down to lo-hi interval */
-		mid = lo + (hi - lo) * (point - state->points[lo].point) / (state->points[hi].point - state->points[lo].point);
+		/* test middle point */
+		mid = lo + (hi - lo) / 2;
 
 		/* perfect match */
 		if (point <= state->points[mid].point && point > (mid ? state->points[mid-1].point : 0)) {
@@ -124,10 +124,14 @@ mmc_t *mmc_consistent_find_server(void *s, const char *key, unsigned int key_len
 	mmc_consistent_state_t *state = s;
 
 	if (state->num_servers > 1) {
+		unsigned int hash;
+
 		if (!state->buckets_populated) {
 			mmc_consistent_populate_buckets(state);
 		}
-		return state->buckets[state->hash(key, key_len) % MMC_CONSISTENT_BUCKETS];
+		
+		hash = mmc_hash(state->hash, key, key_len);
+		return state->buckets[hash % MMC_CONSISTENT_BUCKETS];
 	}
 
 	return state->points[0].server;
@@ -138,17 +142,21 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 {
 	mmc_consistent_state_t *state = s;
 	int i, key_len, points = weight * MMC_CONSISTENT_POINTS;
+	unsigned int seed = state->hash->init(), hash;
 	
 	/* buffer for "host:port-i\0" */
 	char *key = emalloc(strlen(mmc->host) + MAX_LENGTH_OF_LONG * 2 + 3);
+	key_len = sprintf(key, "%s:%d-", mmc->host, mmc->tcp.port);
+	seed = state->hash->combine(seed, key, key_len);
 
 	/* add weight * MMC_CONSISTENT_POINTS number of points for this server */
 	state->points = erealloc(state->points, sizeof(*state->points) * (state->num_points + points));
 
 	for (i=0; i<points; i++) {
-		key_len = sprintf(key, "%s:%d-%d", mmc->host, mmc->tcp.port, i);
+		key_len = sprintf(key, "%d", i);
+		hash = state->hash->finish(state->hash->combine(seed, key, key_len));
 		state->points[state->num_points + i].server = mmc;
-		state->points[state->num_points + i].point = state->hash(key, key_len);
+		state->points[state->num_points + i].point = hash;
 	}
 
 	state->num_points += points;
@@ -159,7 +167,7 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 }
 /* }}} */
 
-mmc_hash_t mmc_consistent_hash = {
+mmc_hash_strategy_t mmc_consistent_hash = {
 	mmc_consistent_create_state,
 	mmc_consistent_free_state,
 	mmc_consistent_find_server,

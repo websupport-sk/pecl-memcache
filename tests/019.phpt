@@ -46,8 +46,20 @@ var_dump($result2);
 var_dump($result3);
 var_dump($result4);
 
+// Test empty connection
+$memcache = new Memcache();
+$memcache->set('test_key', '1');
+
+// Test bad connection id
+$memcache = new Memcache();
+$memcache->connect($host, $port);
+var_dump($memcache->connection);
+
+$memcache->connection = true;
+$memcache->set('test_key', '1');
+
 ?>
---EXPECT--
+--EXPECTF--
 bool(false)
 bool(false)
 bool(true)
@@ -59,3 +71,8 @@ bool(true)
 bool(true)
 bool(true)
 bool(true)
+
+Warning: %s::set(): No servers added %s
+resource(%d) of type (memcache connection)
+
+Warning: %s::set(): Invalid %s member variable %s

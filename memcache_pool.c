@@ -53,32 +53,48 @@ inline void mmc_buffer_free(mmc_buffer_t *buffer)  /* {{{ */
 }
 /* }}} */
 
-static unsigned int mmc_hash_crc32(const char *key, unsigned int key_len) /* 
+static unsigned int mmc_hash_crc32_init()						{ return ~0; }
+static unsigned int mmc_hash_crc32_finish(unsigned int seed)	{ return ~seed; }
+
+static unsigned int mmc_hash_crc32_combine(unsigned int seed, const void *key, unsigned int key_len) /* 
 	CRC32 hash {{{ */
 {
-	unsigned int i, crc = ~0;
-
-	for (i=0; i<key_len; i++) {
-		CRC32(crc, key[i]);
+	const char *p = (const char *)key, *end = p + key_len;
+	while (p < end) {
+		CRC32(seed, *(p++));
 	}
 
-  	return ~crc;
+  	return seed;
 }
 /* }}} */
 
-static unsigned int mmc_hash_fnv1a(const char *key, unsigned int key_len) /* 
+mmc_hash_function_t mmc_hash_crc32 = {
+	mmc_hash_crc32_init,
+	mmc_hash_crc32_combine,
+	mmc_hash_crc32_finish
+};
+
+static unsigned int mmc_hash_fnv1a_combine(unsigned int seed, const void *key, unsigned int key_len) /* 
 	FNV-1a hash {{{ */
 {
-	unsigned int i, hval = FNV_32_INIT;
-
-	for (i=0; i<key_len; i++) {
-		hval ^= (unsigned int)key[i];
-		hval *= FNV_32_PRIME;
+	const char *p = (const char *)key, *end = p + key_len;
+	while (p < end) {
+		seed ^= (unsigned int)*(p++);
+		seed *= FNV_32_PRIME;
     }
 
-    return hval;
+    return seed;
 }
 /* }}} */
+
+static unsigned int mmc_hash_fnv1a_init()						{ return FNV_32_INIT; }
+static unsigned int mmc_hash_fnv1a_finish(unsigned int seed)	{ return seed; }
+
+mmc_hash_function_t mmc_hash_fnv1a = {
+	mmc_hash_fnv1a_init,
+	mmc_hash_fnv1a_combine,
+	mmc_hash_fnv1a_finish
+};
 
 static size_t mmc_stream_read_buffered(mmc_stream_t *io, char *buf, size_t count TSRMLS_DC) /* 
 	attempts to reads count bytes from the stream buffer {{{ */
@@ -803,7 +819,7 @@ void mmc_server_free(mmc_t *mmc TSRMLS_DC) /* {{{ */
 
 static void mmc_pool_init_hash(mmc_pool_t *pool TSRMLS_DC) /* {{{ */
 {
-	mmc_hash_function hash;
+	mmc_hash_function_t *hash;
 
 	switch (MEMCACHE_G(hash_strategy)) {
 		case MMC_CONSISTENT_HASH:
