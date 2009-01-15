@@ -65,6 +65,21 @@ $result7 = @$memcache->set('test_key', 'test-032-01');
 var_dump($result6);
 var_dump($result7);
 
+// Test refcount
+function _callback_server_failure2($host, $tcp_port, $udp_port, $error, $errnum) {
+	var_dump($error);
+}
+
+function test_connect() {
+	global $mc, $nonExistingHost, $nonExistingPort;
+	$mc = new Memcache();
+	$mc->addServer($nonExistingHost, $nonExistingPort, false, 1, 1, 15, true, '_callback_server_failure2');
+}
+
+test_connect();
+$result10 = $mc->set('test_key', 'test-032-02');
+var_dump($result10);
+
 ?>
 --EXPECTF--
 string(%d) "%s"
@@ -83,4 +98,6 @@ bool(false)
 bool(false)
 bool(false)
 bool(true)
+bool(false)
+string(%d) "Connection %s"
 bool(false)

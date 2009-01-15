@@ -87,8 +87,8 @@ static mmc_t *mmc_consistent_find(mmc_consistent_state_t *state, unsigned int po
 			return state->points[lo].server;
 		}
 
-		/* best guess with random distribution, distance between lowpoint and point scaled down to lo-hi interval */
-		mid = lo + (hi - lo) * (point - state->points[lo].point) / (state->points[hi].point - state->points[lo].point);
+		/* test middle point */
+		mid = lo + (hi - lo) / 2;
 		MMC_DEBUG(("mmc_consistent_find: lo %d, hi %d, mid %d, point %u, midpoint %u", lo, hi, mid, point, state->points[mid].point));
 
 		/* perfect match */

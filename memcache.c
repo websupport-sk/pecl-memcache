@@ -773,8 +773,32 @@ int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const
 		}
 	}
 
-	request_len = spprintf(&request, 0, "%s %s %d %d %d\r\n%s\r\n", command, key, flags, expire, value_len, value);
+	request = emalloc( 		
+			command_len 		
+			+ 1 /* space */ 		
+			+ key_len 		
+			+ 1 /* space */ 		
+			+ MAX_LENGTH_OF_LONG 		
+			+ 1 /* space */ 		
+			+ MAX_LENGTH_OF_LONG 		
+			+ 1 /* space */ 		
+			+ MAX_LENGTH_OF_LONG 		
+			+ sizeof("\r\n") - 1 		
+			+ value_len 		
+			+ sizeof("\r\n") - 1 		
+			+ 1 		
+			); 		
 
+	request_len = sprintf(request, "%s %s %d %d %d\r\n", command, key, flags, expire, value_len);
+
+	memcpy(request + request_len, value, value_len); 		
+	request_len += value_len; 		
+
+	memcpy(request + request_len, "\r\n", sizeof("\r\n") - 1); 		
+	request_len += sizeof("\r\n") - 1; 		
+
+	request[request_len] = '\0';
+	
 	while (result < 0 && (mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC)) != NULL) {
 		if ((result = mmc_server_store(mmc, request, request_len TSRMLS_CC)) < 0) {
 			mmc_server_failure(mmc TSRMLS_CC);
@@ -888,7 +912,6 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 	struct timeval tv;
 	char *hostname = NULL, *hash_key = NULL, *errstr = NULL;
 	int	hostname_len, err = 0;
-	int secs = 0;
 
 	/* close open stream */
 	if (mmc->stream != NULL) {
@@ -2640,7 +2663,7 @@ PHP_FUNCTION(memcache_setoptimeout)
 {
 	mmc_pool_t *pool;
 	mmc_t *mmc;
-	int i, failures = 0;
+	int i;
 	zval *mmc_object = getThis();
 	long timeoutms = 0;
 
