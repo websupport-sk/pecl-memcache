@@ -36,8 +36,9 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    Improved performance of consistent hash strategy
-    Fixed PECL request #13758 (Failed to extract 'connection' variable from object)
+    - Improved performance of consistent hash strategy
+    - Fixed PECL bug #14642 (3.0.x breaks BC with 2.2.x)
+    - Fixed PECL request #13758 (Failed to extract 'connection' variable from object)
   </notes>
   <contents>
     <dir name="/">

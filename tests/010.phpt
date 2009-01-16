@@ -11,10 +11,10 @@ $var = new stdClass;
 $var->plain_attribute = 'value';
 $var->array_attribute = Array('test1', 'test2');
 
-$memcache->get('test_key');
-
 $result = $memcache->get('test_key');
+var_dump($result);
 
+$result = $memcache->get(array('unset_test_key', 'unset_test_key1'));
 var_dump($result);
 
 ?>
@@ -29,4 +29,6 @@ object(stdClass)%s2) {
     [1]=>
     string(5) "test2"
   }
+}
+array(0) {
 }

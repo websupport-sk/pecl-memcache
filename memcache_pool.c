@@ -164,14 +164,15 @@ void mmc_request_free(mmc_request_t *request)  /* {{{ */
 
 static inline int mmc_request_send(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /* {{{ */
 {
+	int count, bytes;
+	
 	/* send next chunk of buffer */
-	int count = request->sendbuf.value.len - request->sendbuf.idx;
+	count = request->sendbuf.value.len - request->sendbuf.idx;
 	if (count > request->io->stream->chunk_size) {
 		count = request->io->stream->chunk_size;
 	}
 
-	int bytes = send(request->io->fd, request->sendbuf.value.c + request->sendbuf.idx, count, 0);
-	
+	bytes = send(request->io->fd, request->sendbuf.value.c + request->sendbuf.idx, count, MSG_NOSIGNAL);
 	if (bytes >= 0) {
 		request->sendbuf.idx += bytes;
 		
@@ -182,13 +183,17 @@ static inline int mmc_request_send(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 		
 		return MMC_REQUEST_MORE;
 	}
-
-	long err = php_socket_errno();
-	if (err == EAGAIN) {
-		return MMC_REQUEST_MORE;
+	else {
+		char *message, buf[1024];
+		long err = php_socket_errno();
+		
+		if (err == EAGAIN) {
+			return MMC_REQUEST_MORE;
+		}
+		
+		message = php_socket_strerror(err, buf, 1024);
+		return mmc_server_failure(mmc, request->io, message, err TSRMLS_CC);
 	}
-	
-	return mmc_server_failure(mmc, request->io, "Write failed (socket unexpectedly closed)", err TSRMLS_CC);
 }
 /* }}} */
 
@@ -548,7 +553,9 @@ static void _mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io, int close_persi
 		else {
 			php_stream_close(io->stream);
 		}
+		
 		io->stream = NULL;
+		io->fd = 0;
 	}
 
 	io->status = MMC_STATUS_DISCONNECTED;
@@ -645,7 +652,7 @@ int mmc_request_failure(mmc_t *mmc, mmc_stream_t *io, const char *message, unsig
 	 checks for a valid server generated error message and calls mmc_server_failure() {{{ */
 {
 	if (message_len) {
-		return mmc_server_failure(mmc, io, message, errnum TSRMLS_CC);;
+		return mmc_server_failure(mmc, io, message, errnum TSRMLS_CC);
 	}
 	
 	return mmc_server_failure(mmc, io, "Malformed server response", errnum TSRMLS_CC);
@@ -699,6 +706,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 				if (php_stream_eof(io->stream)) {
 					php_stream_pclose(io->stream);
 					io->stream = NULL;
+					io->fd = 0;
 					break;
 				}
 			case PHP_STREAM_PERSISTENT_FAILURE:
@@ -742,22 +750,23 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	io->status = MMC_STATUS_CONNECTED;
 	
 	php_stream_auto_cleanup(io->stream);
+	php_stream_set_chunk_size(io->stream, io->chunk_size);
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_BLOCKING, 0, NULL);
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_READ_TIMEOUT, 0, &tv);
+	
+	/* doing our own buffering increases performance */
+	php_stream_set_option(io->stream, PHP_STREAM_OPTION_READ_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
+	php_stream_set_option(io->stream, PHP_STREAM_OPTION_WRITE_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
 	
 	/* php_stream buffering prevent us from detecting datagram boundaries when using udp */ 
 	if (udp) { 
 		io->read = mmc_stream_read_buffered;
 		io->readline = mmc_stream_readline_buffered;
-		php_stream_set_option(io->stream, PHP_STREAM_OPTION_READ_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
 	}
 	else {
 		io->read = mmc_stream_read_wrapper;
 		io->readline = mmc_stream_readline_wrapper;
 	}
-	
-	php_stream_set_option(io->stream, PHP_STREAM_OPTION_WRITE_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
-	php_stream_set_chunk_size(io->stream, io->chunk_size);
 	
 	if (mmc->error != NULL) {
 		efree(mmc->error);
@@ -1290,19 +1299,32 @@ static inline void mmc_pool_switch(mmc_pool_t *pool) {
 	mmc_queue_reset(pool->reading);
 }
 
-static void mmc_select_failure(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, int result TSRMLS_DC) /* {{{ */
+static int mmc_select_failure(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *request, int result TSRMLS_DC) /* {{{ */
 {
 	if (result == 0) {
 		/* timeout expired, non-responsive server */
-		if (mmc_server_failure(mmc, request->io, "Network timeout", 0 TSRMLS_CC) != MMC_REQUEST_RETRY) {
-			mmc_server_deactivate(pool, mmc TSRMLS_CC);
+		if (mmc_server_failure(mmc, request->io, "Network timeout", 0 TSRMLS_CC) == MMC_REQUEST_RETRY) {
+			return MMC_REQUEST_RETRY;
 		}
 	}
 	else {
-		/* hard failure, deactivate connection */
-		mmc_server_seterror(mmc, "Unknown select() error", errno);
-		mmc_server_deactivate(pool, mmc TSRMLS_CC);
+		char buf[1024];
+		const char *message;
+		long err = php_socket_errno();
+		
+		if (err) {
+			message = php_socket_strerror(err, buf, 1024);
+		}
+		else {
+			message = "Unknown select() error";
+		}
+				
+		mmc_server_seterror(mmc, message, errno);
 	}
+	
+	/* hard failure, deactivate connection */
+	mmc_server_deactivate(pool, mmc TSRMLS_CC);
+	return MMC_REQUEST_FAILURE;
 }
 /* }}} */
 
@@ -1392,15 +1414,27 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				mmc = (mmc_t *)mmc_queue_item(sending, i);
 				if (!FD_ISSET(mmc->sendreq->io->fd, &(pool->wfds))) {
 					mmc_queue_remove(sending, mmc);
-					mmc_select_failure(pool, mmc, mmc->sendreq, result TSRMLS_CC);
+					mmc_queue_remove(reading, mmc);
+					i--;
+
+					if (mmc_select_failure(pool, mmc, mmc->sendreq, result TSRMLS_CC) == MMC_REQUEST_RETRY) {
+						/* allow request to try and send again */
+						mmc_select_retry(pool, mmc, mmc->sendreq TSRMLS_CC);
+					}
 				}
 			}
 			
 			for (i=0; i < reading->len; i++) {
 				mmc = (mmc_t *)mmc_queue_item(reading, i);
 				if (!FD_ISSET(mmc->readreq->io->fd, &(pool->rfds))) {
+					mmc_queue_remove(sending, mmc);
 					mmc_queue_remove(reading, mmc);
-					mmc_select_failure(pool, mmc, mmc->readreq, result TSRMLS_CC);
+					i--;
+
+					if (mmc_select_failure(pool, mmc, mmc->readreq, result TSRMLS_CC) == MMC_REQUEST_RETRY) {
+						/* allow request to try and read again */
+						mmc_select_retry(pool, mmc, mmc->readreq TSRMLS_CC);
+					}
 				}
 			}
 		}
@@ -1408,7 +1442,6 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 		pool->in_select = 1;
 	}
 
-	/* until stream buffer is empty */
 	for (i=0; i < sending->len; i++) {
 		mmc = mmc_queue_item(sending, i);
 		
@@ -1419,7 +1452,11 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 
 		if (FD_ISSET(mmc->sendreq->io->fd, &(pool->wfds))) {
 			fd = mmc->sendreq->io->fd;
-			
+
+			/* clear bit for reentrancy reasons */
+			FD_CLR(fd, &(pool->wfds));
+
+			/* until stream buffer is empty */
 			do {
 				/* delegate to request send handler */
 				result = mmc_request_send(mmc, mmc->sendreq TSRMLS_CC);
@@ -1431,11 +1468,11 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				
 				switch (result) {
 					case MMC_REQUEST_FAILURE:
-						/* clear readbit for this round */
-						FD_CLR(mmc->sendreq->io->fd, &(pool->rfds));
-
 						/* take server offline and failover requests */
 						mmc_server_deactivate(pool, mmc TSRMLS_CC);
+
+						/* server is failed, remove from read queue */
+						mmc_queue_remove(reading, mmc);
 						break;
 						
 					case MMC_REQUEST_RETRY:
@@ -1461,9 +1498,6 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				/* add server to read queue once more */
 				mmc_queue_push(pool->sending, mmc);
 			}
-
-			/* clear bit for reentrancy reasons */
-			FD_CLR(fd, &(pool->wfds));
 		}
 		else {
 			/* add server to send queue once more */
@@ -1482,6 +1516,9 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 		if (FD_ISSET(mmc->readreq->io->fd, &(pool->rfds))) {
 			fd = mmc->readreq->io->fd;
 			
+			/* clear bit for reentrancy reasons */
+			FD_CLR(fd, &(pool->rfds));
+
 			/* fill read buffer if needed */
 			if (mmc->readreq->read != NULL) {
 				result = mmc->readreq->read(mmc, mmc->readreq TSRMLS_CC);
@@ -1512,6 +1549,7 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				}
 			}
 
+			/* until stream buffer is empty */
 			do {
 				/* delegate to request response handler */
 				result = mmc->readreq->parse(mmc, mmc->readreq TSRMLS_CC);
@@ -1578,9 +1616,6 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 				/* add server to read queue once more */
 				mmc_queue_push(pool->reading, mmc);
 			}
-
-			/* clear bit for reentrancy reasons */
-			FD_CLR(fd, &(pool->rfds));
 		}
 		else {
 			/* add server to read queue once more */

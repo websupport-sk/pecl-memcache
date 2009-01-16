@@ -5,6 +5,8 @@
 
 error_reporting(E_ALL);
 ini_set('memcache.hash_strategy', 'consistent');
+//ini_set('memcache.protocol', 'binary');
+$threshold = 0;
 
 $count = 50;	// Keys per interation (multi-key operations do $count keys at a time)
 $reps = 1000;	// Number of iterations
@@ -17,17 +19,17 @@ $hosts = array(
 $pools = array();
 
 $tests1 = array(
-	array('test_get_single', 'Single-Get'),
-	array('test_get_multi', 'Multi-Get'),
-	array('test_get_single_obj', 'Get-Object'),
-	array('test_get_multi_obj', 'MulGet-Object'),
-	);
-
-$tests2 = array(
 	array('test_set_single', 'Single-Set'),
 	array('test_set_single_obj', 'Set-Object'),
 	array('test_incr_single', 'Single-Incr'),
 	array('test_delete_single', 'Single-Del'),
+	);
+
+$tests2 = array(
+	array('test_get_single', 'Single-Get'),
+	array('test_get_multi', 'Multi-Get'),
+	array('test_get_single_obj', 'Get-Object'),
+	array('test_get_multi_obj', 'MulGet-Object'),
 	);
 
 $tests3 = array(
@@ -83,11 +85,13 @@ function run_tests($pools, $tests) {
 // Create pools to run all tests against
 $memcache1 = new Memcache();
 $memcache1->connect($hosts[0][0], $hosts[0][1]);
+$memcache1->setCompressThreshold($threshold);
 $pools[] = array($memcache1, 'TCP (1 server)');
 
 if (class_exists('MemcachePool')) {
 	$memcache2 = new MemcachePool();
 	$memcache2->connect($hosts[0][0], $hosts[0][1], $hosts[0][2], false);
+	$memcache2->setCompressThreshold($threshold);
 	$pools[] = array($memcache2, 'UDP (1 server)');
 }
 
@@ -95,12 +99,14 @@ if (count($hosts) > 1) {
 	$memcache3 = new Memcache();
 	foreach ($hosts as $h)
 		$memcache3->connect($h[0], $h[1]);
+	$memcache3->setCompressThreshold($threshold);
 	$pools[] = array($memcache3, sprintf('TCP (%d servers)', count($hosts)));
 
 	if (class_exists('MemcachePool')) {
 		$memcache4 = new MemcachePool();
 		foreach ($hosts as $h)
 			$memcache4->connect($h[0], $h[1], $h[2], false);
+		$memcache4->setCompressThreshold($threshold);
 		$pools[] = array($memcache4, sprintf('UDP (%d servers)', count($hosts)));
 	}
 }
@@ -115,19 +121,21 @@ $key2 = 'test_key_int';
 $key3 = 'test_key_obj';
 
 for ($i=0; $i<$count; $i++) {
-	$values[$key.$i] = $key.'_value_'.$i;
+	$values[$key.$i] = $key.'_value_'.$i.str_repeat('a', $i*1000);
 	$ints[$key2.$i] = $i;
-	$objects[$key3.$i] = new TestClass(new TestClass(new TestClass()));
+	$objects[$key3.$i] = new TestClass(new TestClass(new TestClass(str_repeat('a', $i*100))));
 }
 
 print "Measures are in keys-per-second (higher is better) with number of seconds\nspent in test within parentheses (lower is better).\n\n";
 
 // Configuration
-printf("memcache.hash_strategy:     %s\n", ini_get('memcache.hash_strategy'));
-printf("memcache.chunk_size:        %u\n", ini_get('memcache.chunk_size'));
-printf("servers:                    %d\n", count($hosts));
-printf("iterations:                 %d\n", $reps);
-printf("keys per iteration:         %d\n", $count);
+printf("memcache.hash_strategy:       %s\n", ini_get('memcache.hash_strategy'));
+printf("memcache.chunk_size:          %u\n", ini_get('memcache.chunk_size'));
+printf("memcache.protocol:            %s\n", ini_get('memcache.protocol'));
+printf("memcache.compress_threshold:  %s\n", $threshold);
+printf("servers:                      %d\n", count($hosts));
+printf("iterations:                   %d\n", $reps);
+printf("keys per iteration:           %d\n", $count);
 print "\n";
 
 $ts = time();
@@ -146,7 +154,7 @@ printf("total time: %d minutes, %d seconds\n", floor(($ts2 - $ts)/60), ($ts2 - $
 // Tests
 class TestClass {
 	function __construct($obj = null) {
-		$this->v1 = str_repeat('abc', 250);
+		$this->v1 = str_repeat('abc', 25);
 		$this->v2 = 123;
 		$this->v3 = 123.123;
 		$this->v4 = array('abc', 123);

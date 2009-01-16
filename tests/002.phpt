@@ -20,7 +20,10 @@ var_dump($result);
 $result = memcache_get($memcache, 'test_key');
 var_dump($result);
 
-$result = memcache_get($memcache, Array('test_key', 'test_key1'));
+$result = memcache_get($memcache, array('test_key', 'test_key1'));
+var_dump($result);
+
+$result = memcache_get($memcache, array('unset_test_key', 'unset_test_key1'));
 var_dump($result);
 
 ?>
@@ -63,4 +66,6 @@ array(2) {
       string(5) "test2"
     }
   }
+}
+array(0) {
 }

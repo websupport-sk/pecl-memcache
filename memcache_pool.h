@@ -230,7 +230,7 @@ typedef int (*mmc_protocol_store)(
 	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, 
 	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC);
 typedef void (*mmc_protocol_delete)(mmc_request_t *request, const char *key, unsigned int key_len, unsigned int exptime);
-typedef void (*mmc_protocol_mutate)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime);
+typedef void (*mmc_protocol_mutate)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, int defval_used, unsigned int exptime);
 
 typedef void (*mmc_protocol_flush)(mmc_request_t *request, unsigned int exptime);
 typedef void (*mmc_protocol_stats)(mmc_request_t *request, const char *type, long slabid, long limit);

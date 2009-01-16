@@ -35,12 +35,6 @@ $largeval = str_repeat('a', 1024*2048);
 $_SESSION['_test_key']= $largeval;
 session_write_close();
 
-ini_set('memcache.compress_threshold', 0);
-session_start();
-$largeval = str_repeat('a', 1024*2048);
-$_SESSION['_test_key']= $largeval;
-session_write_close();
-
 var_dump($result1);
 var_dump($id);
 var_dump($result2);
@@ -51,10 +45,6 @@ var_dump($result6);
 
 ?>
 --EXPECTF--
-%s: SERVER_ERROR object too large for cache
- (3) in %s
-
-Warning: session_write_close(): Failed to write session data (memcache). %s
 bool(true)
 string(%d) "%s"
 bool(false)

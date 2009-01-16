@@ -493,7 +493,7 @@ static void mmc_binary_delete(mmc_request_t *request, const char *key, unsigned 
 }
 /* }}} */
 
-static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime) /* {{{ */ 
+static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, int defval_used, unsigned int exptime) /* {{{ */ 
 {
 	mmc_mutate_request_header_t header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
@@ -511,7 +511,15 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 	}
 		
 	header.defval = htonll(defval);
-	header.exptime = htonl(exptime);
+	
+	if (defval_used) {
+		/* server inserts defval if key doesn't exist */
+		header.exptime = htonl(exptime);
+	}
+	else {
+		/* server replies with NOT_FOUND if exptime ~0 and key doesn't exist */
+		header.exptime = ~(uint32_t)0;
+	}
 	
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));	
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);

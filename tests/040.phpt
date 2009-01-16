@@ -28,6 +28,12 @@ var_dump($result);
 $result = memcache_decrement($memcache, array($balanceKey1, $balanceKey2), 1);
 var_dump($result);
 
+$result = $memcache->increment(array());
+var_dump($result);
+
+$result = $memcache->increment(array('unset_test_key', 'unset_test_key1'));
+var_dump($result);
+
 ?>
 --EXPECTF--
 array(2) {
@@ -55,4 +61,12 @@ array(2) {
   int(1)
   ["%s"]=>
   int(2)
+}
+array(0) {
+}
+array(2) {
+  ["%s"]=>
+  bool(false)
+  ["%s"]=>
+  bool(false)
 }

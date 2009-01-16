@@ -332,7 +332,7 @@ static void mmc_ascii_delete(mmc_request_t *request, const char *key, unsigned i
 }
 /* }}} */
 
-static void mmc_ascii_mutate(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, unsigned int exptime) /* {{{ */
+static void mmc_ascii_mutate(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, int defval_used, unsigned int exptime) /* {{{ */
 {
 	request->parse = mmc_request_parse_mutate;
 	

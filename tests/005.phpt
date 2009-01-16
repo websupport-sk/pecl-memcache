@@ -117,7 +117,7 @@ var_dump($result);
 $keys = array_keys($values);
 $result = $memcache->get($keys);
 var_dump($keys);
-var_dump($result);
+var_dump(array_values($result));
 
 ?>
 --EXPECTF--
@@ -192,8 +192,8 @@ array(2) {
   string(9) "test test"
 }
 array(2) {
-  ["_"]=>
+  [0]=>
   string(5) "value"
-  ["test_test"]=>
+  [1]=>
   string(6) "value2"
 }

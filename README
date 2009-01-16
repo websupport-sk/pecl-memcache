@@ -113,6 +113,9 @@ class MemcachePool() {
 	 * The new defval (default value) and exptime (expiration time) are used
 	 * if the key doesn't already exist. They must be supplied (even if 0) for
 	 * this to be enabled.
+	 *
+	 * Returns an integer with the new value if key is a string
+	 * Returns an array of integers if the key is an array
 	 */
 	mixed increment(mixed key, int value = 1, int defval = 0, int exptime = 0)
 	mixed decrement(mixed key, int value = 1, int defval = 0, int exptime = 0)
