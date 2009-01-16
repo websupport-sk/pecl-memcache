@@ -195,7 +195,7 @@ struct mmc {
 	mmc_queue_t			sendqueue;				/* mmc_queue_t<mmc_request_t *>, requests waiting to be sent */
 	mmc_queue_t			readqueue;				/* mmc_queue_t<mmc_request_t *>, requests waiting to be read */
 	char				*host;
-	long				timeout;				/* network timeout */
+	struct timeval		timeout;				/* network timeout for this server */
 	int					persistent;
 	uint16_t			reqid;					/* next sequential request id */
 	char				*error;					/* last error message */
@@ -306,6 +306,7 @@ struct mmc_pool {
 	void					*hash_state;				/* strategy specific state */
 	fd_set					wfds;
 	fd_set					rfds;
+	struct timeval			timeout;					/* smallest timeout for any of the servers */
 	int						in_select;
 	mmc_queue_t				*sending;					/* mmc_queue_t<mmc_t *>, connections that want to send */
 	mmc_queue_t				*reading;					/* mmc_queue_t<mmc_t *>, connections that want to read */
@@ -320,7 +321,7 @@ struct mmc_pool {
 };
 
 /* server functions */
-mmc_t *mmc_server_new(const char *, int, unsigned short, unsigned short, int, int, int TSRMLS_DC);
+mmc_t *mmc_server_new(const char *, int, unsigned short, unsigned short, int, double, int TSRMLS_DC);
 void mmc_server_free(mmc_t * TSRMLS_DC);
 void mmc_server_disconnect(mmc_t *mmc, mmc_stream_t *io TSRMLS_DC);
 int mmc_server_valid(mmc_t * TSRMLS_DC);
@@ -333,7 +334,7 @@ void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
 void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
 void mmc_pool_close(mmc_pool_t * TSRMLS_DC);
 int mmc_pool_open(mmc_pool_t *, mmc_t *, mmc_stream_t *, int TSRMLS_DC);
-void mmc_pool_select(mmc_pool_t *, long TSRMLS_DC);
+void mmc_pool_select(mmc_pool_t * TSRMLS_DC);
 void mmc_pool_run(mmc_pool_t * TSRMLS_DC);
 mmc_t *mmc_pool_find_next(mmc_pool_t *, const char *, unsigned int, mmc_queue_t *, unsigned int * TSRMLS_DC);
 mmc_t *mmc_pool_find(mmc_pool_t *, const char *, unsigned int TSRMLS_DC);
@@ -358,6 +359,8 @@ int mmc_pool_schedule_get(mmc_pool_t *, int, int, zval *,
 /* utility functions */
 int mmc_pack_value(mmc_pool_t *, mmc_buffer_t *, zval *, unsigned int * TSRMLS_DC);
 int mmc_unpack_value(mmc_t *, mmc_request_t *, mmc_buffer_t *, const char *, unsigned int, unsigned int, unsigned long, unsigned int TSRMLS_DC); 
+double timeval_to_double(struct timeval tv);
+struct timeval double_to_timeval(double sec);
 
 inline int mmc_prepare_key_ex(const char *, unsigned int, char *, unsigned int *);
 inline int mmc_prepare_key(zval *, char *, unsigned int *);

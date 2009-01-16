@@ -477,7 +477,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 			}
 
 			/* begin sending requests immediatly */
-			mmc_pool_select(pool, 0 TSRMLS_CC);
+			mmc_pool_select(pool TSRMLS_CC);
 		}
 	}
 	else if (value) {
@@ -639,7 +639,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 			}
 
 			/* begin sending requests immediatly */
-			mmc_pool_select(pool, 0 TSRMLS_CC);
+			mmc_pool_select(pool TSRMLS_CC);
 		}
 	}
 	else {
@@ -678,7 +678,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 }
 /* }}} */
 
-mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, unsigned short udp_port, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
+mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, unsigned short udp_port, double timeout, int retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 	zend_rsrc_list_entry *le;
@@ -721,7 +721,7 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 	}
 	else {
 		mmc = (mmc_t *)le->ptr;
-		mmc->timeout = timeout;
+		mmc->timeout = double_to_timeval(timeout);
 		mmc->tcp.retry_interval = retry_interval;
 
 		/* attempt to reconnect this node before failover in case connection has gone away */
@@ -740,7 +740,7 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 
 static mmc_t *php_mmc_pool_addserver(
 	zval *mmc_object, const char *host, int host_len, long tcp_port, long udp_port, long weight, 
-	zend_bool persistent, long timeout, long retry_interval, zend_bool status, mmc_pool_t **pool_result TSRMLS_DC) /* {{{ */
+	zend_bool persistent, double timeout, long retry_interval, zend_bool status, mmc_pool_t **pool_result TSRMLS_DC) /* {{{ */
 {
 	zval **connection;
 	mmc_pool_t *pool;
@@ -805,9 +805,10 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 
 	char *host;
 	int host_len;
-	long tcp_port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT;
+	long tcp_port = MEMCACHE_G(default_port);
+	double timeout = MMC_DEFAULT_TIMEOUT;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|ll", &host, &host_len, &tcp_port, &timeout) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|ld", &host, &host_len, &tcp_port, &timeout) == FAILURE) {
 		return;
 	}
 
@@ -1046,7 +1047,7 @@ static void php_mmc_set_failure_callback(mmc_pool_t *pool, zval *mmc_object, zva
    module functions
    ---------------- */
 
-/* {{{ proto bool MemcachePool::connect(string host [, int tcp_port [, int udp_port [, bool persistent [, int weight [, int timeout [, int retry_interval] ] ] ] ] ])
+/* {{{ proto bool MemcachePool::connect(string host [, int tcp_port [, int udp_port [, bool persistent [, int weight [, double timeout [, int retry_interval] ] ] ] ] ])
    Connects to server and returns a Memcache object */
 PHP_NAMED_FUNCTION(zif_memcache_pool_connect)
 {
@@ -1056,10 +1057,11 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_connect)
 
 	char *host;
 	int host_len;
-	long tcp_port = MEMCACHE_G(default_port), udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long tcp_port = MEMCACHE_G(default_port), udp_port = 0, weight = 1, retry_interval = MMC_DEFAULT_RETRY;
+	double timeout = MMC_DEFAULT_TIMEOUT;
 	zend_bool persistent = 1;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|llblll", 
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|llbldl", 
 		&host, &host_len, &tcp_port, &udp_port, &persistent, &weight, &timeout, &retry_interval) == FAILURE) {
 		return;
 	}
@@ -1088,7 +1090,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_connect)
 }
 /* }}} */
 
-/* {{{ proto object memcache_connect(string host [, int port [, int timeout ] ])
+/* {{{ proto object memcache_connect(string host [, int port [, double timeout ] ])
    Connects to server and returns a Memcache object */
 PHP_FUNCTION(memcache_connect)
 {
@@ -1096,7 +1098,7 @@ PHP_FUNCTION(memcache_connect)
 }
 /* }}} */
 
-/* {{{ proto object memcache_pconnect(string host [, int port [, int timeout ] ])
+/* {{{ proto object memcache_pconnect(string host [, int port [, double timeout ] ])
    Connects to server and returns a Memcache object */
 PHP_FUNCTION(memcache_pconnect)
 {
@@ -1104,7 +1106,7 @@ PHP_FUNCTION(memcache_pconnect)
 }
 /* }}} */
 
-/* {{{ proto bool MemcachePool::addServer(string host [, int tcp_port [, int udp_port [, bool persistent [, int weight [, int timeout [, int retry_interval [, bool status] ] ] ] ])
+/* {{{ proto bool MemcachePool::addServer(string host [, int tcp_port [, int udp_port [, bool persistent [, int weight [, double timeout [, int retry_interval [, bool status] ] ] ] ])
    Adds a server to the pool */
 PHP_NAMED_FUNCTION(zif_memcache_pool_addserver)
 {
@@ -1113,10 +1115,11 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_addserver)
 
 	char *host;
 	int host_len;
-	long tcp_port = MEMCACHE_G(default_port), udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long tcp_port = MEMCACHE_G(default_port), udp_port = 0, weight = 1, retry_interval = MMC_DEFAULT_RETRY;
+	double timeout = MMC_DEFAULT_TIMEOUT;
 	zend_bool persistent = 1, status = 1;
 	
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|llblllb", 
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|llbldlb", 
 		&host, &host_len, &tcp_port, &udp_port, &persistent, &weight, &timeout, &retry_interval, &status) == FAILURE) {
 		return;
 	}
@@ -1130,7 +1133,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_addserver)
 }
 /* }}} */
 
-/* {{{ proto bool memcache_add_server(string host [, int port [, bool persistent [, int weight [, int timeout [, int retry_interval [, bool status [, callback failure_callback ] ] ] ] ] ] ])
+/* {{{ proto bool memcache_add_server(string host [, int port [, bool persistent [, int weight [, double timeout [, int retry_interval [, bool status [, callback failure_callback ] ] ] ] ] ] ])
    Adds a connection to the pool. The order in which this function is called is significant */
 PHP_FUNCTION(memcache_add_server)
 {
@@ -1140,17 +1143,18 @@ PHP_FUNCTION(memcache_add_server)
 
 	char *host;
 	int host_len;
-	long tcp_port = MEMCACHE_G(default_port), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long tcp_port = MEMCACHE_G(default_port), weight = 1, retry_interval = MMC_DEFAULT_RETRY;
+	double timeout = MMC_DEFAULT_TIMEOUT;
 	zend_bool persistent = 1, status = 1;
 
 	if (mmc_object) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lblllbz", 
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lbldlbz", 
 			&host, &host_len, &tcp_port, &persistent, &weight, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|lblllbz", &mmc_object, memcache_ce, 
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|lbldlbz", &mmc_object, memcache_ce, 
 			&host, &host_len, &tcp_port, &persistent, &weight, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
 			return;
 		}
@@ -1176,26 +1180,27 @@ PHP_FUNCTION(memcache_add_server)
 }
 /* }}} */
 
-/* {{{ proto bool memcache_set_server_params( string host [, int port [, int timeout [, int retry_interval [, bool status [, callback failure_callback ] ] ] ] ])
+/* {{{ proto bool memcache_set_server_params( string host [, int port [, double timeout [, int retry_interval [, bool status [, callback failure_callback ] ] ] ] ])
    Changes server parameters at runtime */
 PHP_FUNCTION(memcache_set_server_params)
 {
 	zval *mmc_object = getThis(), *failure_callback = NULL;
 	mmc_pool_t *pool;
 	mmc_t *mmc = NULL;
-	long tcp_port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	long tcp_port = MEMCACHE_G(default_port), retry_interval = MMC_DEFAULT_RETRY;
+	double timeout = MMC_DEFAULT_TIMEOUT;
 	zend_bool status = 1;
 	int host_len, i;
 	char *host;
 
 	if (mmc_object) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lllbz", 
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|ldlbz", 
 			&host, &host_len, &tcp_port, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|lllbz", &mmc_object, memcache_pool_ce, 
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|ldlbz", &mmc_object, memcache_pool_ce, 
 			&host, &host_len, &tcp_port, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
 			return;
 		}
@@ -1224,9 +1229,14 @@ PHP_FUNCTION(memcache_set_server_params)
 		}
 	}
 
-	mmc->timeout = timeout;
+	mmc->timeout = double_to_timeval(timeout);
 	mmc->tcp.retry_interval = retry_interval;
 
+	/* store the smallest timeout for any server */
+	if (timeval_to_double(mmc->timeout) < timeval_to_double(pool->timeout)) {
+		pool->timeout = mmc->timeout;
+	}
+	
 	if (!status) {
 		mmc->tcp.status = MMC_STATUS_FAILED;
 		mmc->udp.status = MMC_STATUS_FAILED;
@@ -1901,7 +1911,7 @@ PHP_FUNCTION(memcache_flush)
 		
 		if (mmc_pool_schedule(pool, pool->servers[i], request TSRMLS_CC) == MMC_OK) {
 			/* begin sending requests immediatly */
-			mmc_pool_select(pool, 0 TSRMLS_CC);
+			mmc_pool_select(pool TSRMLS_CC);
 		}
 	}
 

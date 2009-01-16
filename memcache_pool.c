@@ -96,6 +96,17 @@ mmc_hash_function_t mmc_hash_fnv1a = {
 	mmc_hash_fnv1a_finish
 };
 
+double timeval_to_double(struct timeval tv) {
+	return (double)tv.tv_sec + ((double)tv.tv_usec) / 1000000;
+}
+
+struct timeval double_to_timeval(double sec) {
+	struct timeval tv;
+	tv.tv_sec = (long)sec;
+	tv.tv_usec = (sec - tv.tv_sec) * 1000000;
+	return tv;
+}
+
 static size_t mmc_stream_read_buffered(mmc_stream_t *io, char *buf, size_t count TSRMLS_DC) /* 
 	attempts to reads count bytes from the stream buffer {{{ */
 {
@@ -514,7 +525,7 @@ int mmc_unpack_value(
 
 mmc_t *mmc_server_new(
 	const char *host, int host_len, unsigned short tcp_port, unsigned short udp_port, 
-	int persistent, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
+	int persistent, double timeout, int retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc = pemalloc(sizeof(mmc_t), persistent);
 	memset(mmc, 0, sizeof(*mmc));
@@ -529,7 +540,7 @@ mmc_t *mmc_server_new(
 	mmc->udp.status = MMC_STATUS_DISCONNECTED;
 	
 	mmc->persistent = persistent;
-	mmc->timeout = timeout;
+	mmc->timeout = double_to_timeval(timeout);
 	
 	mmc->tcp.retry_interval = retry_interval;
 	mmc->tcp.chunk_size = MEMCACHE_G(chunk_size);
@@ -664,7 +675,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 {
 	char *host, *hash_key = NULL, *errstr = NULL;
 	int	host_len, errnum = 0;
-	struct timeval tv;
+	struct timeval tv = mmc->timeout;
 
 	/* close open stream */
 	if (io->stream != NULL) {
@@ -674,9 +685,6 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	if (mmc->persistent) {
 		spprintf(&hash_key, 0, "memcache:stream:%s:%u:%d", mmc->host, io->port, udp);
 	}
-
-	tv.tv_sec = mmc->timeout;
-	tv.tv_usec = 0;
 
 #if PHP_API_VERSION > 20020918
 
@@ -752,7 +760,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	php_stream_auto_cleanup(io->stream);
 	php_stream_set_chunk_size(io->stream, io->chunk_size);
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_BLOCKING, 0, NULL);
-	php_stream_set_option(io->stream, PHP_STREAM_OPTION_READ_TIMEOUT, 0, &tv);
+	php_stream_set_option(io->stream, PHP_STREAM_OPTION_READ_TIMEOUT, 0, &(mmc->timeout));
 	
 	/* doing our own buffering increases performance */
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_READ_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
@@ -918,6 +926,12 @@ void mmc_pool_add(mmc_pool_t *pool, mmc_t *mmc, unsigned int weight) /*
 	pool->hash->add_server(pool->hash_state, mmc, weight);
 	pool->servers = erealloc(pool->servers, sizeof(*pool->servers) * (pool->num_servers + 1));
 	pool->servers[pool->num_servers] = mmc;
+	
+	/* store the smallest timeout for any server */
+	if (!pool->num_servers || timeval_to_double(mmc->timeout) < timeval_to_double(pool->timeout)) {
+		pool->timeout = mmc->timeout;
+	}
+
 	pool->num_servers++;
 }
 /* }}} */
@@ -1264,7 +1278,7 @@ int mmc_pool_schedule_get(
 		mmc_pool_schedule(pool, mmc, mmc->buildreq TSRMLS_CC);
 
 		/* begin sending requests immediatly */
-		mmc_pool_select(pool, 0 TSRMLS_CC);
+		mmc_pool_select(pool TSRMLS_CC);
 		
 		mmc->buildreq = mmc_pool_request_get(
 			pool, protocol, value_handler, value_handler_param, 
@@ -1359,7 +1373,7 @@ static void mmc_select_retry(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reques
 }
 /* }}} */
 
-void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /* 
+void mmc_pool_select(mmc_pool_t *pool TSRMLS_DC) /* 
 	runs one select() round on all scheduled requests {{{ */
 {
 	int i, fd, result;
@@ -1378,8 +1392,8 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 		}
 	}
 	else {
-		struct timeval tv;
 		int nfds = 0;
+		struct timeval tv = pool->timeout;
 
 		sending = pool->sending;
 		reading = pool->reading;
@@ -1387,9 +1401,6 @@ void mmc_pool_select(mmc_pool_t *pool, long timeout TSRMLS_DC) /*
 
 		FD_ZERO(&(pool->wfds));
 		FD_ZERO(&(pool->rfds));
-
-		tv.tv_sec = timeout;
-		tv.tv_usec = 0;
 
 		for (i=0; i < sending->len; i++) {
 			mmc = mmc_queue_item(sending, i);
@@ -1638,8 +1649,7 @@ void mmc_pool_run(mmc_pool_t *pool TSRMLS_DC)  /*
 	}
 
 	while (pool->reading->len || pool->sending->len) {
-		/* TODO: replace 1 with pool->timeout */
-		mmc_pool_select(pool, 1 TSRMLS_CC);
+		mmc_pool_select(pool TSRMLS_CC);
 	}
 }
 /* }}} */

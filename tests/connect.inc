@@ -36,8 +36,13 @@ if (ini_get('memcache.protocol') == 'binary') {
  */
 $domainsocket = 'unix:///var/run/memcached/memcached.sock';
 
+// A server which is guaranteed to fail immediatly
 $nonExistingHost = "localhost";
 $nonExistingPort = 11213;
+
+// A server which times out when attempting to connect to
+$unreachableHost = '10.254.254.254';
+$unreachablePort = 11211;
 
 $udpPacketSize = 1400;
 
