@@ -39,9 +39,12 @@ http://pear.php.net/dtd/package-2.0.xsd">
     - Improved performance of consistent hash strategy
     - Accept timeout parameter as float to enable microsecond timeouts, param is still 
       given in seconds but with a microsecond fraction.
+    - Added session locking to avoid concurrency problems with AJAX apps
     - Fixed PECL bug #14642 (3.0.x breaks BC with 2.2.x)
     - Fixed PECL request #13758 (Failed to extract 'connection' variable from object)
     - Fixed PECL request #14658 (Allow connection timeouts in ms, not seconds)
+    - New INI directive
+       memcache.lock_timeout = 15
   </notes>
   <contents>
     <dir name="/">

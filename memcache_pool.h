@@ -82,7 +82,7 @@
 #define MMC_REQUEST_RETRY 		3			/* retry/reschedule request */
 
 #define MMC_RESPONSE_UNKNOWN		-2
-#define MMC_RESPONSE_ERROR			-1				
+#define MMC_RESPONSE_ERROR			-1
 #define MMC_RESPONSE_NOT_FOUND		0x01			/* same as binary protocol */
 #define MMC_RESPONSE_EXISTS			0x02			/* same as binary protocol */
 #define MMC_RESPONSE_TOO_LARGE		0x03			/* same as binary protocol */
@@ -105,7 +105,7 @@ typedef struct mmc_buffer {
 } mmc_buffer_t;
 
 #define mmc_buffer_release(b) memset((b), 0, sizeof(*(b)))
-#define mmc_buffer_reset(b) (b)->value.len = (b)->idx = 0   
+#define mmc_buffer_reset(b) (b)->value.len = (b)->idx = 0
 
 inline void mmc_buffer_alloc(mmc_buffer_t *, unsigned int);
 inline void mmc_buffer_free(mmc_buffer_t *);
@@ -126,8 +126,8 @@ struct mmc_stream {
 	long					failed;						/* the timestamp the stream was marked as failed */
 	long					retry_interval;				/* seconds to wait before automatic reconnect */
 	mmc_buffer_t			buffer;						/* read buffer (when using udp) */
-	mmc_stream_read			read;						/* handles reading from stream */ 
-	mmc_stream_readline		readline;					/* handles reading lines from stream */ 
+	mmc_stream_read			read;						/* handles reading from stream */
+	mmc_stream_readline		readline;					/* handles reading lines from stream */
 	struct {											/* temporary input buffer, see mmc_server_readline() */
 		char				value[MMC_BUFFER_SIZE];
 		int					idx;
@@ -142,7 +142,7 @@ typedef struct mmc_request mmc_request_t;
 typedef int (*mmc_request_reader)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_parser)(mmc_t *mmc, mmc_request_t *request TSRMLS_DC);
 typedef int (*mmc_request_value_handler)(
-	const char *key, unsigned int key_len, zval *value, 
+	const char *key, unsigned int key_len, zval *value,
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC);
 typedef int (*mmc_request_response_handler)(
 	mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param TSRMLS_DC);
@@ -165,11 +165,11 @@ struct mmc_request {
 	mmc_request_reader				read;							/* handles reading (and validating datagrams) */
 	mmc_request_parser				parse;							/* called to parse response payload */
 	mmc_request_value_handler		value_handler;					/* called when result value have been parsed */
-	void							*value_handler_param;			
+	void							*value_handler_param;
 	mmc_request_response_handler	response_handler;				/* called when a non-value response has been received */
-	void							*response_handler_param;		
+	void							*response_handler_param;
 	mmc_request_failover_handler	failover_handler;				/* called to perform failover of failed request */
-	void							*failover_handler_param;		
+	void							*failover_handler_param;
 	struct {
 		uint16_t		reqid;										/* id of the request, increasing value set by client */
 		uint16_t		seqid;										/* next expected seqid */
@@ -213,7 +213,7 @@ struct mmc {
 #define MMC_OP_REPLACE		0x03
 #define MMC_OP_GETS			0x32
 #define MMC_OP_CAS			0x33
-#define MMC_OP_APPEND		0x34	/* not supported by binary protocol */ 
+#define MMC_OP_APPEND		0x34	/* not supported by binary protocol */
 #define MMC_OP_PREPEND		0x35	/* not supported by binary protocol */
 
 typedef mmc_request_t * (*mmc_protocol_create_request)();
@@ -227,7 +227,7 @@ typedef void (*mmc_protocol_append_get)(mmc_request_t *request, zval *zkey, cons
 typedef void (*mmc_protocol_end_get)(mmc_request_t *request);
 
 typedef int (*mmc_protocol_store)(
-	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len, 
+	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len,
 	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC);
 typedef void (*mmc_protocol_delete)(mmc_request_t *request, const char *key, unsigned int key_len, unsigned int exptime);
 typedef void (*mmc_protocol_mutate)(mmc_request_t *request, zval *zkey, const char *key, unsigned int key_len, long value, long defval, int defval_used, unsigned int exptime);
@@ -241,16 +241,16 @@ typedef struct mmc_protocol {
 	mmc_protocol_clone_request	clone_request;
 	mmc_protocol_reset_request	reset_request;
 	mmc_protocol_free_request	free_request;
-	
+
 	mmc_protocol_get		get;
 	mmc_protocol_begin_get	begin_get;
 	mmc_protocol_append_get	append_get;
 	mmc_protocol_end_get	end_get;
-	
+
 	mmc_protocol_store		store;
 	mmc_protocol_delete		delete;
 	mmc_protocol_mutate		mutate;
-	
+
 	mmc_protocol_flush		flush;
 	mmc_protocol_version	version;
 	mmc_protocol_stats		stats;
@@ -292,7 +292,7 @@ extern mmc_hash_strategy_t mmc_consistent_hash;
 
 /* 32 bit magic FNV-1a prime and init */
 #define FNV_32_PRIME	0x01000193
-#define FNV_32_INIT		0x811c9dc5 
+#define FNV_32_INIT		0x811c9dc5
 
 /* failure callback prototype */
 typedef void (*mmc_failure_callback)(mmc_pool_t *pool, mmc_t *mmc, void *param TSRMLS_DC);
@@ -340,6 +340,7 @@ mmc_t *mmc_pool_find_next(mmc_pool_t *, const char *, unsigned int, mmc_queue_t 
 mmc_t *mmc_pool_find(mmc_pool_t *, const char *, unsigned int TSRMLS_DC);
 int mmc_pool_schedule(mmc_pool_t *, mmc_t *, mmc_request_t * TSRMLS_DC);
 int mmc_pool_failover_handler(mmc_pool_t *, mmc_t *, mmc_request_t *, void * TSRMLS_DC);
+int mmc_pool_failover_handler_null(mmc_pool_t *, mmc_t *, mmc_request_t *, void * TSRMLS_DC);
 
 mmc_request_t *mmc_pool_request(mmc_pool_t *, int,
 	mmc_request_response_handler, void *, mmc_request_failover_handler, void * TSRMLS_DC);
@@ -353,12 +354,12 @@ int mmc_prepare_store(
 	const char *, unsigned int, unsigned int, unsigned int, zval * TSRMLS_DC);
 
 int mmc_pool_schedule_key(mmc_pool_t *, const char *, unsigned int, mmc_request_t *, unsigned int TSRMLS_DC);
-int mmc_pool_schedule_get(mmc_pool_t *, int, int, zval *, 
+int mmc_pool_schedule_get(mmc_pool_t *, int, int, zval *,
 	mmc_request_value_handler, void *, mmc_request_failover_handler, void *, mmc_request_t * TSRMLS_DC);
 
 /* utility functions */
 int mmc_pack_value(mmc_pool_t *, mmc_buffer_t *, zval *, unsigned int * TSRMLS_DC);
-int mmc_unpack_value(mmc_t *, mmc_request_t *, mmc_buffer_t *, const char *, unsigned int, unsigned int, unsigned long, unsigned int TSRMLS_DC); 
+int mmc_unpack_value(mmc_t *, mmc_request_t *, mmc_buffer_t *, const char *, unsigned int, unsigned int, unsigned long, unsigned int TSRMLS_DC);
 double timeval_to_double(struct timeval tv);
 struct timeval double_to_timeval(double sec);
 
@@ -379,6 +380,7 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long redundancy;
 	long session_redundancy;
 	long compress_threshold;
+	long lock_timeout;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #ifdef ZTS
