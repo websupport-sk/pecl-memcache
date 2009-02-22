@@ -1422,9 +1422,12 @@ void mmc_pool_select(mmc_pool_t *pool TSRMLS_DC) /*
 
 		result = select(nfds + 1, &(pool->rfds), &(pool->wfds), NULL, &tv);
 
+		/* if select timed out */
 		if (result <= 0) {
 			for (i=0; i < sending->len; i++) {
 				mmc = (mmc_t *)mmc_queue_item(sending, i);
+				
+				/* remove sending request */
 				if (!FD_ISSET(mmc->sendreq->io->fd, &(pool->wfds))) {
 					mmc_queue_remove(sending, mmc);
 					mmc_queue_remove(reading, mmc);
@@ -1439,6 +1442,8 @@ void mmc_pool_select(mmc_pool_t *pool TSRMLS_DC) /*
 
 			for (i=0; i < reading->len; i++) {
 				mmc = (mmc_t *)mmc_queue_item(reading, i);
+				
+				/* remove reading request */
 				if (!FD_ISSET(mmc->readreq->io->fd, &(pool->rfds))) {
 					mmc_queue_remove(sending, mmc);
 					mmc_queue_remove(reading, mmc);
