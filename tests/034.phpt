@@ -34,8 +34,8 @@ var_dump($result[key($result)][1]);
 $result = $memcache->getStats('items');
 var_dump($result['items'][$slab]['number']);
 
-$result = $memcache->getStats('sizes');
-var_dump($result['64']);
+//$result = $memcache->getStats('sizes');
+//var_dump($result['64']);
 
 print "\n";
 
@@ -51,7 +51,6 @@ bool(true)
 string(%d) "%d"
 bool(false)
 bool(true)
-string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
