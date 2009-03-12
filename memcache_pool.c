@@ -777,6 +777,14 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 		io->read = mmc_stream_read_wrapper;
 		io->readline = mmc_stream_readline_wrapper;
 	}
+	
+#ifdef SO_NOSIGPIPE
+	/* Mac OS X doesn't have MSG_NOSIGNAL */
+	{
+		int optval = 1;
+		setsockopt(io->fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&optval, sizeof(optval));
+	}
+#endif
 
 	if (mmc->error != NULL) {
 		efree(mmc->error);

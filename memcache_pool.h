@@ -26,6 +26,14 @@
 #include "config.h"
 #endif
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+
 #include <stdint.h>
 #include <string.h>
 
@@ -40,6 +48,15 @@
 #else
 #define ZSTR_VAL(v) (v).s
 #endif
+
+/*
+ * Mac OS X has no MSG_NOSIGNAL but >= 10.2 comes with SO_NOSIGPIPE which is a setsockopt() option
+ * and not a send() parameter as MSG_NOSIGNAL. OpenBSD has none of the options so we need to ignore 
+ * SIGPIPE events
+ */
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif /*MSG_NOSIGNAL*/
 
 /* use lowest byte for flags */
 #define MMC_SERIALIZED	0x0001

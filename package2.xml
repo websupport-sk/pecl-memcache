@@ -17,7 +17,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <name>Antony Dovgal</name>
     <user>tony2001</user>
     <email>tony@daylessday.org</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
   <lead>
     <name>Mikael Johansson</name>
@@ -25,26 +25,18 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2009-02-22</date>
+  <date>2009-xx-xx</date>
   <version>
-    <release>3.0.4</release>
-    <api>3.0.4</api>
+    <release>3.0.5</release>
+    <api>3.0.5</api>
   </version>
   <stability>
-    <release>beta</release>
-    <api>beta</api>
+    <release>stable</release>
+    <api>stable</api>
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    - Improved performance of consistent hash strategy
-    - Accept timeout parameter as float to enable microsecond timeouts, param is still 
-      given in seconds but with a microsecond fraction.
-    - Added session locking to avoid concurrency problems with AJAX apps
-    - Fixed PECL bug #14642 (3.0.x breaks BC with 2.2.x)
-    - Fixed PECL request #13758 (Failed to extract 'connection' variable from object)
-    - Fixed PECL request #14658 (Allow connection timeouts in ms, not seconds)
-    - New INI directive
-       memcache.lock_timeout = 15
+    - Fixed PECL bug #16059 (Build error: 'MSG_NOSIGNAL' undeclared) 
   </notes>
   <contents>
     <dir name="/">
@@ -84,6 +76,29 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <configureoption name="enable-memcache-session" default="yes" prompt="Enable memcache session handler support?" />
   </extsrcrelease>
   <changelog>
+    <release>
+      <date>2009-02-22</date>
+      <version>
+        <release>3.0.4</release>
+        <api>3.0.4</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Improved performance of consistent hash strategy
+        - Accept timeout parameter as float to enable microsecond timeouts, param is still 
+          given in seconds but with a microsecond fraction.
+        - Added session locking to avoid concurrency problems with AJAX apps
+        - Fixed PECL bug #14642 (3.0.x breaks BC with 2.2.x)
+        - Fixed PECL request #13758 (Failed to extract 'connection' variable from object)
+        - Fixed PECL request #14658 (Allow connection timeouts in ms, not seconds)
+        - New INI directive
+           memcache.lock_timeout = 15
+      </notes>
+    </release>
     <release>
       <date>2009-01-13</date>
       <version>
