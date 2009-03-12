@@ -1172,7 +1172,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
 	}
 	
 	mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
-	spprintf(&hostname, 0, "%s:%d:%d", mmc->host, mmc->tcp.port, mmc->udp.port);	
+	spprintf(&hostname, 0, "%s:%d", mmc->host, mmc->tcp.port);	
 	RETURN_STRING(hostname, 0);
 }
 /* }}} */

@@ -134,7 +134,7 @@ class MemcachePool() {
 	/**
 	 * Locates the server a given would be hashed to
 	 * 
-	 * Returns a string "hostname:tcpport:udpport" on success
+	 * Returns a string "hostname:port" on success
 	 * Returns false on failure such as invalid key
 	 */
 	string findServer(string key)

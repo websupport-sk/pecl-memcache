@@ -12,4 +12,4 @@ var_dump($result);
 
 ?>
 --EXPECTF--
-string(%d) "%s:%d:%d"
+string(%d) "%s:%d"
