@@ -130,6 +130,14 @@ class MemcachePool() {
 	 * Where $host and $error are strings or null, the other params are integers.
 	 */
 	bool setFailureCallback(function callback)
+	
+	/**
+	 * Locates the server a given would be hashed to
+	 * 
+	 * Returns a string "hostname:tcpport:udpport" on success
+	 * Returns false on failure such as invalid key
+	 */
+	string findServer(string key)
 }
 
 

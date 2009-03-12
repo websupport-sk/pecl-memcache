@@ -39,6 +39,7 @@ PHP_MINFO_FUNCTION(memcache);
 
 PHP_NAMED_FUNCTION(zif_memcache_pool_connect);
 PHP_NAMED_FUNCTION(zif_memcache_pool_addserver);
+PHP_NAMED_FUNCTION(zif_memcache_pool_findserver);
 
 PHP_FUNCTION(memcache_connect);
 PHP_FUNCTION(memcache_pconnect);

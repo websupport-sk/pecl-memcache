@@ -36,6 +36,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
+    - Added method MemcachePool::findServer(key) which returns the server a key hashes to
     - Fixed PECL bug #16059 (Build error: 'MSG_NOSIGNAL' undeclared) 
   </notes>
   <contents>

@@ -75,6 +75,7 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(setserverparams,			memcache_set_server_params,			NULL)
 	PHP_FALIAS(setfailurecallback,		memcache_set_failure_callback,		NULL)
 	PHP_FALIAS(getserverstatus,			memcache_get_server_status,			NULL)
+	PHP_NAMED_FE(findserver,			zif_memcache_pool_findserver,		NULL)
 	PHP_FALIAS(getversion,				memcache_get_version,				NULL)
 	PHP_FALIAS(add,						memcache_add,						NULL)
 	PHP_FALIAS(set,						memcache_set,						NULL)
@@ -262,11 +263,6 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.compress_threshold",	"20000",		PHP_INI_ALL, OnUpdateCompressThreshold,	compress_threshold,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.lock_timeout",			"15",			PHP_INI_ALL, OnUpdateLockTimeout,		lock_timeout,		zend_memcache_globals,	memcache_globals)
 PHP_INI_END()
-/* }}} */
-
-/* {{{ macros */
-#define MMC_PREPARE_KEY(key, key_len) \
-	php_strtr(key, key_len, "\t\r\n ", "____", 4); \
 /* }}} */
 
 /* {{{ internal function protos */
@@ -1145,6 +1141,39 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_addserver)
 	}
 
 	RETURN_TRUE;
+}
+/* }}} */
+
+/* {{{ proto string MemcachePool::findServer(string key)
+	Returns the server corresponding to a key
+*/
+PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
+{
+	zval *mmc_object = getThis();
+	mmc_pool_t *pool;
+	mmc_t *mmc;
+	
+	zval *zkey;
+	char key[MMC_MAX_KEY_LEN + 1];
+	unsigned int key_len;
+	char *hostname;
+
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &zkey) == FAILURE) {
+		return;
+	}
+	
+	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
+		RETURN_FALSE;
+	}
+
+	if (mmc_prepare_key(zkey, key, &key_len) != MMC_OK) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
+		RETURN_FALSE;
+	}
+	
+	mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
+	spprintf(&hostname, 0, "%s:%d:%d", mmc->host, mmc->tcp.port, mmc->udp.port);	
+	RETURN_STRING(hostname, 0);
 }
 /* }}} */
 
