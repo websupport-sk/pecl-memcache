@@ -8,6 +8,7 @@ if (PHP_MEMCACHE != "no") {
 		EXTENSION("memcache", "memcache.c memcache_queue.c memcache_standard_hash.c memcache_consistent_hash.c memcache_session.c");
 		AC_DEFINE('HAVE_MEMCACHE', 1, 'Have memcache support');
 		ADD_FLAG("CFLAGS_MEMCACHE", "/D HAVE_MEMCACHE_SESSION=1");
+		ADD_EXTENSION_DEP('memcache', 'session');
 	} else {
 		WARNING("memcache not enabled; libraries and headers not found");
 	}
