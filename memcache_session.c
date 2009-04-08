@@ -32,6 +32,10 @@
 #include "ext/standard/url.h"
 #include "php_memcache.h"
 
+#if HAVE_MEMCACHE_SESSION
+#include "session\php_session.h"
+#endif
+
 ps_module ps_mod_memcache = {
 	PS_MOD(memcache)
 };
