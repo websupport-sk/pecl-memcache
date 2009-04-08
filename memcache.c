@@ -42,6 +42,10 @@
 #include "php_memcache.h"
 #include "memcache_queue.h"
 
+#if HAVE_MEMCACHE_SESSION
+#include "session\php_session.h"
+#endif
+
 #ifndef ZEND_ENGINE_2
 #define OnUpdateLong OnUpdateInt
 #endif
