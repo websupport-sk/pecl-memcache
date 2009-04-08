@@ -33,7 +33,7 @@
 #include "php_memcache.h"
 
 #if HAVE_MEMCACHE_SESSION
-#include "session\php_session.h"
+#include "session/php_session.h"
 #endif
 
 ps_module ps_mod_memcache = {
