@@ -43,7 +43,7 @@
 #include "memcache_queue.h"
 
 #if HAVE_MEMCACHE_SESSION
-#include "session/php_session.h"
+#include "ext/session/php_session.h"
 #endif
 
 #ifndef ZEND_ENGINE_2
