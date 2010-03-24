@@ -2037,7 +2037,7 @@ PHP_FUNCTION(memcache_add_server)
 		timeoutms = MEMCACHE_G(default_timeout_ms);
 	}
 
-	if (weight < 0) {
+	if (weight < 1) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "weight must be a positive integer");
 		RETURN_FALSE;
 	}
