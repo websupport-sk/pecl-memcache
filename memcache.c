@@ -758,7 +758,7 @@ static mmc_t *php_mmc_pool_addserver(
 	mmc_t *mmc;
 	int list_id, resource_type;
 
-	if (weight < 0) {
+	if (weight < 1) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "weight must be a positive integer");
 		return NULL;
 	}
