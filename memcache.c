@@ -926,6 +926,7 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 		tv = _convert_timeoutms_to_ts(mmc->connect_timeoutms);
 	} else {
 		tv.tv_sec = mmc->timeout;
+		tv.tv_usec = 0;
 	}
 
 	if (mmc->port) {
