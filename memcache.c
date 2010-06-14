@@ -638,7 +638,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 			}
 
 			if (deleted) {
-				pool->protocol->delete(request, request->key, request->key_len, value);
+				pool->protocol->delete(request, request->key, request->key_len, exptime);
 			}
 			else {
 				pool->protocol->mutate(request, *key, request->key, request->key_len, invert ? -value : value, defval, defval_used, exptime);
@@ -672,7 +672,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 		}
 
 		if (deleted) {
-			pool->protocol->delete(request, request->key, request->key_len, value);
+			pool->protocol->delete(request, request->key, request->key_len, exptime);
 		}
 		else {
 			pool->protocol->mutate(request, keys, request->key, request->key_len, invert ? -value : value, defval, defval_used, exptime);
