@@ -363,6 +363,7 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 
 		case IS_LONG:
 			*flags |= MMC_TYPE_LONG;
+			*flags &= ~MMC_COMPRESSED;
 			smart_str_append_long(&(buffer->value), Z_LVAL_P(value));
 			break;
 
@@ -370,12 +371,14 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 			char buf[256];
 			int len = snprintf(buf, 256, "%.14g", Z_DVAL_P(value));
 			*flags |= MMC_TYPE_DOUBLE;
+			*flags &= ~MMC_COMPRESSED;
 			smart_str_appendl(&(buffer->value), buf, len);
 			break;
 		}
 
 		case IS_BOOL:
 			*flags |= MMC_TYPE_BOOL;
+			*flags &= ~MMC_COMPRESSED;
 			smart_str_appendc(&(buffer->value), Z_BVAL_P(value) ? '1' : '0');
 			break;
 
