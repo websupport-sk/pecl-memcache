@@ -12,6 +12,7 @@ var_dump($result);
 
 $result = $memcache->getStats();
 var_dump($result['pid']);
+$version = $result['version'];
 
 $result = $memcache->getStats('abc');
 var_dump($result);
@@ -19,8 +20,13 @@ var_dump($result);
 $result = $memcache->getStats('reset');
 var_dump($result);
 
-$result = $memcache->getStats('malloc');
-var_dump($result['arena_size']);
+// malloc was removed in memcached 1.4.0
+if ($version >= '1.4.0') {
+	var_dump("0");
+} else {
+	$result = $memcache->getStats('malloc');
+	var_dump($result['arena_size']);
+}
 
 $result = $memcache->getStats('slabs');
 var_dump($result[key($result)]['chunk_size']);
