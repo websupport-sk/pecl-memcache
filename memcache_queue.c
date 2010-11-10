@@ -27,6 +27,8 @@
 #include "memcache_queue.h"
 
 inline void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
+	if (mmc_queue_contains(queue, ptr)) return;
+
 	if (queue->len >= queue->alloc) {
 		int increase = 1 + MMC_QUEUE_PREALLOC;
 		queue->alloc += increase;
