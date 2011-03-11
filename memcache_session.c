@@ -426,6 +426,17 @@ static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, int response,
 		return MMC_REQUEST_DONE;
 	}
 
+	if (response == MMC_RESPONSE_CLIENT_ERROR) {
+		ZVAL_FALSE((zval *)param);
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, 
+				"Server %s (tcp %d, udp %d) failed with: %s (%d)",
+				mmc->host, mmc->tcp.port, 
+				mmc->udp.port, message, response);
+
+		return MMC_REQUEST_DONE;
+	}
+
+
 	return mmc_request_failure(mmc, request->io, message, message_len, 0 TSRMLS_CC);
 }
 /* }}} */

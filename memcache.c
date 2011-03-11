@@ -396,7 +396,8 @@ int mmc_stored_handler(mmc_t *mmc, mmc_request_t *request, int response, const c
 	}
 
 	/* return FALSE or catch memory errors without failover */
-	if (response == MMC_RESPONSE_EXISTS || response == MMC_RESPONSE_OUT_OF_MEMORY || response == MMC_RESPONSE_TOO_LARGE) {
+	if (response == MMC_RESPONSE_EXISTS || response == MMC_RESPONSE_OUT_OF_MEMORY || response == MMC_RESPONSE_TOO_LARGE 
+			|| response == MMC_RESPONSE_CLIENT_ERROR) {
 		ZVAL_FALSE(result);
 
 		if (response != MMC_RESPONSE_EXISTS) {
@@ -542,12 +543,19 @@ int mmc_numeric_response_handler(mmc_t *mmc, mmc_request_t *request, int respons
 		return MMC_REQUEST_DONE;
 	}
 
-	if (response == MMC_RESPONSE_NOT_FOUND) {
+	if (response == MMC_RESPONSE_NOT_FOUND || response == MMC_RESPONSE_CLIENT_ERROR) {
 		if (Z_TYPE_P(result) == IS_ARRAY) {
 			add_assoc_bool_ex(result, request->key, request->key_len + 1, 0);
 		}
 		else {
 			ZVAL_FALSE(result);
+		}
+
+		if (response != MMC_RESPONSE_NOT_FOUND) {
+			php_error_docref(NULL TSRMLS_CC, 
+					E_NOTICE, "Server %s (tcp %d, udp %d) failed with: %s (%d)",
+					mmc->host, mmc->tcp.port, 
+					mmc->udp.port, message, response);
 		}
 
 		return MMC_REQUEST_DONE;
@@ -1916,6 +1924,16 @@ static int mmc_flush_handler(mmc_t *mmc, mmc_request_t *request, int response, c
 {
 	if (response == MMC_OK) {
 		(*((int *)param))++;
+		return MMC_REQUEST_DONE;
+	}
+
+	if (response == MMC_RESPONSE_CLIENT_ERROR) {
+		ZVAL_FALSE((zval *)param);
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE, 
+				"Server %s (tcp %d, udp %d) failed with: %s (%d)",
+				mmc->host, mmc->tcp.port, 
+				mmc->udp.port, message, response);
+
 		return MMC_REQUEST_DONE;
 	}
 

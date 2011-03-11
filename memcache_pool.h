@@ -104,6 +104,7 @@
 #define MMC_RESPONSE_EXISTS			0x02			/* same as binary protocol */
 #define MMC_RESPONSE_TOO_LARGE		0x03			/* same as binary protocol */
 #define MMC_RESPONSE_NOT_STORED		0x05			/* same as binary protocol */
+#define MMC_RESPONSE_CLIENT_ERROR	0x06
 #define MMC_RESPONSE_UNKNOWN_CMD	0x81			/* same as binary protocol */
 #define MMC_RESPONSE_OUT_OF_MEMORY	0x82			/* same as binary protocol */
 

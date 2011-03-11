@@ -84,10 +84,12 @@ static int mmc_request_check_response(const char *line, int line_len) /*
 	}
 	else if (
 		mmc_str_left(line, "ERROR", line_len, sizeof("ERROR")-1) ||
-		mmc_str_left(line, "SERVER_ERROR", line_len, sizeof("SERVER_ERROR")-1) ||
-		mmc_str_left(line, "CLIENT_ERROR", line_len, sizeof("CLIENT_ERROR")-1)) 
+		mmc_str_left(line, "SERVER_ERROR", line_len, sizeof("SERVER_ERROR")-1)) 
 	{
 		response = MMC_RESPONSE_ERROR;
+	}
+	else if (mmc_str_left(line, "CLIENT_ERROR", line_len, sizeof("CLIENT_ERROR")-1)) {
+		response = MMC_RESPONSE_CLIENT_ERROR;
 	}
 	else {
 		response = MMC_RESPONSE_UNKNOWN;
