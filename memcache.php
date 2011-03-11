@@ -25,8 +25,9 @@ define('DATE_FORMAT','Y/m/d H:i:s');
 define('GRAPH_SIZE',200);
 define('MAX_ITEM_DUMP',50);
 
-$MEMCACHE_SERVERS[] = 'mymemcache-server1:11211'; // add more as an array
-$MEMCACHE_SERVERS[] = 'mymemcache-server2:11211'; // add more as an array
+$MEMCACHE_SERVERS[] = 'localhost:11211'; // add more as an array
+//$MEMCACHE_SERVERS[] = 'mymemcache-server1:11211'; // add more as an array
+//$MEMCACHE_SERVERS[] = 'mymemcache-server2:11211'; // add more as an array
 
 
 ////////// END OF DEFAULT CONFIG AREA /////////////////////////////////////////////////////////////
@@ -848,11 +849,19 @@ EOB;
         <div class="info"><table cellspacing=0><tbody>
 			<tr><th>Server<th>Key</th><th>Value</th><th>Delete</th></tr>
 EOB;
-        echo "<tr><td class=td-0>",$theserver,"</td><td class=td-0>",$theKey,
-             " <br/>flag:",$r['VALUE'][$theKey]['stat']['flag'],
-             " <br/>Size:",bsize($r['VALUE'][$theKey]['stat']['size']),
-             "</td><td>",chunk_split($r['VALUE'][$theKey]['value'],40),"</td>",
-             '<td><a href="',$PHP_SELF,'&op=5&server=',(int)$_GET['server'],'&key=',base64_encode($theKey),"\">Delete</a></td>","</tr>";
+        if (!isset($r['VALUE'])) {
+            echo "<tr><td class=td-0>",$theserver,"</td><td class=td-0>",$theKey,
+                 "</td><td>[The requested item was not found or has expired]</td>",
+                 "<td></td>","</tr>";
+        }
+        else {
+
+            echo "<tr><td class=td-0>",$theserver,"</td><td class=td-0>",$theKey,
+                 " <br/>flag:",$r['VALUE'][$theKey]['stat']['flag'],
+                 " <br/>Size:",bsize($r['VALUE'][$theKey]['stat']['size']),
+                 "</td><td>",chunk_split($r['VALUE'][$theKey]['value'],40),"</td>",
+                 '<td><a href="',$PHP_SELF,'&op=5&server=',(int)$_GET['server'],'&key=',base64_encode($theKey),"\">Delete</a></td>","</tr>";
+        }
         echo <<<EOB
 			</tbody></table>
 			</div><hr/>
