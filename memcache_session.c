@@ -333,7 +333,7 @@ PS_READ_FUNC(memcache)
 					timeout = 1000000;
 				}
 			}
-		} while (skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers && remainingtime > 0);
+		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers && remainingtime > 0);
 
 		mmc_queue_free(&skip_servers);
 		zval_dtor(&dataresult);
@@ -402,7 +402,7 @@ PS_WRITE_FUNC(memcache)
 				mmc_pool_release(pool, lockrequest);
 				continue;
 			}
-		} while (skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers);
+		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers);
 
 		mmc_queue_free(&skip_servers);
 
@@ -493,7 +493,7 @@ PS_DESTROY_FUNC(memcache)
 				mmc_pool_release(pool, lockrequest);
 				continue;
 			}
-		} while (skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers);
+		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers);
 
 		mmc_queue_free(&skip_servers);
 
