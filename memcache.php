@@ -48,12 +48,22 @@ EOB;
 
 ///////////MEMCACHE FUNCTIONS /////////////////////////////////////////////////////////////////////
 
+function get_host_port_from_server($server){
+	$values = explode(':', $server);
+	if (($values[0] == 'unix') && (!is_numeric( $values[1]))) {
+		return array($server, 0);
+	}
+	else {
+		return values;
+	}
+}
+
 function sendMemcacheCommands($command){
     global $MEMCACHE_SERVERS;
 	$result = array();
 
 	foreach($MEMCACHE_SERVERS as $server){
-		$strs = explode(':',$server);
+		$strs = get_host_port_from_server($server);
 		$host = $strs[0];
 		$port = $strs[1];
 		$result[$server] = sendMemcacheCommand($host,$port,$command);
@@ -110,7 +120,7 @@ function parseMemcacheResults($str){
 }
 
 function dumpCacheSlab($server,$slabId,$limit){
-    list($host,$port) = explode(':',$server);
+    list($host,$port) = get_host_port_from_server($server);
     $resp = sendMemcacheCommand($host,$port,'stats cachedump '.$slabId.' '.$limit);
 
    return $resp;
@@ -118,7 +128,7 @@ function dumpCacheSlab($server,$slabId,$limit){
 }
 
 function flushServer($server){
-    list($host,$port) = explode(':',$server);
+    list($host,$port) = get_host_port_from_server($server);
     $resp = sendMemcacheCommand($host,$port,'flush_all');
     return $resp;
 }
@@ -842,7 +852,7 @@ EOB;
         $theKey = htmlentities(base64_decode($_GET['key']));
 
         $theserver = $MEMCACHE_SERVERS[(int)$_GET['server']];
-        list($h,$p) = explode(':',$theserver);
+        list($h,$p) = get_host_port_from_server($theserver);
         $r = sendMemcacheCommand($h,$p,'get '.$theKey);
         echo <<<EOB
         <div class="info"><table cellspacing=0><tbody>
@@ -873,7 +883,7 @@ EOB;
         }
         $theKey = htmlentities(base64_decode($_GET['key']));
 		$theserver = $MEMCACHE_SERVERS[(int)$_GET['server']];
-		list($h,$p) = explode(':',$theserver);
+		list($h,$p) = get_host_port_from_server($theserver);
         $r = sendMemcacheCommand($h,$p,'delete '.$theKey);
         echo 'Deleting '.$theKey.':'.$r;
 	break;
