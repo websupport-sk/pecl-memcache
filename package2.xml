@@ -48,7 +48,6 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    - Fixed PECL Bug #16061 (Session redundancy doesn't work)
     - Fixed PECL Bug #16672 (memcache.php doesn't support unix socket)
     - Fixed PECL Bug #19374 (memcache.php throws Notice: Undefined index: VALUE when viewing expired items)
     - Fixed PECL Bug #17518 (Strange behavior in increment on non integer and after)
