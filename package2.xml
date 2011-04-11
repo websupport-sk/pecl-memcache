@@ -25,19 +25,35 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>mikael@synd.info</email>
     <active>yes</active>
   </lead>
-  <date>2009-xx-xx</date>
+  <lead>
+    <name>Pierre-Alain Joye</name>
+    <user>pajoye</user>
+    <email>pierre.php@gmail.com</email>
+    <active>yes</active>
+  </lead>
+  <lead>
+    <name>Herman Radtke</name>
+    <user>hradtke</user>
+    <email>hradtke@php.net</email>
+    <active>yes</active>
+  </lead>
+  <date>2011-04-10</date>
   <version>
-    <release>3.0.5</release>
-    <api>3.0.5</api>
+    <release>3.0.6</release>
+    <api>3.0.6</api>
   </version>
   <stability>
-    <release>stable</release>
-    <api>stable</api>
+    <release>beta</release>
+    <api>beta</api>
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    - Added method MemcachePool::findServer(key) which returns the server a key hashes to
-    - Fixed PECL bug #16059 (Build error: 'MSG_NOSIGNAL' undeclared) 
+    - Fixed PECL Bug #16061 (Session redundancy doesn't work)
+    - Fixed PECL Bug #16672 (memcache.php doesn't support unix socket)
+    - Fixed PECL Bug #19374 (memcache.php throws Notice: Undefined index: VALUE when viewing expired items)
+    - Fixed PECL Bug #17518 (Strange behavior in increment on non integer and after)
+    - Fixed potential segfault in memcache queue.
+    - Fixed various tests
   </notes>
   <contents>
     <dir name="/">
@@ -77,6 +93,26 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <configureoption name="enable-memcache-session" default="yes" prompt="Enable memcache session handler support?" />
   </extsrcrelease>
   <changelog>
+    <release>
+      <date>2010-10-03</date>
+      <version>
+        <release>3.0.5</release>
+        <api>3.0.5</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fixed PECL bug #16059 (Build error: 'MSG_NOSIGNAL' undeclared)
+        - Added method MemcachePool::findServer(key) which returns the server a key hashes to
+        - Changed MemcachePool::findServer() to return only "hostname:port" since tcp port is significant
+        - Fixed PECL bug #16536 (Weight of 0 causes SegFault on memcache_add_server)
+        - Fixed PECL bug #17566 (3.0.4 cache delete bug)
+        - Fixed PECL Bug #16442 (memcache_set fail with integer value)
+      </notes>
+    </release>
     <release>
       <date>2009-02-22</date>
       <version>
