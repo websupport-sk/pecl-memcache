@@ -1967,7 +1967,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 		mmc_pool_add(pool, mmc, 1);
 
 		object_init_ex(return_value, memcache_class_entry_ptr);
-		list_id = zend_list_insert(pool, le_memcache_pool);
+		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
 		add_property_resource(return_value, "connection", list_id);
 	}
 	else if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **) &connection) != FAILURE) {
@@ -1984,7 +1984,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 		pool = mmc_pool_new(TSRMLS_C);
 		mmc_pool_add(pool, mmc, 1);
 
-		list_id = zend_list_insert(pool, le_memcache_pool);
+		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_id);
 		RETURN_TRUE;
 	}
@@ -2044,7 +2044,7 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -2074,7 +2074,7 @@ PHP_FUNCTION(memcache_add_server)
 	/* initialize pool if need be */
 	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **) &connection) == FAILURE) {
 		pool = mmc_pool_new(TSRMLS_C);
-		list_id = zend_list_insert(pool, le_memcache_pool);
+		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_id);
 	}
 	else {
@@ -2130,7 +2130,7 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -2229,7 +2229,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		} else {
-			zend_list_insert(mmc, le_pmemcache);
+			MEMCACHE_LIST_INSERT(mmc, le_pmemcache);
 		}
 	}
 	else if (le->type != le_pmemcache || le->ptr == NULL) {
@@ -2247,7 +2247,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 			mmc = NULL;
 		}
 		else {
-			zend_list_insert(mmc, le_pmemcache);
+			MEMCACHE_LIST_INSERT(mmc, le_pmemcache);
 		}
 	}
 	else {
