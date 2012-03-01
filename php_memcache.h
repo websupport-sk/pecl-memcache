@@ -162,9 +162,9 @@ ZEND_END_MODULE_GLOBALS(memcache)
 #endif
 
 #if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION >= 4)
-#    define MEMCACHE_LIST_INSERT(item, list TSRMLS_CC)
+#    define MEMCACHE_LIST_INSERT(item, list) zend_list_insert(item, list TSRMLS_CC);
 #else
-#    define MEMCACHE_LIST_INSERT(item, list)
+#    define MEMCACHE_LIST_INSERT(item, list) zend_list_insert(item, list);
 #endif
 
 /* internal functions */
