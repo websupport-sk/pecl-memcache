@@ -182,11 +182,13 @@ static int mmc_server_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /
 
 	/* done reading? */
 	if (request->readbuf.idx >= req->value.length + 2) {
+		int result;
+
 		/* allow parse_value to read next VALUE or END line */
 		request->parse = mmc_request_parse_value;
 		mmc_buffer_reset(&(request->readbuf));
 
-		int result = mmc_unpack_value(
+		result = mmc_unpack_value(
 			mmc, request, &(request->readbuf), req->value.key, strlen(req->value.key), 
 			req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
 		

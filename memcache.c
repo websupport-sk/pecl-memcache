@@ -718,7 +718,11 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		} else {
+#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
 			zend_list_insert(mmc, le_memcache_server);
+#else
+			zend_list_insert(mmc, le_memcache_server TSRMLS_CC);
+#endif
 		}
 	}
 	else if (le->type != le_memcache_server || le->ptr == NULL) {
@@ -735,7 +739,11 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 			mmc = NULL;
 		}
 		else {
+#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
 			zend_list_insert(mmc, le_memcache_server);
+#else
+			zend_list_insert(mmc, le_memcache_server TSRMLS_CC);
+#endif
 		}
 	}
 	else {
@@ -775,7 +783,11 @@ static mmc_t *php_mmc_pool_addserver(
 	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
 		pool = mmc_pool_new(TSRMLS_C);
 		pool->failure_callback = &php_mmc_failure_callback;
+#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
 		list_id = zend_list_insert(pool, le_memcache_pool);
+#else
+		list_id = zend_list_insert(pool, le_memcache_pool TSRMLS_CC);
+#endif
 		add_property_resource(mmc_object, "connection", list_id);
 	}
 	else {
@@ -836,7 +848,11 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 		int list_id;
 		mmc_pool_t *pool = mmc_pool_new(TSRMLS_C);
 		pool->failure_callback = &php_mmc_failure_callback;
+#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
 		list_id = zend_list_insert(pool, le_memcache_pool);
+#else
+		list_id = zend_list_insert(pool, le_memcache_pool TSRMLS_CC);
+#endif
 		mmc_object = return_value;
 		object_init_ex(mmc_object, memcache_ce);
 		add_property_resource(mmc_object, "connection", list_id);

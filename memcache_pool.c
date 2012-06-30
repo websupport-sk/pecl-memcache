@@ -24,7 +24,11 @@
 #endif
 
 #include <zlib.h>
+#ifdef PHP_WIN32
+#include <winsock2.h>
+#else
 #include <arpa/inet.h>
+#endif
 
 #include "php.h"
 #include "php_network.h"
@@ -213,6 +217,7 @@ static int mmc_request_read_udp(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 {
 	size_t bytes;
 	mmc_udp_header_t *header;
+	uint16_t reqid, seqid;
 
 	/* reset buffer if completely consumed */
 	if (request->io->buffer.idx >= request->io->buffer.value.len) {
@@ -231,8 +236,8 @@ static int mmc_request_read_udp(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
 	}
 
 	header = (mmc_udp_header_t *)(request->io->buffer.value.c + request->io->buffer.value.len);
-	uint16_t reqid = ntohs(header->reqid);
-	uint16_t seqid = ntohs(header->seqid);
+	reqid = ntohs(header->reqid);
+	seqid = ntohs(header->seqid);
 
 	/* initialize udp header fields */
 	if (!request->udp.total && request->udp.reqid == reqid) {
@@ -681,6 +686,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	char *host, *hash_key = NULL, *errstr = NULL;
 	int	host_len, errnum = 0;
 	struct timeval tv = mmc->timeout;
+	void *fd;
 
 	/* close open stream */
 	if (io->stream != NULL) {
@@ -746,7 +752,6 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	}
 
 	/* check connection and extract socket for select() purposes */
-	void *fd;
 
 	if (!io->stream || php_stream_cast(io->stream, PHP_STREAM_AS_FD_FOR_SELECT, &fd, 1) != SUCCESS) {
 		mmc_server_seterror(mmc, errstr != NULL ? errstr : "Connection failed", errnum);

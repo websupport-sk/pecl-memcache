@@ -26,7 +26,7 @@
 #include "php.h"
 #include "memcache_queue.h"
 
-inline void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
+MMC_QUEUE_INLINE void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
 	if (mmc_queue_contains(queue, ptr)) return;
 
 	if (queue->len >= queue->alloc) {
@@ -53,7 +53,7 @@ inline void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
 	queue->len++;
 }
 
-inline void *mmc_queue_pop(mmc_queue_t *queue) {
+MMC_QUEUE_INLINE void *mmc_queue_pop(mmc_queue_t *queue) {
 	if (queue->len) {
 		void *ptr;
 		
@@ -73,7 +73,7 @@ inline void *mmc_queue_pop(mmc_queue_t *queue) {
 	return NULL;
 }
 
-inline int mmc_queue_contains(mmc_queue_t *queue, void *ptr) {
+MMC_QUEUE_INLINE int mmc_queue_contains(mmc_queue_t *queue, void *ptr) {
 	if (queue != NULL) {
 		int i;
 		
@@ -87,14 +87,14 @@ inline int mmc_queue_contains(mmc_queue_t *queue, void *ptr) {
 	return 0;
 }
 
-inline void mmc_queue_free(mmc_queue_t *queue) {
+MMC_QUEUE_INLINE void mmc_queue_free(mmc_queue_t *queue) {
 	if (queue->items != NULL) {
 		efree(queue->items);
 	}
 	memset(queue, 0, sizeof(*queue));
 }
 
-inline void mmc_queue_copy(mmc_queue_t *target, mmc_queue_t *source) {
+MMC_QUEUE_INLINE void mmc_queue_copy(mmc_queue_t *target, mmc_queue_t *source) {
 	if (target->alloc != source->alloc) {
 		target->alloc = source->alloc;
 		target->items = erealloc(target->items, sizeof(*target->items) * target->alloc);
@@ -106,7 +106,7 @@ inline void mmc_queue_copy(mmc_queue_t *target, mmc_queue_t *source) {
 	target->len = source->len;
 }
 
-inline void mmc_queue_remove(mmc_queue_t *queue, void *ptr) { 
+MMC_QUEUE_INLINE void mmc_queue_remove(mmc_queue_t *queue, void *ptr) { 
 	void *item;
 	mmc_queue_t original = *queue;
 	mmc_queue_release(queue);

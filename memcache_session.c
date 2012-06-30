@@ -33,6 +33,20 @@
 #include "ext/standard/url.h"
 #include "php_memcache.h"
 
+#ifdef PHP_WIN32
+void usleep(int waitTime) { 
+    __int64 time1 = 0, time2 = 0, freq = 0; 
+	 
+	QueryPerformanceCounter((LARGE_INTEGER *) &time1); 
+	QueryPerformanceFrequency((LARGE_INTEGER *)&freq); 
+			  
+	do { 
+		QueryPerformanceCounter((LARGE_INTEGER *) &time2); 
+	} while((time2-time1) < waitTime); 
+} 
+
+#endif
+
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
 ps_module ps_mod_memcache = {
@@ -195,6 +209,7 @@ static int php_mmc_session_read_request(
 	mmc_request_t **lockreq, mmc_request_t **addreq, mmc_request_t **datareq TSRMLS_DC) /* {{{ */
 {
 	mmc_request_t *lreq, *areq, *dreq;
+	zval lockvalue;
 
 	/* increment request which stores the response int using value_handler_single */
 	lreq = mmc_pool_request(
@@ -231,7 +246,6 @@ static int php_mmc_session_read_request(
 	lreq->key_len = areq->key_len = dreq->key_len + sizeof(".lock")-1;
 
 	/* value for add request */
-	zval lockvalue;
 	ZVAL_LONG(&lockvalue, 1);
 
 	/* build requests */
