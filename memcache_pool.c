@@ -686,7 +686,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	char *host, *hash_key = NULL, *errstr = NULL;
 	int	host_len, errnum = 0;
 	struct timeval tv = mmc->timeout;
-	void *fd;
+	int fd;
 
 	/* close open stream */
 	if (io->stream != NULL) {
@@ -753,7 +753,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 
 	/* check connection and extract socket for select() purposes */
 
-	if (!io->stream || php_stream_cast(io->stream, PHP_STREAM_AS_FD_FOR_SELECT, &fd, 1) != SUCCESS) {
+	if (!io->stream || php_stream_cast(io->stream, PHP_STREAM_AS_FD_FOR_SELECT, (void **)&fd, 1) != SUCCESS) {
 		mmc_server_seterror(mmc, errstr != NULL ? errstr : "Connection failed", errnum);
 		mmc_server_deactivate(pool, mmc TSRMLS_CC);
 
@@ -764,7 +764,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 		return MMC_REQUEST_FAILURE;
 	}
 
-	io->fd = (long)fd;
+	io->fd = fd;
 	io->status = MMC_STATUS_CONNECTED;
 
 	php_stream_auto_cleanup(io->stream);
