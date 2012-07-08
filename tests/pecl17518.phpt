@@ -28,7 +28,7 @@ bool(false)
 bool(false)
 
 Notice: MemcachePool::increment(): Server localhost (tcp 11211, udp 0) failed with: CLIENT_ERROR cannot increment or decrement non-numeric value
- (6) in /home/hradtke/projects/php/src/pecl/memcache/branches/NON_BLOCKING_IO/tests/pecl17518.php on line 12
+ (6) in %s/pecl17518.php on line 12
 bool(false)
 string(3) "bar"
 int(43)
