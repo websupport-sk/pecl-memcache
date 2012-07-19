@@ -54,7 +54,7 @@ function get_host_port_from_server($server){
 		return array($server, 0);
 	}
 	else {
-		return values;
+		return $values;
 	}
 }
 
