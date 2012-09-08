@@ -411,7 +411,7 @@ static void mmc_server_callback_dtor(zval **callback TSRMLS_DC) /* {{{ */
 	if (Z_TYPE_PP(callback) == IS_ARRAY && 
 		zend_hash_index_find(Z_ARRVAL_PP(callback), 0, (void **)&this_obj) == SUCCESS &&
 		Z_TYPE_PP(this_obj) == IS_OBJECT) {
-		zval_ptr_dtor(this_obj);
+		zend_hash_index_del(Z_ARRVAL_PP(callback), 0);
 	}
 	zval_ptr_dtor(callback);
 }
