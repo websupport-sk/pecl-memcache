@@ -53,6 +53,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="config9.m4" role="src" />
       <file name="config.w32" role="src" />
       <file name="CREDITS" role="doc" />
+      <file name="LICENSE" role="doc" />
       <file name="example.php" role="doc" />
       <file name="memcache.c" role="src" />
       <file name="memcache_queue.c" role="src" />
@@ -64,6 +65,58 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />
       <file name="memcache.php" role="doc" />
+      <file name="tests/001.phpt" role="test" />
+      <file name="tests/002.phpt" role="test" />
+      <file name="tests/003.phpt" role="test" />
+      <file name="tests/004.phpt" role="test" />
+      <file name="tests/005.phpt" role="test" />
+      <file name="tests/006.phpt" role="test" />
+      <file name="tests/007.phpt" role="test" />
+      <file name="tests/008.phpt" role="test" />
+      <file name="tests/009.phpt" role="test" />
+      <file name="tests/010.phpt" role="test" />
+      <file name="tests/011.phpt" role="test" />
+      <file name="tests/012.phpt" role="test" />
+      <file name="tests/013.phpt" role="test" />
+      <file name="tests/014.phpt" role="test" />
+      <file name="tests/015.phpt" role="test" />
+      <file name="tests/016.phpt" role="test" />
+      <file name="tests/017.phpt" role="test" />
+      <file name="tests/018.phpt" role="test" />
+      <file name="tests/019a.phpt" role="test" />
+      <file name="tests/019.phpt" role="test" />
+      <file name="tests/020.phpt" role="test" />
+      <file name="tests/021.phpt" role="test" />
+      <file name="tests/022a.phpt" role="test" />
+      <file name="tests/022.phpt" role="test" />
+      <file name="tests/023.phpt" role="test" />
+      <file name="tests/024a.phpt" role="test" />
+      <file name="tests/024.phpt" role="test" />
+      <file name="tests/025.phpt" role="test" />
+      <file name="tests/026.phpt" role="test" />
+      <file name="tests/027a.phpt" role="test" />
+      <file name="tests/027.phpt" role="test" />
+      <file name="tests/028.phpt" role="test" />
+      <file name="tests/029.phpt" role="test" />
+      <file name="tests/030.phpt" role="test" />
+      <file name="tests/031.phpt" role="test" />
+      <file name="tests/032.phpt" role="test" />
+      <file name="tests/033.phpt" role="test" />
+      <file name="tests/034.phpt" role="test" />
+      <file name="tests/035.phpt" role="test" />
+      <file name="tests/036.phpt" role="test" />
+      <file name="tests/037.phpt" role="test" />
+      <file name="tests/045.phpt" role="test" />
+      <file name="tests/046.phpt" role="test" />
+      <file name="tests/047.phpt" role="test" />
+      <file name="tests/050.phpt" role="test" />
+      <file name="tests/051.phpt" role="test" />
+      <file name="tests/052.phpt" role="test" />
+      <file name="tests/053.phpt" role="test" />
+      <file name="tests/100a.phpt" role="test" />
+      <file name="tests/100.phpt" role="test" />
+      <file name="tests/pecl11221.phpt" role="test" />
+      <file name="tests/pecl16536.phpt" role="test" />
     </dir>
   </contents>
   <dependencies>
