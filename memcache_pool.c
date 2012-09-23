@@ -426,13 +426,15 @@ int mmc_unpack_value(
 {
 	char *data = NULL;
 	unsigned long data_len;
+	int rv;
 
-	zval value;
-	INIT_ZVAL(value);
+	zval *object;
+	ALLOC_INIT_ZVAL(object);
 
 	if (flags & MMC_COMPRESSED) {
 		if (mmc_uncompress(buffer->value.c, bytes, &data, &data_len) != MMC_OK) {
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Failed to uncompress data");
+			zval_ptr_dtor(&object);
 			return MMC_REQUEST_DONE;
 		}
 	}
@@ -444,7 +446,6 @@ int mmc_unpack_value(
 	if (flags & MMC_SERIALIZED) {
 		php_unserialize_data_t var_hash;
 		const unsigned char *p = (unsigned char *)data;
-		zval *object = &value;
 
 		char key_tmp[MMC_MAX_KEY_LEN + 1];
 		mmc_request_value_handler value_handler;
@@ -476,6 +477,7 @@ int mmc_unpack_value(
 			}
 
 			php_error_docref(NULL TSRMLS_CC, E_NOTICE, "Failed to unserialize data");
+			zval_ptr_dtor(&object);
 			return MMC_REQUEST_DONE;
 		}
 
@@ -492,7 +494,9 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return value_handler(key_tmp, key_len, object, flags, cas, value_handler_param TSRMLS_CC);
+		rv = value_handler(key_tmp, key_len, object, flags, cas, value_handler_param TSRMLS_CC);
+		zval_ptr_dtor(&object);
+		return rv;
 	}
 	else {
 		switch (flags & 0x0f00) {
@@ -500,7 +504,7 @@ int mmc_unpack_value(
 				long val;
 				data[data_len] = '\0';
 				val = strtol(data, NULL, 10);
-				ZVAL_LONG(&value, val);
+				ZVAL_LONG(object, val);
 				break;
 			}
 
@@ -508,17 +512,17 @@ int mmc_unpack_value(
 				double val = 0;
 				data[data_len] = '\0';
 				sscanf(data, "%lg", &val);
-				ZVAL_DOUBLE(&value, val);
+				ZVAL_DOUBLE(object, val);
 				break;
 			}
 
 			case MMC_TYPE_BOOL:
-				ZVAL_BOOL(&value, data_len == 1 && data[0] == '1');
+				ZVAL_BOOL(object, data_len == 1 && data[0] == '1');
 				break;
 
 			default:
 				data[data_len] = '\0';
-				ZVAL_STRINGL(&value, data, data_len, 0);
+				ZVAL_STRINGL(object, data, data_len, 0);
 
 				if (!(flags & MMC_COMPRESSED)) {
 					/* release buffer because it's now owned by the zval */
@@ -527,7 +531,9 @@ int mmc_unpack_value(
 		}
 
 		/* delegate to value handler */
-		return request->value_handler(key, key_len, &value, flags, cas, request->value_handler_param TSRMLS_CC);
+		rv = request->value_handler(key, key_len, object, flags, cas, request->value_handler_param TSRMLS_CC);
+		zval_ptr_dtor(&object);
+		return rv;
 	}
 }
 /* }}}*/
