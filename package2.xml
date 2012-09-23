@@ -144,6 +144,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name ="tests/pecl16536.phpt" role="test" />
       <file name ="tests/pecl17518.phpt" role="test" />
       <file name ="tests/pecl17566.phpt" role="test" />
+      <file name ="tests/pecl63142.phpt" role="test" />
     </dir>
   </contents>
   <dependencies>
