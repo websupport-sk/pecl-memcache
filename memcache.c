@@ -1836,7 +1836,9 @@ PHP_FUNCTION(memcache_get_extended_stats)
 		request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_stats_handler, stats, NULL, NULL TSRMLS_CC);
 		pool->protocol->stats(request, type, slabid, limit);
 
-		mmc_pool_schedule(pool, pool->servers[i], request TSRMLS_CC);
+		if (mmc_pool_schedule(pool, pool->servers[i], request TSRMLS_CC) == MMC_OK) {
+			mmc_pool_run(pool TSRMLS_CC);			
+		}
 	}
 
 	/* execute all requests */
