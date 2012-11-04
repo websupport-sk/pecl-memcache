@@ -9,6 +9,9 @@ The memcached website is here:
 You will probably need libevent to install memcached:
 You can download it here: http://www.monkey.org/~provos/libevent/
 
+How to run tests:
+1. sh tests/memcache.sh
+2. TEST_PHP_EXECUTABLE=/usr/local/bin/php php -dextension=modules/memcache.so run-tests.php -d extension=modules/memcache.so
+
 Maintainers:
-Mikael Johansson	mikael at synd dot info
-Antony Dovgal		tony at daylessday dot org
+Herman J. Radtke III	hradtke at php dot net
