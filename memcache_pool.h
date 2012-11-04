@@ -77,6 +77,12 @@
 #define MMC_TYPE_DOUBLE	0x0700
 /*#define MMC_TYPE_BLOB	0x0800*/
 
+/* These flags are set here to reserve the for use by users of the pecl-memcache in set and get */
+#define MMC_RESERVED_APPLICATIONDEFINEDFLAG_12 0x10000 /* not used in pecl-memcache code */
+#define MMC_RESERVED_APPLICATIONDEFINEDFLAG_13 0x20000 /* not used in pecl-memcache code */
+#define MMC_RESERVED_APPLICATIONDEFINEDFLAG_14 0x40000 /* not used in pecl-memcache code */
+#define MMC_RESERVED_APPLICATIONDEFINEDFLAG_15 0x80000 /* not used in pecl-memcache code */
+
 #define MMC_BUFFER_SIZE			4096
 #define MMC_MAX_UDP_LEN			1400
 #define MMC_MAX_KEY_LEN			250
