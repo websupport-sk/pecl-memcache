@@ -1529,15 +1529,13 @@ int mmc_value_handler_multi(
 	unsigned int flags, unsigned long cas, void *param TSRMLS_DC) /*
 	receives a multiple values, param is a zval** array to store value and flags in {{{ */
 {
-	zval *arrval, **result = (zval **)param;
-	ALLOC_ZVAL(arrval);
-	*((zval *)arrval) = *value;
+	zval **result = (zval **)param;
 
 	/* add value to result */
 	if (Z_TYPE_P(result[0]) != IS_ARRAY) {
 		array_init(result[0]);
 	}
-	add_assoc_zval_ex(result[0], (char *)key, key_len + 1, arrval);
+	add_assoc_zval_ex(result[0], (char *)key, key_len + 1, value);
 
 	/* add flags to result */
 	if (result[1] != NULL) {
@@ -1565,7 +1563,7 @@ int mmc_value_handler_single(
 	receives a single value, param is a zval pointer to store value to {{{ */
 {
 	zval **result = (zval **)param;
-	*(result[0]) = *value;
+	ZVAL_ZVAL(result[0], value, 1, 1);
 
 	if (result[1] != NULL) {
 		ZVAL_LONG(result[1], flags);
