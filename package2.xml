@@ -75,6 +75,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />
       <file name="memcache.php" role="doc" />
+      <file name ="tests/connect.inc" role="test" />
+      <file name ="tests/memcache.sh" role="test" />
       <file name ="tests/001.phpt" role="test" />
       <file name ="tests/002.phpt" role="test" />
       <file name ="tests/003.phpt" role="test" />
