@@ -37,10 +37,10 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <email>hradtke@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2011-09-22</date>
+  <date>2013-04-07</date>
   <version>
-    <release>3.0.7</release>
-    <api>3.0.7</api>
+    <release>3.0.8</release>
+    <api>3.0.8</api>
   </version>
   <stability>
     <release>beta</release>
@@ -48,9 +48,10 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    - Fixed bug #62589 - missing "$" in memcache.php
-    - Fix php_stream_cast() usage.
-    - fixes for windows build and php 5.4 compat
+   - Fix Bug #63142 - memcache client Segmentation fault
+   - Fix Bug #63272 - Explicitly reserve range of flags in php_memcache.h so application code can use
+   - Fix Bug #59602 - getExtendedStats fails on the host intermittently after restarting memcache
+   - Fix Bug #63141 - Added LICENSE file and include tests folder in package
   </notes>
   <contents>
     <dir name="/">
@@ -162,6 +163,24 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <configureoption name="enable-memcache-session" default="yes" prompt="Enable memcache session handler support?" />
   </extsrcrelease>
   <changelog>
+    <release>
+      <date>2013-04-07</date>
+      <version>
+        <release>3.0.8</release>
+        <api>3.0.8</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fix Bug #63142 - memcache client Segmentation fault
+        - Fix Bug #63272 - Explicitly reserve range of flags in php_memcache.h so application code can use
+        - Fix Bug #59602 - getExtendedStats fails on the host intermittently after restarting memcache
+        - Fix Bug #63141 - Added LICENSE file and include tests folder in package
+      </notes>
+    </release>
     <release>
       <date>2012-09-22</date>
       <version>
