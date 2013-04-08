@@ -1,0 +1,89 @@
+--TEST--
+memcache->get() with flags
+--SKIPIF--
+<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
+--FILE--
+<?php
+
+include 'connect.inc';
+
+$flag1 = 0x10000;
+$flag2 = 0x20000;
+
+$memcache->set('test_key1', 'test1', $flag1);
+$memcache->set('test_key2', 'test2', $flag2);
+
+// Test OO
+$result1 = null;
+$result2 = $memcache->get('test_key1', $result1);
+
+var_dump($result1);
+var_dump($result2);
+
+$result3 = null;
+$result4 = $memcache->get(array('test_key1', 'test_key2'), $result3);
+
+if (is_array($result3))
+	ksort($result3);
+if (is_array($result4))
+	ksort($result4);
+
+var_dump($result3);
+var_dump($result4);
+
+$result5 = $memcache->get('test_key1', null);
+var_dump($result5);
+
+// Test procedural
+$result1 = null;
+$result2 = memcache_get($memcache, 'test_key1', $result1);
+
+var_dump($result1);
+var_dump($result2);
+
+$result3 = null;
+$result4 = memcache_get($memcache, array('test_key1', 'test_key2'), $result3);
+
+if (is_array($result3))
+	ksort($result3);
+if (is_array($result4))
+	ksort($result4);
+
+var_dump($result3);
+var_dump($result4);
+
+$result5 = memcache_get($memcache, 'test_key1', null);
+var_dump($result5);
+
+?>
+--EXPECT--
+int(65536)
+string(5) "test1"
+array(2) {
+  ["test_key1"]=>
+  int(65536)
+  ["test_key2"]=>
+  int(131072)
+}
+array(2) {
+  ["test_key1"]=>
+  string(5) "test1"
+  ["test_key2"]=>
+  string(5) "test2"
+}
+string(5) "test1"
+int(65536)
+string(5) "test1"
+array(2) {
+  ["test_key1"]=>
+  int(65536)
+  ["test_key2"]=>
+  int(131072)
+}
+array(2) {
+  ["test_key1"]=>
+  string(5) "test1"
+  ["test_key2"]=>
+  string(5) "test2"
+}
+string(5) "test1"
