@@ -32,7 +32,7 @@
 #include "ext/standard/php_smart_str.h"
 #include "ext/standard/url.h"
 #ifdef PHP_WIN32
-# if PHP_MAJOR_VERSION >= 5 && PHP_MINOR_VERSION >= 6
+# if (PHP_MAJOR_VERSION > 5) || (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION >= 6)
 #  include "win32/time.h"
 # else 
 /* The function is exported in the php dll, but is missing in the header */
