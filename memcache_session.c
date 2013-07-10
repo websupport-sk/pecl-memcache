@@ -31,21 +31,15 @@
 #include "SAPI.h"
 #include "ext/standard/php_smart_str.h"
 #include "ext/standard/url.h"
-#include "php_memcache.h"
-
 #ifdef PHP_WIN32
-void usleep(int waitTime) { 
-    __int64 time1 = 0, time2 = 0, freq = 0; 
-	 
-	QueryPerformanceCounter((LARGE_INTEGER *) &time1); 
-	QueryPerformanceFrequency((LARGE_INTEGER *)&freq); 
-			  
-	do { 
-		QueryPerformanceCounter((LARGE_INTEGER *) &time2); 
-	} while((time2-time1) < waitTime); 
-} 
-
+# if PHP_MAJOR_VERSION >= 5 && PHP_MINOR_VERSION >= 6
+#  include "win32/time.h"
+# else 
+/* The function is exported in the php dll, but is missing in the header */
+PHPAPI int usleep(unsigned int useconds);
+# endif
 #endif
+#include "php_memcache.h"
 
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
