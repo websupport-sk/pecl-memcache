@@ -400,7 +400,7 @@ int mmc_stored_handler(mmc_t *mmc, mmc_request_t *request, int response, const c
 	}
 
 	/* return FALSE or catch memory errors without failover */
-	if (response == MMC_RESPONSE_EXISTS || response == MMC_RESPONSE_OUT_OF_MEMORY || response == MMC_RESPONSE_TOO_LARGE 
+	if (response == MMC_RESPONSE_EXISTS || response == MMC_RESPONSE_OUT_OF_MEMORY || response == MMC_RESPONSE_TOO_LARGE
 			|| response == MMC_RESPONSE_CLIENT_ERROR) {
 		ZVAL_FALSE(result);
 
@@ -556,9 +556,9 @@ int mmc_numeric_response_handler(mmc_t *mmc, mmc_request_t *request, int respons
 		}
 
 		if (response != MMC_RESPONSE_NOT_FOUND) {
-			php_error_docref(NULL TSRMLS_CC, 
+			php_error_docref(NULL TSRMLS_CC,
 					E_NOTICE, "Server %s (tcp %d, udp %d) failed with: %s (%d)",
-					mmc->host, mmc->tcp.port, 
+					mmc->host, mmc->tcp.port,
 					mmc->udp.port, message, response);
 		}
 
@@ -613,7 +613,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
 		RETURN_FALSE;
 	}
-
+__debugbreak();
 	value_handler_param[0] = return_value;
 	value_handler_param[1] = NULL;
 	value_handler_param[2] = NULL;
@@ -782,7 +782,7 @@ static mmc_t *php_mmc_pool_addserver(
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "weight must be a positive integer");
 		return NULL;
 	}
-	
+
 	if (tcp_port > 65635 || tcp_port < 0) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid tcp port number");
 		return NULL;
@@ -1188,7 +1188,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
 	zval *mmc_object = getThis();
 	mmc_pool_t *pool;
 	mmc_t *mmc;
-	
+
 	zval *zkey;
 	char key[MMC_MAX_KEY_LEN + 1];
 	unsigned int key_len;
@@ -1197,7 +1197,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &zkey) == FAILURE) {
 		return;
 	}
-	
+
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
 		RETURN_FALSE;
 	}
@@ -1206,9 +1206,9 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 		RETURN_FALSE;
 	}
-	
+
 	mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
-	spprintf(&hostname, 0, "%s:%d", mmc->host, mmc->tcp.port);	
+	spprintf(&hostname, 0, "%s:%d", mmc->host, mmc->tcp.port);
 	RETURN_STRING(hostname, 0);
 }
 /* }}} */
@@ -1847,7 +1847,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 		pool->protocol->stats(request, type, slabid, limit);
 
 		if (mmc_pool_schedule(pool, pool->servers[i], request TSRMLS_CC) == MMC_OK) {
-			mmc_pool_run(pool TSRMLS_CC);			
+			mmc_pool_run(pool TSRMLS_CC);
 		}
 	}
 
@@ -1957,9 +1957,9 @@ static int mmc_flush_handler(mmc_t *mmc, mmc_request_t *request, int response, c
 
 	if (response == MMC_RESPONSE_CLIENT_ERROR) {
 		ZVAL_FALSE((zval *)param);
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, 
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE,
 				"Server %s (tcp %d, udp %d) failed with: %s (%d)",
-				mmc->host, mmc->tcp.port, 
+				mmc->host, mmc->tcp.port,
 				mmc->udp.port, message, response);
 
 		return MMC_REQUEST_DONE;
