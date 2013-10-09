@@ -420,7 +420,7 @@ static void mmc_binary_get(mmc_request_t *request, int op, zval *zkey, const cha
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_parse_value;
-
+__debugbreak();
 	/* reqid/opaque is the index into the collection of key pointers */
 	mmc_pack_header(&header, MMC_OP_GET, req->keys.len, key_len, 0, 0);
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
@@ -505,13 +505,13 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_mutate;
-
+	/* extra is always 20 bytes */
 	if (value >= 0) {
-		mmc_pack_header(&(header.base), MMC_OP_INCR, req->keys.len, key_len, sizeof(header) - sizeof(header.base), 0);
+		mmc_pack_header(&(header.base), MMC_OP_INCR, req->keys.len, key_len, 20, 0);
 		header.value = htonll(value);
 	}
 	else {
-		mmc_pack_header(&(header.base), MMC_OP_DECR, req->keys.len, key_len, sizeof(header) - sizeof(header.base), 0);
+		mmc_pack_header(&(header.base), MMC_OP_DECR, req->keys.len, key_len, 20, 0);
 		header.value = htonll(-value);
 	}
 
