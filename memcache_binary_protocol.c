@@ -445,9 +445,9 @@ static int mmc_binary_store(
 	prevlen = request->sendbuf.value.len;
 	
 	/* allocate space for header */
-	mmc_buffer_alloc(&(request->sendbuf), sizeof(*header));
-	request->sendbuf.value.len += sizeof(*header);
-	
+	mmc_buffer_alloc(&(request->sendbuf), sizeof(mmc_store_request_header_t));
+	request->sendbuf.value.len += sizeof(mmc_store_request_header_t);
+
 	/* append key and data */
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
 	
