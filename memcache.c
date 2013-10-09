@@ -782,7 +782,15 @@ static mmc_t *php_mmc_pool_addserver(
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "weight must be a positive integer");
 		return NULL;
 	}
-
+	
+	if (tcp_port > 65635 || tcp_port < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid tcp port number");
+		return NULL;
+	}
+	if (udp_port > 65635 || udp_port < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid udp port number");
+		return NULL;
+	}
 	/* initialize pool if need be */
 	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
 		pool = mmc_pool_new(TSRMLS_C);
@@ -810,10 +818,10 @@ static mmc_t *php_mmc_pool_addserver(
 
 	/* lazy initialization of server struct */
 	if (persistent && status) {
-		mmc = mmc_find_persistent(host, host_len, tcp_port, udp_port, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_find_persistent(host, host_len, (unsigned short) tcp_port, (unsigned short) udp_port, timeout, retry_interval TSRMLS_CC);
 	}
 	else {
-		mmc = mmc_server_new(host, host_len, tcp_port, udp_port, 0, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_server_new(host, host_len, (unsigned short) tcp_port, (unsigned short) udp_port, 0, timeout, retry_interval TSRMLS_CC);
 	}
 
 	/* add server in failed mode */
