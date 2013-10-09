@@ -472,7 +472,7 @@ static int mmc_binary_store(
 			return MMC_REQUEST_FAILURE;
 	}
 	
-	mmc_pack_header(&(header->base), op, 0, key_len, sizeof(*header) - sizeof(header->base), request->sendbuf.value.len - valuelen);
+	mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_request_header_t) - sizeof(mmc_request_header_t) - sizeof(header->cas), request->sendbuf.value.len - valuelen);
 
 	header->cas = htonll(cas); 
 	header->flags = htonl(flags);
