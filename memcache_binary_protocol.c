@@ -473,7 +473,7 @@ static int mmc_binary_store(
 	}
 	
 	mmc_pack_header(&(header->base), op, 0, key_len, sizeof(*header) - sizeof(header->base), request->sendbuf.value.len - valuelen);
-	
+
 	header->cas = htonll(cas); 
 	header->flags = htonl(flags);
 	header->exptime = htonl(exptime);

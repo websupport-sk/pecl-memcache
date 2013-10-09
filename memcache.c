@@ -1006,7 +1006,7 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 
 	/* check for userspace callback */
 	if (param != NULL && zend_hash_find(Z_OBJPROP_P((zval *)param), "_failureCallback", sizeof("_failureCallback"), (void **)&callback) == SUCCESS && Z_TYPE_PP(callback) != IS_NULL) {
-		if (IS_CALLABLE(*callback, 0, NULL)) {
+		if (MEMCACHE_IS_CALLABLE(*callback, 0, NULL)) {
 			zval *retval = NULL;
 			zval *host, *tcp_port, *udp_port, *error, *errnum;
 			zval **params[5];
@@ -1233,7 +1233,7 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -1295,7 +1295,7 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -1360,7 +1360,7 @@ PHP_FUNCTION(memcache_set_failure_callback)
 	}
 
 	if (Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
