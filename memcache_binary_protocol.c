@@ -159,7 +159,7 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 {
 	mmc_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-		__debugbreak();
+
 	header = (mmc_response_header_t *)mmc_stream_get(request->io, sizeof(*header) TSRMLS_CC);
 	if (header != NULL) {
 		if (header->magic != MMC_RESPONSE_MAGIC) {
@@ -212,7 +212,7 @@ static int mmc_request_read_response(mmc_t *mmc, mmc_request_t *request TSRMLS_D
 	read the response body into the buffer and delegates to response_handler {{{ */
 {
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-		__debugbreak();
+
 	request->readbuf.idx +=
 		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx TSRMLS_CC);
 
@@ -274,7 +274,7 @@ static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 {
 	mmc_get_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-		__debugbreak();
+
 	header = (mmc_get_response_header_t *)mmc_stream_get(request->io, sizeof(*header) TSRMLS_CC);
 	if (header != NULL) {
 		req->value.cas = ntohll(header->cas);
@@ -297,7 +297,7 @@ static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) 
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	request->readbuf.idx +=
 		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx TSRMLS_CC);
-		__debugbreak();
+
 	/* done reading? */
 	if (request->readbuf.idx >= req->value.length) {
 		zval *key;
@@ -598,7 +598,7 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	req->next_parse_handler = mmc_request_read_response;
 
 	memcpy(request->key, "PLAIN", 5 + 1);
-	//__debugbreak();
+
 	prevlen = request->sendbuf.value.len;
 
 	/* allocate space for header */
