@@ -613,7 +613,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
 		RETURN_FALSE;
 	}
-__debugbreak();
+
 	value_handler_param[0] = return_value;
 	value_handler_param[1] = NULL;
 	value_handler_param[2] = NULL;
