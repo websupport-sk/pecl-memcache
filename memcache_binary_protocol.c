@@ -61,6 +61,10 @@
 #define MMC_OP_NOOP			0x0a
 #define MMC_OP_VERSION		0x0b
 
+#define MMC_OP_SASL_LIST		0x20
+#define MMC_OP_SASL_AUTH		0x21
+#define MMC_OP_SASL_AUTH_STEP	0x21
+
 typedef struct mmc_binary_request {
 	mmc_request_t		base;					/* enable cast to mmc_request_t */
 	mmc_request_parser	next_parse_handler;		/* next payload parser state */
@@ -107,6 +111,11 @@ typedef struct mmc_mutate_request_header {
 	uint32_t				exptime;
 } mmc_mutate_request_header_t;
 
+typedef struct mmc_sasl_request_header {
+	mmc_request_header_t	base;
+	uint64_t				cas;
+} mmc_sasl_request_header;
+
 typedef struct mmc_response_header {
 	uint8_t		magic;
 	uint8_t		opcode;
@@ -150,7 +159,7 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 {
 	mmc_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-
+		__debugbreak();
 	header = (mmc_response_header_t *)mmc_stream_get(request->io, sizeof(*header) TSRMLS_CC);
 	if (header != NULL) {
 		if (header->magic != MMC_RESPONSE_MAGIC) {
@@ -203,6 +212,7 @@ static int mmc_request_read_response(mmc_t *mmc, mmc_request_t *request TSRMLS_D
 	read the response body into the buffer and delegates to response_handler {{{ */
 {
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
+		__debugbreak();
 	request->readbuf.idx +=
 		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx TSRMLS_CC);
 
@@ -264,7 +274,7 @@ static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 {
 	mmc_get_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-
+		__debugbreak();
 	header = (mmc_get_response_header_t *)mmc_stream_get(request->io, sizeof(*header) TSRMLS_CC);
 	if (header != NULL) {
 		req->value.cas = ntohll(header->cas);
@@ -287,7 +297,7 @@ static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) 
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	request->readbuf.idx +=
 		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx TSRMLS_CC);
-
+		__debugbreak();
 	/* done reading? */
 	if (request->readbuf.idx >= req->value.length) {
 		zval *key;
@@ -574,6 +584,53 @@ static void mmc_binary_stats(mmc_request_t *request, const char *type, long slab
 }
 /* }}} */
 
+static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, const char *user,  const char *password TSRMLS_DC) /* {{{ */
+{
+	const char *key = "PLAIN";
+	const unsigned int key_len = 5;
+	int status, prevlen, valuelen;
+	mmc_sasl_request_header *header;
+	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
+	zval *sasl_data;
+	unsigned int flags = 0;
+
+	request->parse = mmc_request_parse_response;
+	req->next_parse_handler = mmc_request_read_response;
+
+	memcpy(request->key, "PLAIN", 5 + 1);
+	//__debugbreak();
+	prevlen = request->sendbuf.value.len;
+
+	/* allocate space for header */
+	mmc_buffer_alloc(&(request->sendbuf), sizeof(*header));
+	request->sendbuf.value.len += sizeof(*header);
+
+	/* append key and data */
+	smart_str_appendl(&(request->sendbuf.value), "PLAIN", 5);
+	valuelen = request->sendbuf.value.len;
+
+	/* initialize header */
+	header = (mmc_sasl_request_header *)(request->sendbuf.value.c + prevlen);
+
+	(header->base).magic = MMC_REQUEST_MAGIC;
+	(header->base).opcode = MMC_OP_SASL_AUTH;
+	(header->base).key_len = htons(key_len);
+	(header->base).extras_len = 0x0;
+	(header->base).datatype = 0x0;
+	(header->base)._reserved = 0x0;
+	(header->base).length = htonl(strlen("phpuser123456") + key_len + 2);
+	(header->base).reqid = htonl(0);
+	header->cas = 0x0;
+
+	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
+	smart_str_appendl(&(request->sendbuf.value), "phpuser", strlen("phpuser"));
+	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
+	smart_str_appendl(&(request->sendbuf.value), "123456", strlen("123456"));
+
+	return;
+}
+/* }}} */
+
 mmc_protocol_t mmc_binary_protocol = {
 	mmc_binary_create_request,
 	mmc_binary_clone_request,
@@ -588,7 +645,8 @@ mmc_protocol_t mmc_binary_protocol = {
 	mmc_binary_mutate,
 	mmc_binary_flush,
 	mmc_binary_version,
-	mmc_binary_stats
+	mmc_binary_stats,
+	mmc_set_sasl_auth_data
 };
 
 /*

@@ -397,6 +397,12 @@ static void mmc_ascii_stats(mmc_request_t *request, const char *type, long slabi
 }
 /* }}} */
 
+static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, const char *user,  const char *password) /* {{{ */
+{
+	/* stats not supported */
+}
+/* }}} */
+
 mmc_protocol_t mmc_ascii_protocol = {
 	mmc_ascii_create_request,
 	mmc_ascii_clone_request,
@@ -411,7 +417,8 @@ mmc_protocol_t mmc_ascii_protocol = {
 	mmc_ascii_mutate,
 	mmc_ascii_flush,
 	mmc_ascii_version,
-	mmc_ascii_stats
+	mmc_ascii_stats,
+	mmc_set_sasl_auth_data
 };
 
 /*
