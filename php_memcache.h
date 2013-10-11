@@ -76,7 +76,11 @@ PHP_FUNCTION(memcache_flush);
 #else
 #   define MEMCACHE_IS_CALLABLE(cb_zv, flags, cb_sp) zend_is_callable((cb_zv), (flags), (cb_sp))
 #endif
-
+#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
+#	define MEMCACHE_LIST_INSERT(list, val) zend_list_insert((list), (val))
+#else
+#	define MEMCACHE_LIST_INSERT(list, val) zend_list_insert((list), (val) TSRMLS_CC)
+#endif
 /* internal functions */
 mmc_t *mmc_find_persistent(const char *, int, unsigned short, unsigned short, double, int TSRMLS_DC);
 int mmc_value_handler_single(const char *, unsigned int, zval *, unsigned int, unsigned long, void * TSRMLS_DC);
