@@ -477,8 +477,9 @@ static void mmc_binary_get(mmc_request_t *request, int op, zval *zkey, const cha
 
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(mmc_get_request_header_t));
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
-
+#if MMC_DEBUG
 	mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
+#endif
 	/* store key to be used by the response handler */
 	mmc_queue_push(&(req->keys), zkey);
 }
