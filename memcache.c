@@ -1658,7 +1658,7 @@ PHP_FUNCTION(memcache_get)
 
 		/* allocate request */
 		request = mmc_pool_request_get(
-			pool, MMC_PROTO_UDP,
+			pool, MMC_PROTO_TCP,
 			mmc_value_handler_single, value_handler_param,
 			mmc_pool_failover_handler, NULL TSRMLS_CC);
 
