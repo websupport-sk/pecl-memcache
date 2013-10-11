@@ -76,6 +76,7 @@ PHP_FUNCTION(memcache_flush);
 #else
 #   define MEMCACHE_IS_CALLABLE(cb_zv, flags, cb_sp) zend_is_callable((cb_zv), (flags), (cb_sp))
 #endif
+
 #if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
 #	define MEMCACHE_LIST_INSERT(list, val) zend_list_insert((list), (val))
 #else

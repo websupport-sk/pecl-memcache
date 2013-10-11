@@ -140,6 +140,37 @@ static int mmc_request_read_response(mmc_t *, mmc_request_t * TSRMLS_DC);
 static int mmc_request_parse_value(mmc_t *, mmc_request_t * TSRMLS_DC);
 static int mmc_request_read_value(mmc_t *, mmc_request_t * TSRMLS_DC);
 
+void mmc_binary_hexdump(void *mem, unsigned int len)
+{
+#	define HEXDUMP_COLS 4
+        unsigned int i, j;
+        
+        for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
+                if(i % HEXDUMP_COLS == 0) {
+                        printf("0x%06x: ", i);
+                }
+ 
+                if(i < len) {
+                        printf("%02x ", 0xFF & ((char*)mem)[i]);
+                } else {
+                        printf("   ");
+                }
+                
+                if(i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
+                        for(j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
+                                if(j >= len) {
+                                        putchar(' ');
+                                } else if(isprint(((char*)mem)[j])) {
+                                        putchar(0xFF & ((char*)mem)[j]);        
+                                } else {
+                                        putchar('.');
+                                }
+                        }
+                        putchar('\n');
+                }
+        }
+}
+
 static inline char *mmc_stream_get(mmc_stream_t *io, size_t bytes TSRMLS_DC) /*
 	attempts to read a number of bytes from server, returns the a pointer to the buffer on success, NULL if the complete number of bytes could not be read {{{ */
 {
