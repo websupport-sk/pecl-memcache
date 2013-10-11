@@ -97,6 +97,11 @@ typedef struct mmc_get_request_header {
 	uint64_t				cas;
 } mmc_get_request_header_t;
 
+typedef struct mmc_version_request_header {
+	mmc_request_header_t	base;
+	uint64_t				cas;
+} mmc_version_request_header_t;
+
 typedef struct mmc_store_request_header {
 	mmc_request_header_t	base;
 	uint64_t				cas;
@@ -603,13 +608,14 @@ static void mmc_binary_flush(mmc_request_t *request, unsigned int exptime) /* {{
 
 static void mmc_binary_version(mmc_request_t *request) /* {{{ */
 {
-	mmc_request_header_t header;
+	mmc_version_request_header_t header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_response;
 
 	mmc_pack_header(&header, MMC_OP_VERSION, 0, 0, 0, 0);
+	header.cas = 0x0;
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 }
 /* }}} */
