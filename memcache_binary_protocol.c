@@ -567,7 +567,9 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 	req->next_parse_handler = mmc_request_read_mutate;
 
 	/* extra is always 20 bytes 
-	https://code.google.com/p/memcached/wiki/BinaryProtocolRevamped#Increment,_Decrement */
+	https://code.google.com/p/memcached/wiki/BinaryProtocolRevamped#Increment,_Decrement
+	TODO: add flags to do not force alignments so we can rely on sizeof instead of 
+	fixed sizes, safer&cleaner */
 	if (value >= 0) {
 		mmc_pack_header(&(header.base), MMC_OP_INCR, req->keys.len, key_len, 20, 0);
 		header.value = htonll((int64_t)value);
