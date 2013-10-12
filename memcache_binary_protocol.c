@@ -116,6 +116,7 @@ typedef struct mmc_delete_request_header {
 
 typedef struct mmc_mutate_request_header {
 	mmc_request_header_t	base;
+	uint64_t				cas;
 	uint64_t				value;
 	uint64_t				defval;
 	uint32_t				exptime;
@@ -564,17 +565,18 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_mutate;
-	/* extra is always 20 bytes */
+
+	/* extra is always 20 bytes 
+	https://code.google.com/p/memcached/wiki/BinaryProtocolRevamped#Increment,_Decrement */
 	if (value >= 0) {
 		mmc_pack_header(&(header.base), MMC_OP_INCR, req->keys.len, key_len, 20, 0);
-		header.value = htonll(value);
+		header.value = htonll((int64_t)value);
+	} else {
+		mmc_pack_header(&(header.base), MMC_OP_DECR, req->keys.len, key_len,  20, 0);
+		header.value = htonll((int64_t)-value);
 	}
-	else {
-		mmc_pack_header(&(header.base), MMC_OP_DECR, req->keys.len, key_len, 20, 0);
-		header.value = htonll(-value);
-	}
-
-	header.defval = htonll(defval);
+	header.cas = 0x0;
+	header.defval = htonll((int64_t)defval);
 
 	if (defval_used) {
 		/* server inserts defval if key doesn't exist */
@@ -584,9 +586,17 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 		/* server replies with NOT_FOUND if exptime ~0 and key doesn't exist */
 		header.exptime = ~(uint32_t)0;
 	}
+	header.exptime = htonl(0x00000e10);
+	header.value   = htonll(0x0000000000000001);
+	header.defval  = htonll(0x0000000000000000);
 
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
+	/* mutate request is 43 bytes */
+	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, 44);
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
+
+#if MMC_DEBUG
+	mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
+#endif
 
 	/* store key to be used by the response handler */
 	mmc_queue_push(&(req->keys), zkey);
@@ -614,7 +624,7 @@ static void mmc_binary_version(mmc_request_t *request) /* {{{ */
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_response;
 
-	mmc_pack_header(&header, MMC_OP_VERSION, 0, 0, 0, 0);
+	mmc_pack_header(&(header.base), MMC_OP_VERSION, 0, 0, 0, 0);
 	header.cas = 0x0;
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 }
