@@ -158,7 +158,7 @@ void mmc_binary_hexdump(void *mem, unsigned int len)
         
         for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
                 if(i % HEXDUMP_COLS == 0) {
-                        printf("0x%06x: ", i);
+					printf("%06i: ", i);
                 }
  
                 if(i < len) {
