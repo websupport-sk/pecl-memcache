@@ -588,9 +588,6 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 		/* server replies with NOT_FOUND if exptime ~0 and key doesn't exist */
 		header.exptime = ~(uint32_t)0;
 	}
-	header.exptime = htonl(0x00000e10);
-	header.value   = htonll(0x0000000000000001);
-	header.defval  = htonll(0x0000000000000000);
 
 	/* mutate request is 43 bytes */
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, 44);
