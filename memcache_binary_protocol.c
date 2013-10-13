@@ -535,7 +535,7 @@ static int mmc_binary_store(
 #if 1
 	if (op == MMC_OP_APPEND || op == MMC_OP_PREPEND) {
 		mmc_store_append_header_t *header;
-		__debugbreak();
+
 		if (op == MMC_OP_APPEND) {
 			op = MMC_BIN_OP_APPEND;
 		} else {
