@@ -65,6 +65,9 @@ uint64_t mmc_htonll(uint64_t value);
 #define MMC_OP_GETQ			0x09
 #define MMC_OP_NOOP			0x0a
 #define MMC_OP_VERSION		0x0b
+#define MMC_BIN_OP_APPEND		0x0e
+#define MMC_BIN_OP_PREPEND		0x0f
+
 
 #define MMC_OP_SASL_LIST		0x20
 #define MMC_OP_SASL_AUTH		0x21
@@ -527,20 +530,45 @@ static int mmc_binary_store(
 	req->next_parse_handler = mmc_request_read_response;
 
 	prevlen = request->sendbuf.value.len;
+
 /*  placeholder for upcoming append/prepend support */
-#if 0
+#if 1
 	if (op == MMC_OP_APPEND || op == MMC_OP_PREPEND) {
 		mmc_store_append_header_t *header;
+		__debugbreak();
+		if (op == MMC_OP_APPEND) {
+			op = MMC_BIN_OP_APPEND;
+		} else {
+			op = MMC_BIN_OP_PREPEND;
+		}
 
 		/* allocate space for header */
 		mmc_buffer_alloc(&(request->sendbuf), sizeof(mmc_store_append_header_t));
 		request->sendbuf.value.len += sizeof(mmc_store_append_header_t);
+
+		/* append key and data */
+		smart_str_appendl(&(request->sendbuf.value), key, key_len);
+
+		valuelen = request->sendbuf.value.len;
+		status = mmc_pack_value(pool, &(request->sendbuf), value, &flags TSRMLS_CC);
+
+		if (status != MMC_OK) {
+			return status;
+		}
+
+		header = (mmc_store_request_header_t *)(request->sendbuf.value.c + prevlen);
+
+		mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_append_header_t) - sizeof(mmc_request_header_t), request->sendbuf.value.len - valuelen);
+		header->base.cas = mmc_htonll(cas);
+		
+#if MMC_DEBUG
+		mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
+#endif
 		/* todo */
 		return MMC_OK;
 	} else
 #endif
 	{
-
 		mmc_store_request_header_t *header;
 
 		/* allocate space for header */
@@ -560,15 +588,8 @@ static int mmc_binary_store(
 		/* initialize header */
 		header = (mmc_store_request_header_t *)(request->sendbuf.value.c + prevlen);
 
-		switch (op) {
-			case MMC_OP_CAS:
-				op = MMC_OP_SET;
-				break;
-
-			case MMC_OP_APPEND:
-			case MMC_OP_PREPEND:
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Binary protocol doesn't support append/prepend");
-				return MMC_REQUEST_FAILURE;
+		if (op == MMC_OP_CAS) {
+			op = MMC_OP_SET;
 		}
 
 		mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_request_header_t) - sizeof(mmc_request_header_t), request->sendbuf.value.len - valuelen);
