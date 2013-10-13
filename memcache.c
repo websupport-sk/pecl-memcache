@@ -92,6 +92,8 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(decrement,				memcache_decrement,					NULL)
 	PHP_FALIAS(close,					memcache_close,						NULL)
 	PHP_FALIAS(flush,					memcache_flush,						NULL)
+	PHP_FALIAS(setSaslData,				memcache_set_sasl_data,				NULL)
+	
 	{NULL, NULL, NULL}
 };
 
@@ -789,6 +791,8 @@ static mmc_t *php_mmc_pool_addserver(
 		pool->failure_callback = &php_mmc_failure_callback;
 		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_id);
+		add_property_null(mmc_object, "username");
+		add_property_null(mmc_object, "password");
 	}
 	else {
 		pool = (mmc_pool_t *)zend_list_find(Z_LVAL_PP(connection), &resource_type);
@@ -1999,6 +2003,35 @@ PHP_FUNCTION(memcache_flush)
 	RETURN_TRUE;
 }
 /* }}} */
+
+/* {{{ proto string memcache_set_sasl_data(object memcache, string username, string password)
+   Set credentials for sals authentification */
+PHP_FUNCTION(memcache_set_sasl_data)
+{
+	zval *mmc_object = getThis();
+	char *user;
+	long user_length;
+	char *password;
+	long password_length;
+
+	if (mmc_object == NULL) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oss", &mmc_object, memcache_pool_ce, &user, &user_length, &password, &password_length) == FAILURE) {
+			return;
+		}
+	} else {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss", &user, &user_length, &password, &password_length) == FAILURE) {
+			return;
+		}
+	}
+	if (user_length < 1 || password_length < 1) {
+		RETURN_FALSE;
+	}
+	add_property_stringl(mmc_object, "username", user, user_length, 1);
+	add_property_stringl(mmc_object, "password", password, password_length, 1);
+	RETURN_TRUE;
+}
+/* }}} */
+
 
 /* {{{ proto bool memcache_debug( bool onoff ) */
 PHP_FUNCTION(memcache_debug)
