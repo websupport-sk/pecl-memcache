@@ -34,6 +34,7 @@
 #include "memcache_pool.h"
 #include "ext/standard/php_smart_str.h"
 
+#ifndef PHP_WIN32
 #if __BYTE_ORDER == __BIG_ENDIAN
 # define ntohll(x) (x)
 # define htonll(x) (x)
@@ -43,6 +44,10 @@
 # define htonll(x) bswap_64(x)
 #else
 # error "Could not determine byte order: __BYTE_ORDER uncorrectly defined"
+#endif
+#else
+uint64_t mmc_htonll(uint64_t value);
+# define ntohll mmc_htonll
 #endif
 
 #define MMC_REQUEST_MAGIC	0x80
@@ -90,24 +95,26 @@ typedef struct mmc_request_header {
 	uint16_t	_reserved;
 	uint32_t	length;							/* trailing body length (not including this header) */
 	uint32_t	reqid;							/* opaque request id */
+	uint64_t	cas;
 } mmc_request_header_t;
 
 typedef struct mmc_get_request_header {
 	mmc_request_header_t	base;
-	uint64_t				cas;
 } mmc_get_request_header_t;
 
 typedef struct mmc_version_request_header {
 	mmc_request_header_t	base;
-	uint64_t				cas;
 } mmc_version_request_header_t;
 
 typedef struct mmc_store_request_header {
 	mmc_request_header_t	base;
-	uint64_t				cas;
 	uint32_t				flags;
 	uint32_t				exptime;
 } mmc_store_request_header_t;
+
+typedef struct mmc_store_append_header {
+	mmc_request_header_t	base;
+} mmc_store_append_header_t;
 
 typedef struct mmc_delete_request_header {
 	mmc_request_header_t	base;
@@ -116,15 +123,13 @@ typedef struct mmc_delete_request_header {
 
 typedef struct mmc_mutate_request_header {
 	mmc_request_header_t	base;
-	uint64_t				cas;
-	uint64_t				value;
-	uint64_t				defval;
-	uint32_t				exptime;
+	uint64_t				delta;
+	uint64_t				initial;
+	uint32_t				expiration;
 } mmc_mutate_request_header_t;
 
 typedef struct mmc_sasl_request_header {
 	mmc_request_header_t	base;
-	uint64_t				cas;
 } mmc_sasl_request_header;
 
 typedef struct mmc_response_header {
@@ -181,6 +186,26 @@ void mmc_binary_hexdump(void *mem, unsigned int len)
                 }
         }
 }
+#ifdef PHP_WIN32
+uint64_t mmc_htonll(uint64_t value)
+{
+	if (value == 0) {
+		return 0x0LL;
+	} else {
+		static const int num = 42;
+
+		// Check the endianness
+		if (*(const char *)(&num) == num) {
+			const uint32_t high_part = htonl((uint32_t)(value >> 32));
+			const uint32_t low_part = htonl((uint32_t)(value & 0xFFFFFFFFLL));
+
+			return ((uint64_t)(low_part) << 32) | high_part;
+		} else {
+			return value;
+		}
+	}
+}
+#endif
 
 static inline char *mmc_stream_get(mmc_stream_t *io, size_t bytes TSRMLS_DC) /*
 	attempts to read a number of bytes from server, returns the a pointer to the buffer on success, NULL if the complete number of bytes could not be read {{{ */
@@ -479,7 +504,7 @@ static void mmc_binary_get(mmc_request_t *request, int op, zval *zkey, const cha
 
 	/* reqid/opaque is the index into the collection of key pointers */
 	mmc_pack_header(&(header.base), MMC_OP_GET, req->keys.len, key_len, 0, 0);
-	header.cas = 0x0;
+	header.base.cas = 0x0;
 
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(mmc_get_request_header_t));
 	smart_str_appendl(&(request->sendbuf.value), key, key_len);
@@ -495,50 +520,65 @@ static int mmc_binary_store(
 	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len,
 	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC) /* {{{ */
 {
-	int status, prevlen, valuelen;
-	mmc_store_request_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
+	int status, prevlen, valuelen;
 
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_response;
 
 	prevlen = request->sendbuf.value.len;
+/*  placeholder for upcoming append/prepend support */
+#if 0
+	if (op == MMC_OP_APPEND || op == MMC_OP_PREPEND) {
+		mmc_store_append_header_t *header;
 
-	/* allocate space for header */
-	mmc_buffer_alloc(&(request->sendbuf), sizeof(mmc_store_request_header_t));
-	request->sendbuf.value.len += sizeof(mmc_store_request_header_t);
+		/* allocate space for header */
+		mmc_buffer_alloc(&(request->sendbuf), sizeof(mmc_store_append_header_t));
+		request->sendbuf.value.len += sizeof(mmc_store_append_header_t);
+		/* todo */
+		return MMC_OK;
+	} else
+#endif
+	{
 
-	/* append key and data */
-	smart_str_appendl(&(request->sendbuf.value), key, key_len);
+		mmc_store_request_header_t *header;
 
-	valuelen = request->sendbuf.value.len;
-	status = mmc_pack_value(pool, &(request->sendbuf), value, &flags TSRMLS_CC);
+		/* allocate space for header */
+		mmc_buffer_alloc(&(request->sendbuf), sizeof(mmc_store_request_header_t));
+		request->sendbuf.value.len += sizeof(mmc_store_request_header_t);
 
-	if (status != MMC_OK) {
-		return status;
+		/* append key and data */
+		smart_str_appendl(&(request->sendbuf.value), key, key_len);
+
+		valuelen = request->sendbuf.value.len;
+		status = mmc_pack_value(pool, &(request->sendbuf), value, &flags TSRMLS_CC);
+
+		if (status != MMC_OK) {
+			return status;
+		}
+
+		/* initialize header */
+		header = (mmc_store_request_header_t *)(request->sendbuf.value.c + prevlen);
+
+		switch (op) {
+			case MMC_OP_CAS:
+				op = MMC_OP_SET;
+				break;
+
+			case MMC_OP_APPEND:
+			case MMC_OP_PREPEND:
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Binary protocol doesn't support append/prepend");
+				return MMC_REQUEST_FAILURE;
+		}
+
+		mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_request_header_t) - sizeof(mmc_request_header_t), request->sendbuf.value.len - valuelen);
+
+		header->base.cas = mmc_htonll(cas);
+		header->flags = htonl(flags);
+		header->exptime = htonl(exptime);
+
+		return MMC_OK;
 	}
-
-	/* initialize header */
-	header = (mmc_store_request_header_t *)(request->sendbuf.value.c + prevlen);
-
-	switch (op) {
-		case MMC_OP_CAS:
-			op = MMC_OP_SET;
-			break;
-
-		case MMC_OP_APPEND:
-		case MMC_OP_PREPEND:
-			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Binary protocol doesn't support append/prepend");
-			return MMC_REQUEST_FAILURE;
-	}
-
-	mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_request_header_t) - sizeof(mmc_request_header_t) - sizeof(header->cas), request->sendbuf.value.len - valuelen);
-
-	header->cas = htonll(cas);
-	header->flags = htonl(flags);
-	header->exptime = htonl(exptime);
-
-	return MMC_OK;
 }
 /* }}} */
 
@@ -562,31 +602,37 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 {
 	mmc_mutate_request_header_t header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
+	const size_t request_header_size = sizeof(mmc_request_header_t);
+	uint8_t op;
 
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_mutate;
+
+	if (value >= 0) {
+		op = MMC_OP_INCR;
+		header.delta = mmc_htonll((uint64_t)value);
+		//header.delta = (uint64_t)value;
+	} else {
+		op = MMC_OP_DECR;
+		header.delta = mmc_htonll((uint64_t)-value);
+	}
 
 	/* extra is always 20 bytes 
 	https://code.google.com/p/memcached/wiki/BinaryProtocolRevamped#Increment,_Decrement
 	TODO: add flags to do not force alignments so we can rely on sizeof instead of 
 	fixed sizes, safer&cleaner */
-	if (value >= 0) {
-		mmc_pack_header(&(header.base), MMC_OP_INCR, req->keys.len, key_len, 20, 0);
-		header.value = htonll((int64_t)value);
-	} else {
-		mmc_pack_header(&(header.base), MMC_OP_DECR, req->keys.len, key_len,  20, 0);
-		header.value = htonll((int64_t)-value);
-	}
-	header.cas = 0x0;
-	header.defval = htonll((int64_t)defval);
+	mmc_pack_header(&(header.base), op, req->keys.len, key_len,  20, 0);
+	header.base.cas = 0x0;
+	header.initial = mmc_htonll((int64_t)defval);
 
 	if (defval_used) {
 		/* server inserts defval if key doesn't exist */
-		header.exptime = htonl(exptime);
+		header.expiration = htonl(exptime);
 	}
 	else {
 		/* server replies with NOT_FOUND if exptime ~0 and key doesn't exist */
-		header.exptime = ~(uint32_t)0;
+		header.expiration = ~(uint32_t)0;
+		header.expiration = htonl(0x00000e10);
 	}
 
 	/* mutate request is 43 bytes */
@@ -624,7 +670,7 @@ static void mmc_binary_version(mmc_request_t *request) /* {{{ */
 	req->next_parse_handler = mmc_request_read_response;
 
 	mmc_pack_header(&(header.base), MMC_OP_VERSION, 0, 0, 0, 0);
-	header.cas = 0x0;
+	header.base.cas = 0x0;
 	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 }
 /* }}} */
@@ -679,7 +725,7 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	(header->base)._reserved = 0x0;
 	(header->base).length = htonl(strlen("phpuser123456") + key_len + 2);
 	(header->base).reqid = htonl(0);
-	header->cas = 0x0;
+	header->base.cas = 0x0;
 
 	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
 	smart_str_appendl(&(request->sendbuf.value), "phpuser", strlen("phpuser"));
