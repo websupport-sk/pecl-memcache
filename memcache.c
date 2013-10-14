@@ -881,8 +881,9 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d, %s (%d)", host, mmc->tcp.port, mmc->error ? mmc->error : "Unknown error", mmc->errnum);
 		RETURN_FALSE;
 	}
-	username = zend_read_property(memcache_ce, mmc_object, "username", strlen("username"), 1);
-	password = zend_read_property(memcache_ce, mmc_object, "password", strlen("password"), 1);
+
+	username = zend_read_property(memcache_ce, mmc_object, "username", strlen("username"), 1 TSRMLS_CC);
+	password = zend_read_property(memcache_ce, mmc_object, "password", strlen("password"), 1 TSRMLS_CC);
 
 	if (Z_TYPE_P(username) == IS_STRING && Z_TYPE_P(password) == IS_STRING) {
 		mmc_request_t *request;

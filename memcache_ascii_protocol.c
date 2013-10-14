@@ -397,7 +397,7 @@ static void mmc_ascii_stats(mmc_request_t *request, const char *type, long slabi
 }
 /* }}} */
 
-static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, const char *user,  const char *password) /* {{{ */
+static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, const char *user,  const char *password TSRMLS_DC) /* {{{ */
 {
 	/* stats not supported */
 }
