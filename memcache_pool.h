@@ -264,6 +264,8 @@ typedef void (*mmc_protocol_flush)(mmc_request_t *request, unsigned int exptime)
 typedef void (*mmc_protocol_stats)(mmc_request_t *request, const char *type, long slabid, long limit);
 typedef void (*mmc_protocol_version)(mmc_request_t *request);
 
+typedef void (*mmc_protocol_set_sasl_auth_data)(mmc_pool_t *pool, mmc_request_t *request, const char *user, const char *password TSRMLS_DC);
+
 typedef struct mmc_protocol {
 	mmc_protocol_create_request	create_request;
 	mmc_protocol_clone_request	clone_request;
@@ -282,6 +284,8 @@ typedef struct mmc_protocol {
 	mmc_protocol_flush		flush;
 	mmc_protocol_version	version;
 	mmc_protocol_stats		stats;
+	
+	mmc_protocol_set_sasl_auth_data set_sasl_auth_data;
 } mmc_protocol_t;
 
 extern mmc_protocol_t mmc_ascii_protocol;

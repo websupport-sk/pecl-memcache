@@ -92,6 +92,8 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(decrement,				memcache_decrement,					NULL)
 	PHP_FALIAS(close,					memcache_close,						NULL)
 	PHP_FALIAS(flush,					memcache_flush,						NULL)
+	PHP_FALIAS(setSaslData,				memcache_set_sasl_data,				NULL)
+	
 	{NULL, NULL, NULL}
 };
 
@@ -400,7 +402,7 @@ int mmc_stored_handler(mmc_t *mmc, mmc_request_t *request, int response, const c
 	}
 
 	/* return FALSE or catch memory errors without failover */
-	if (response == MMC_RESPONSE_EXISTS || response == MMC_RESPONSE_OUT_OF_MEMORY || response == MMC_RESPONSE_TOO_LARGE 
+	if (response == MMC_RESPONSE_EXISTS || response == MMC_RESPONSE_OUT_OF_MEMORY || response == MMC_RESPONSE_TOO_LARGE
 			|| response == MMC_RESPONSE_CLIENT_ERROR) {
 		ZVAL_FALSE(result);
 
@@ -556,9 +558,9 @@ int mmc_numeric_response_handler(mmc_t *mmc, mmc_request_t *request, int respons
 		}
 
 		if (response != MMC_RESPONSE_NOT_FOUND) {
-			php_error_docref(NULL TSRMLS_CC, 
+			php_error_docref(NULL TSRMLS_CC,
 					E_NOTICE, "Server %s (tcp %d, udp %d) failed with: %s (%d)",
-					mmc->host, mmc->tcp.port, 
+					mmc->host, mmc->tcp.port,
 					mmc->udp.port, message, response);
 		}
 
@@ -722,11 +724,7 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		} else {
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
-			zend_list_insert(mmc, le_memcache_server);
-#else
-			zend_list_insert(mmc, le_memcache_server TSRMLS_CC);
-#endif
+			MEMCACHE_LIST_INSERT(mmc, le_memcache_server);
 		}
 	}
 	else if (le->type != le_memcache_server || le->ptr == NULL) {
@@ -743,11 +741,7 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 			mmc = NULL;
 		}
 		else {
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
-			zend_list_insert(mmc, le_memcache_server);
-#else
-			zend_list_insert(mmc, le_memcache_server TSRMLS_CC);
-#endif
+			MEMCACHE_LIST_INSERT(mmc, le_memcache_server);
 		}
 	}
 	else {
@@ -783,16 +777,23 @@ static mmc_t *php_mmc_pool_addserver(
 		return NULL;
 	}
 
+	if (tcp_port > 65635 || tcp_port < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid tcp port number");
+		return NULL;
+	}
+	if (udp_port > 65635 || udp_port < 0) {
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "invalid udp port number");
+		return NULL;
+	}
 	/* initialize pool if need be */
 	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **)&connection) == FAILURE) {
 		pool = mmc_pool_new(TSRMLS_C);
 		pool->failure_callback = &php_mmc_failure_callback;
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
-		list_id = zend_list_insert(pool, le_memcache_pool);
-#else
-		list_id = zend_list_insert(pool, le_memcache_pool TSRMLS_CC);
-#endif
+		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_id);
+
+		zend_declare_property_null(memcache_pool_ce, "username", strlen("username"), ZEND_ACC_PUBLIC TSRMLS_CC);
+		zend_declare_property_null(memcache_pool_ce, "password", strlen("password"), ZEND_ACC_PUBLIC TSRMLS_CC);
 	}
 	else {
 		pool = (mmc_pool_t *)zend_list_find(Z_LVAL_PP(connection), &resource_type);
@@ -810,10 +811,10 @@ static mmc_t *php_mmc_pool_addserver(
 
 	/* lazy initialization of server struct */
 	if (persistent && status) {
-		mmc = mmc_find_persistent(host, host_len, tcp_port, udp_port, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_find_persistent(host, host_len, (unsigned short) tcp_port, (unsigned short) udp_port, timeout, retry_interval TSRMLS_CC);
 	}
 	else {
-		mmc = mmc_server_new(host, host_len, tcp_port, udp_port, 0, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_server_new(host, host_len, (unsigned short) tcp_port, (unsigned short) udp_port, 0, timeout, retry_interval TSRMLS_CC);
 	}
 
 	/* add server in failed mode */
@@ -837,7 +838,7 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 	zval *mmc_object = getThis();
 	mmc_pool_t *pool;
 	mmc_t *mmc;
-
+	zval *username, *password;
 	char *host;
 	int host_len;
 	long tcp_port = MEMCACHE_G(default_port);
@@ -852,11 +853,7 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 		int list_id;
 		mmc_pool_t *pool = mmc_pool_new(TSRMLS_C);
 		pool->failure_callback = &php_mmc_failure_callback;
-#if (PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3)
-		list_id = zend_list_insert(pool, le_memcache_pool);
-#else
-		list_id = zend_list_insert(pool, le_memcache_pool TSRMLS_CC);
-#endif
+		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
 		mmc_object = return_value;
 		object_init_ex(mmc_object, memcache_ce);
 		add_property_resource(mmc_object, "connection", list_id);
@@ -883,6 +880,26 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 	if (mmc_pool_open(pool, mmc, &(mmc->tcp), 0 TSRMLS_CC) != MMC_OK) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%d, %s (%d)", host, mmc->tcp.port, mmc->error ? mmc->error : "Unknown error", mmc->errnum);
 		RETURN_FALSE;
+	}
+
+	if (pool->protocol == &mmc_binary_protocol) {
+		username = zend_read_property(memcache_ce, mmc_object, "username", strlen("username"), 1 TSRMLS_CC);
+		password = zend_read_property(memcache_ce, mmc_object, "password", strlen("password"), 1 TSRMLS_CC);
+
+		if (Z_TYPE_P(username) == IS_STRING && Z_TYPE_P(password) == IS_STRING) {
+			mmc_request_t *request;
+
+			/* allocate request */
+			request = mmc_pool_request(pool, MMC_PROTO_TCP, mmc_stored_handler, return_value, mmc_pool_failover_handler, NULL TSRMLS_CC);
+			pool->protocol->set_sasl_auth_data(pool, request,  Z_STRVAL_P(username),  Z_STRVAL_P(password) TSRMLS_CC);
+
+			/* schedule request */
+			if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, MEMCACHE_G(redundancy) TSRMLS_CC) != MMC_OK) {
+				RETURN_FALSE;
+			}
+
+			mmc_pool_select(pool TSRMLS_CC);
+		}
 	}
 }
 /* }}} */
@@ -1006,7 +1023,7 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, void *param T
 
 	/* check for userspace callback */
 	if (param != NULL && zend_hash_find(Z_OBJPROP_P((zval *)param), "_failureCallback", sizeof("_failureCallback"), (void **)&callback) == SUCCESS && Z_TYPE_PP(callback) != IS_NULL) {
-		if (IS_CALLABLE(*callback, 0, NULL)) {
+		if (MEMCACHE_IS_CALLABLE(*callback, 0, NULL)) {
 			zval *retval = NULL;
 			zval *host, *tcp_port, *udp_port, *error, *errnum;
 			zval **params[5];
@@ -1180,7 +1197,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
 	zval *mmc_object = getThis();
 	mmc_pool_t *pool;
 	mmc_t *mmc;
-	
+
 	zval *zkey;
 	char key[MMC_MAX_KEY_LEN + 1];
 	unsigned int key_len;
@@ -1189,7 +1206,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &zkey) == FAILURE) {
 		return;
 	}
-	
+
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
 		RETURN_FALSE;
 	}
@@ -1198,9 +1215,9 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_findserver)
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid key");
 		RETURN_FALSE;
 	}
-	
+
 	mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC);
-	spprintf(&hostname, 0, "%s:%d", mmc->host, mmc->tcp.port);	
+	spprintf(&hostname, 0, "%s:%d", mmc->host, mmc->tcp.port);
 	RETURN_STRING(hostname, 0);
 }
 /* }}} */
@@ -1233,7 +1250,7 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -1295,7 +1312,7 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -1360,7 +1377,7 @@ PHP_FUNCTION(memcache_set_failure_callback)
 	}
 
 	if (Z_TYPE_P(failure_callback) != IS_NULL) {
-		if (!IS_CALLABLE(failure_callback, 0, NULL)) {
+		if (!MEMCACHE_IS_CALLABLE(failure_callback, 0, NULL)) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid failure callback");
 			RETURN_FALSE;
 		}
@@ -1665,7 +1682,7 @@ PHP_FUNCTION(memcache_get)
 
 		/* allocate request */
 		request = mmc_pool_request_get(
-			pool, MMC_PROTO_UDP,
+			pool, MMC_PROTO_TCP,
 			mmc_value_handler_single, value_handler_param,
 			mmc_pool_failover_handler, NULL TSRMLS_CC);
 
@@ -1839,7 +1856,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 		pool->protocol->stats(request, type, slabid, limit);
 
 		if (mmc_pool_schedule(pool, pool->servers[i], request TSRMLS_CC) == MMC_OK) {
-			mmc_pool_run(pool TSRMLS_CC);			
+			mmc_pool_run(pool TSRMLS_CC);
 		}
 	}
 
@@ -1949,9 +1966,9 @@ static int mmc_flush_handler(mmc_t *mmc, mmc_request_t *request, int response, c
 
 	if (response == MMC_RESPONSE_CLIENT_ERROR) {
 		ZVAL_FALSE((zval *)param);
-		php_error_docref(NULL TSRMLS_CC, E_NOTICE, 
+		php_error_docref(NULL TSRMLS_CC, E_NOTICE,
 				"Server %s (tcp %d, udp %d) failed with: %s (%d)",
-				mmc->host, mmc->tcp.port, 
+				mmc->host, mmc->tcp.port,
 				mmc->udp.port, message, response);
 
 		return MMC_REQUEST_DONE;
@@ -2006,6 +2023,35 @@ PHP_FUNCTION(memcache_flush)
 	RETURN_TRUE;
 }
 /* }}} */
+
+/* {{{ proto string memcache_set_sasl_data(object memcache, string username, string password)
+   Set credentials for sals authentification */
+PHP_FUNCTION(memcache_set_sasl_data)
+{
+	zval *mmc_object = getThis();
+	char *user;
+	long user_length;
+	char *password;
+	long password_length;
+
+	if (mmc_object == NULL) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oss", &mmc_object, memcache_pool_ce, &user, &user_length, &password, &password_length) == FAILURE) {
+			return;
+		}
+	} else {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "ss", &user, &user_length, &password, &password_length) == FAILURE) {
+			return;
+		}
+	}
+	if (user_length < 1 || password_length < 1) {
+		RETURN_FALSE;
+	}
+	zend_update_property_stringl(memcache_pool_ce, mmc_object, "username", strlen("username"), user, user_length TSRMLS_CC);
+	zend_update_property_stringl(memcache_pool_ce, mmc_object, "password", strlen("password"), password, password_length TSRMLS_CC);
+	RETURN_TRUE;
+}
+/* }}} */
+
 
 /* {{{ proto bool memcache_debug( bool onoff ) */
 PHP_FUNCTION(memcache_debug)
