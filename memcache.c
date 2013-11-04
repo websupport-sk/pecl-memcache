@@ -66,6 +66,7 @@ zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_decrement,				NULL)
 	PHP_FE(memcache_close,					NULL)
 	PHP_FE(memcache_flush,					NULL)
+	PHP_FE(memcache_set_sasl_auth_data,		NULL)
 	{NULL, NULL, NULL}
 };
 
@@ -92,7 +93,7 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(decrement,				memcache_decrement,					NULL)
 	PHP_FALIAS(close,					memcache_close,						NULL)
 	PHP_FALIAS(flush,					memcache_flush,						NULL)
-	PHP_FALIAS(setSaslData,				memcache_set_sasl_data,				NULL)
+	PHP_FALIAS(setSaslAuthData,			memcache_set_sasl_data,				NULL)
 	
 	{NULL, NULL, NULL}
 };
@@ -2026,7 +2027,7 @@ PHP_FUNCTION(memcache_flush)
 
 /* {{{ proto string memcache_set_sasl_data(object memcache, string username, string password)
    Set credentials for sals authentification */
-PHP_FUNCTION(memcache_set_sasl_data)
+PHP_FUNCTION(memcache_set_sasl_auth_data)
 {
 	zval *mmc_object = getThis();
 	char *user;
