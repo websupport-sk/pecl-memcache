@@ -717,7 +717,6 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	int status, prevlen, valuelen;
 	mmc_sasl_request_header *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-	zval *sasl_data;
 	unsigned int flags = 0;
 
 	request->parse = mmc_request_parse_response;
@@ -749,10 +748,12 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	header->base.cas = 0x0;
 
 	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
-	smart_str_appendl(&(request->sendbuf.value), "phpuser", strlen("phpuser"));
+	smart_str_appendl(&(request->sendbuf.value), user, strlen(user));
 	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
-	smart_str_appendl(&(request->sendbuf.value), "123456", strlen("123456"));
-
+	smart_str_appendl(&(request->sendbuf.value), password, strlen(password));
+#if MMC_DEBUG
+	mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
+#endif
 	return;
 }
 /* }}} */

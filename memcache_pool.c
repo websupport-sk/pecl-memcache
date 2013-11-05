@@ -988,6 +988,7 @@ int mmc_pool_open(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, int udp TSRMLS
 
 		case MMC_STATUS_DISCONNECTED:
 		case MMC_STATUS_FAILED:
+
 			return mmc_server_connect(pool, mmc, io, udp TSRMLS_CC);
 	}
 
