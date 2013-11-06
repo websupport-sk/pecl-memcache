@@ -22,7 +22,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
+#define MMC_DEBUG 1
 #ifdef PHP_WIN32
 #include <win32/php_stdint.h>
 #include <winsock2.h>
@@ -232,6 +232,7 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 	size_t size_header = sizeof(mmc_response_header_t);
 
 	header = (mmc_response_header_t *)mmc_stream_get(request->io, sizeof(mmc_response_header_t) TSRMLS_CC);
+
 	if (header != NULL) {
 		if (header->magic != MMC_RESPONSE_MAGIC) {
 			return mmc_server_failure(mmc, request->io, "Malformed server response (invalid magic byte)", 0 TSRMLS_CC);
@@ -714,7 +715,7 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 {
 	const char *key = "PLAIN";
 	const unsigned int key_len = 5;
-	int status, prevlen, valuelen;
+	int prevlen, valuelen;
 	mmc_sasl_request_header *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	unsigned int flags = 0;
@@ -743,7 +744,8 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	(header->base).extras_len = 0x0;
 	(header->base).datatype = 0x0;
 	(header->base)._reserved = 0x0;
-	(header->base).length = htonl(strlen("phpuser123456") + key_len + 2);
+
+	(header->base).length = htonl(strlen(user) + strlen(password) + key_len + 2);
 	(header->base).reqid = htonl(0);
 	header->base.cas = 0x0;
 
@@ -751,6 +753,7 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	smart_str_appendl(&(request->sendbuf.value), user, strlen(user));
 	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
 	smart_str_appendl(&(request->sendbuf.value), password, strlen(password));
+
 #if MMC_DEBUG
 	mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
 #endif
