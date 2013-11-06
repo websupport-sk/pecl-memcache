@@ -22,7 +22,9 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#define MMC_DEBUG 1
+
+#define MMC_DEBUG 0
+
 #ifdef PHP_WIN32
 #include <win32/php_stdint.h>
 #include <winsock2.h>
