@@ -60,6 +60,7 @@ if test "$PHP_MEMCACHE" != "no"; then
       PHP_ADD_LIBRARY_WITH_PATH(z, $PHP_ZLIB_DIR/lib, MEMCACHE_SHARED_LIBADD)
     fi
     PHP_ADD_INCLUDE($PHP_ZLIB_INCDIR)
+    PHP_SUBST(MEMCACHE_SHARED_LIBADD)
   fi
  
   if test "$PHP_MEMCACHE_SESSION" != "no"; then 
