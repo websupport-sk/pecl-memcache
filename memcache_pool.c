@@ -751,7 +751,6 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	}
 
 	/* check connection and extract socket for select() purposes */
-
 	if (!io->stream || php_stream_cast(io->stream, PHP_STREAM_AS_FD_FOR_SELECT, (void **)&fd, 1) != SUCCESS) {
 		mmc_server_seterror(mmc, errstr != NULL ? errstr : "Connection failed", errnum);
 		mmc_server_deactivate(pool, mmc TSRMLS_CC);
@@ -762,10 +761,6 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 
 		return MMC_REQUEST_FAILURE;
 	}
-
-	io->fd = fd;
-	io->status = MMC_STATUS_CONNECTED;
-
 	php_stream_auto_cleanup(io->stream);
 	php_stream_set_chunk_size(io->stream, io->chunk_size);
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_BLOCKING, 0, NULL);
@@ -774,6 +769,9 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	/* doing our own buffering increases performance */
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_READ_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_WRITE_BUFFER, PHP_STREAM_BUFFER_NONE, NULL);
+
+	io->fd = fd;
+	io->status = MMC_STATUS_CONNECTED;
 
 	/* php_stream buffering prevent us from detecting datagram boundaries when using udp */
 	if (udp) {
@@ -988,6 +986,7 @@ int mmc_pool_open(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, int udp TSRMLS
 
 		case MMC_STATUS_DISCONNECTED:
 		case MMC_STATUS_FAILED:
+
 			return mmc_server_connect(pool, mmc, io, udp TSRMLS_CC);
 	}
 
