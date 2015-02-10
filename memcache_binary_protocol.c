@@ -50,6 +50,7 @@
 #else
 uint64_t mmc_htonll(uint64_t value);
 # define ntohll mmc_htonll
+# define htonll mmc_htonll
 #endif
 
 #define MMC_REQUEST_MAGIC	0x80
@@ -562,7 +563,7 @@ static int mmc_binary_store(
 		header = (mmc_store_request_header_t *)(request->sendbuf.value.c + prevlen);
 
 		mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_append_header_t) - sizeof(mmc_request_header_t), request->sendbuf.value.len - valuelen);
-		header->base.cas = mmc_htonll(cas);
+		header->base.cas = htonll(cas);
 		
 #if MMC_DEBUG
 		mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
@@ -597,7 +598,7 @@ static int mmc_binary_store(
 
 		mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_request_header_t) - sizeof(mmc_request_header_t), request->sendbuf.value.len - valuelen);
 
-		header->base.cas = mmc_htonll(cas);
+		header->base.cas = htonll(cas);
 		header->flags = htonl(flags);
 		header->exptime = htonl(exptime);
 
@@ -634,11 +635,11 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 
 	if (value >= 0) {
 		op = MMC_OP_INCR;
-		header.delta = mmc_htonll((uint64_t)value);
+		header.delta = htonll((uint64_t)value);
 		//header.delta = (uint64_t)value;
 	} else {
 		op = MMC_OP_DECR;
-		header.delta = mmc_htonll((uint64_t)-value);
+		header.delta = htonll((uint64_t)-value);
 	}
 
 	/* extra is always 20 bytes 
@@ -647,7 +648,7 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 	fixed sizes, safer&cleaner */
 	mmc_pack_header(&(header.base), op, req->keys.len, key_len,  20, 0);
 	header.base.cas = 0x0;
-	header.initial = mmc_htonll((int64_t)defval);
+	header.initial = htonll((int64_t)defval);
 
 	if (defval_used) {
 		/* server inserts defval if key doesn't exist */
