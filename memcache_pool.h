@@ -135,8 +135,15 @@ typedef struct mmc_buffer {
 #define mmc_buffer_release(b) memset((b), 0, sizeof(*(b)))
 #define mmc_buffer_reset(b) (b)->value.len = (b)->idx = 0
 
-inline void mmc_buffer_alloc(mmc_buffer_t *, unsigned int);
-inline void mmc_buffer_free(mmc_buffer_t *);
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+/* see https://gcc.gnu.org/gcc-5/porting_to.html */
+#define MMC_POOL_INLINE extern inline
+#else
+#define MMC_POOL_INLINE inline
+#endif
+
+MMC_POOL_INLINE void mmc_buffer_alloc(mmc_buffer_t *, unsigned int);
+MMC_POOL_INLINE void mmc_buffer_free(mmc_buffer_t *);
 
 /* stream handlers */
 typedef struct mmc_stream mmc_stream_t;
@@ -395,8 +402,8 @@ int mmc_unpack_value(mmc_t *, mmc_request_t *, mmc_buffer_t *, const char *, uns
 double timeval_to_double(struct timeval tv);
 struct timeval double_to_timeval(double sec);
 
-inline int mmc_prepare_key_ex(const char *, unsigned int, char *, unsigned int *);
-inline int mmc_prepare_key(zval *, char *, unsigned int *);
+MMC_POOL_INLINE int mmc_prepare_key_ex(const char *, unsigned int, char *, unsigned int *);
+MMC_POOL_INLINE int mmc_prepare_key(zval *, char *, unsigned int *);
 
 #define mmc_str_left(h, n, hlen, nlen) ((hlen) >= (nlen) ? memcmp((h), (n), (nlen)) == 0 : 0)
 

@@ -39,6 +39,9 @@ typedef struct mmc_queue {
 
 #ifdef PHP_WIN32
 #define MMC_QUEUE_INLINE
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+/* see https://gcc.gnu.org/gcc-5/porting_to.html */
+#define MMC_QUEUE_INLINE extern inline
 #else
 #define MMC_QUEUE_INLINE inline
 #endif
