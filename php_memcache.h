@@ -35,7 +35,7 @@ extern zend_module_entry memcache_module_entry;
 #include "TSRM.h"
 #endif
 
-#include "ext/standard/php_smart_str_public.h"
+#include "ext/standard/php_smart_string_public.h"
 
 PHP_MINIT_FUNCTION(memcache);
 PHP_MSHUTDOWN_FUNCTION(memcache);
@@ -99,7 +99,7 @@ PHP_FUNCTION(memcache_setoptimeout);
 typedef struct mmc {
 	php_stream				*stream;
 	char					inbuf[MMC_BUF_SIZE];
-	smart_str				outbuf;
+	smart_string				outbuf;
 	char					*host;
 	unsigned short			port;
 	long					timeout;
@@ -111,7 +111,7 @@ typedef struct mmc {
 	int						status;
 	char					*error;					/* last error message */
 	int						errnum;					/* last error code */
-	zval					*failure_callback;
+	zval					failure_callback;
 	zend_bool				in_free;
 } mmc_t;
 
@@ -187,7 +187,7 @@ void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
 void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
 int mmc_pool_store(mmc_pool_t *, const char *, int, const char *, int, int, int, const char *, int TSRMLS_DC);
 int mmc_open(mmc_t *, int, char **, int * TSRMLS_DC);
-int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval **, zval * TSRMLS_DC);
+int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval *, zval * TSRMLS_DC);
 int mmc_delete(mmc_t *, const char *, int, int TSRMLS_DC);
 
 /* session handler struct */

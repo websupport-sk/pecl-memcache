@@ -1,8 +1,8 @@
 /*
   +----------------------------------------------------------------------+
-  | PHP Version 5                                                        |
+  | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2007 The PHP Group                                |
+  | Copyright (c) 1997-2015 The PHP Group                                |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.0 of the PHP license,       |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -14,6 +14,8 @@
   +----------------------------------------------------------------------+
   | Authors: Antony Dovgal <tony@daylessday.org>                         |
   |          Mikael Johansson <mikael AT synd DOT info>                  |
+  |                                                                      |
+  | Port to PHP7: Szabolcs Balogh <baloghsz@szabi.org>                   |
   +----------------------------------------------------------------------+
 */
 
@@ -37,17 +39,13 @@
 #include "ext/standard/info.h"
 #include "ext/standard/php_string.h"
 #include "ext/standard/php_var.h"
-#include "ext/standard/php_smart_str.h"
+#include "ext/standard/php_smart_string.h"
 #include "php_network.h"
 #include "php_memcache.h"
 #include "memcache_queue.h"
 
 #if HAVE_MEMCACHE_SESSION
 #include "ext/session/php_session.h"
-#endif
-
-#ifndef ZEND_ENGINE_2
-#define OnUpdateLong OnUpdateInt
 #endif
 
 /* True global resources - no need for thread safety here */
@@ -135,13 +133,13 @@ static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 {
 	long int lval;
 
-	lval = strtol(new_value, NULL, 10);
+	lval = strtol(new_value->val, NULL, 10);
 	if (lval <= 0) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.chunk_size must be a positive integer ('%s' given)", new_value);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.chunk_size must be a positive integer ('%s' given)", new_value->val);
 		return FAILURE;
 	}
 
-	return OnUpdateLong(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+	return OnUpdateLong(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
 }
 /* }}} */
 
@@ -149,26 +147,26 @@ static PHP_INI_MH(OnUpdateFailoverAttempts) /* {{{ */
 {
 	long int lval;
 
-	lval = strtol(new_value, NULL, 10);
+	lval = strtol(new_value->val, NULL, 10);
 	if (lval <= 0) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.max_failover_attempts must be a positive integer ('%s' given)", new_value);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.max_failover_attempts must be a positive integer ('%s' given)", new_value->val);
 		return FAILURE;
 	}
 
-	return OnUpdateLong(entry, new_value, new_value_length, mh_arg1, mh_arg2, mh_arg3, stage TSRMLS_CC);
+	return OnUpdateLong(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
 }
 /* }}} */
 
 static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
 {
-	if (!strcasecmp(new_value, "standard")) {
+	if (!strcasecmp(new_value->val, "standard")) {
 		MEMCACHE_G(hash_strategy) = MMC_STANDARD_HASH;
 	}
-	else if (!strcasecmp(new_value, "consistent")) {
+	else if (!strcasecmp(new_value->val, "consistent")) {
 		MEMCACHE_G(hash_strategy) = MMC_CONSISTENT_HASH;
 	}
 	else {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_strategy must be in set {standard, consistent} ('%s' given)", new_value);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_strategy must be in set {standard, consistent} ('%s' given)", new_value->val);
 		return FAILURE;
 	}
 
@@ -178,14 +176,14 @@ static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
 
 static PHP_INI_MH(OnUpdateHashFunction) /* {{{ */
 {
-	if (!strcasecmp(new_value, "crc32")) {
+	if (!strcasecmp(new_value->val, "crc32")) {
 		MEMCACHE_G(hash_function) = MMC_HASH_CRC32;
 	}
-	else if (!strcasecmp(new_value, "fnv")) {
+	else if (!strcasecmp(new_value->val, "fnv")) {
 		MEMCACHE_G(hash_function) = MMC_HASH_FNV1A;
 	}
 	else {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_function must be in set {crc32, fnv} ('%s' given)", new_value);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.hash_function must be in set {crc32, fnv} ('%s' given)", new_value->val);
 		return FAILURE;
 	}
 
@@ -197,9 +195,9 @@ static PHP_INI_MH(OnUpdateDefaultTimeout) /* {{{ */
 {
 	long int lval;
 
-	lval = strtol(new_value, NULL, 10);
+	lval = strtol(new_value->val, NULL, 10);
 	if (lval <= 0) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.default_timeout must be a positive number greater than or equal to 1 ('%s' given)", new_value);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.default_timeout must be a positive number greater than or equal to 1 ('%s' given)", new_value->val);
 		return FAILURE;
 	}
 	MEMCACHE_G(default_timeout_ms) = lval;
@@ -220,8 +218,8 @@ PHP_INI_END()
 /* }}} */
 
 /* {{{ internal function protos */
-static void _mmc_pool_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
-static void _mmc_pserver_list_dtor(zend_rsrc_list_entry * TSRMLS_DC);
+static void _mmc_pool_list_dtor(zend_resource * TSRMLS_DC);
+static void _mmc_pserver_list_dtor(zend_resource * TSRMLS_DC);
 
 static void mmc_server_free(mmc_t * TSRMLS_DC);
 static void mmc_server_disconnect(mmc_t * TSRMLS_DC);
@@ -231,7 +229,7 @@ static int mmc_compress(char **, unsigned long *, const char *, int TSRMLS_DC);
 static int mmc_uncompress(char **, unsigned long *, const char *, int);
 static int mmc_get_pool(zval *, mmc_pool_t ** TSRMLS_DC);
 static int mmc_readline(mmc_t * TSRMLS_DC);
-static char * mmc_get_version(mmc_t * TSRMLS_DC);
+static zend_string* mmc_get_version(mmc_t * TSRMLS_DC);
 static int mmc_str_left(char *, char *, int, int);
 static int mmc_sendcmd(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_parse_response(mmc_t *mmc, char *, int, char **, int *, int *, int *);
@@ -370,13 +368,13 @@ static struct timeval _convert_timeoutms_to_ts(long msecs) /* {{{ */
 }
 /* }}} */
 
-static void _mmc_pool_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+static void _mmc_pool_list_dtor(zend_resource *rsrc TSRMLS_DC) /* {{{ */
 {
 	mmc_pool_free((mmc_pool_t *)rsrc->ptr TSRMLS_CC);
 }
 /* }}} */
 
-static void _mmc_pserver_list_dtor(zend_rsrc_list_entry *rsrc TSRMLS_DC) /* {{{ */
+static void _mmc_pserver_list_dtor(zend_resource *rsrc TSRMLS_DC) /* {{{ */
 {
 	mmc_server_free((mmc_t *)rsrc->ptr TSRMLS_CC);
 }
@@ -406,33 +404,20 @@ mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persist
 }
 /* }}} */
 
-static void mmc_server_callback_dtor(zval **callback TSRMLS_DC) /* {{{ */
+static void mmc_server_callback_dtor(zval *callback TSRMLS_DC) /* {{{ */
 {
-	zval **this_obj;
-	
-	if (!callback || !*callback) return;
-
-	if (Z_TYPE_PP(callback) == IS_ARRAY && 
-		zend_hash_index_find(Z_ARRVAL_PP(callback), 0, (void **)&this_obj) == SUCCESS &&
-		Z_TYPE_PP(this_obj) == IS_OBJECT) {
-		zval_ptr_dtor(this_obj);
+	if (!callback) return;
+	if (!Z_ISUNDEF_P(callback)) {
+	  zval_ptr_dtor(callback);
 	}
-	zval_ptr_dtor(callback);
 }
 /* }}} */
 
-static void mmc_server_callback_ctor(zval **callback TSRMLS_DC) /* {{{ */
+static void mmc_server_callback_ctor(zval *mmc_callback, zval *callback TSRMLS_DC) /* {{{ */
 {
-	zval **this_obj;
-	
-	if (!callback || !*callback) return;
+	if (!callback) return;
 
-	if (Z_TYPE_PP(callback) == IS_ARRAY && 
-		zend_hash_index_find(Z_ARRVAL_PP(callback), 0, (void **)&this_obj) == SUCCESS &&
-		Z_TYPE_PP(this_obj) == IS_OBJECT) {
-		zval_add_ref(this_obj);
-	}
-	zval_add_ref(callback);
+	ZVAL_COPY(mmc_callback, callback);
 }
 /* }}} */
 
@@ -440,7 +425,7 @@ static void mmc_server_sleep(mmc_t *mmc TSRMLS_DC) /*
 	prepare server struct for persistent sleep {{{ */
 {
 	mmc_server_callback_dtor(&mmc->failure_callback TSRMLS_CC);
-	mmc->failure_callback = NULL;
+	ZVAL_UNDEF(&mmc->failure_callback);
 	
 	if (mmc->error != NULL) {
 		pefree(mmc->error, mmc->persistent);
@@ -582,17 +567,15 @@ int mmc_prepare_key(zval *key, char *result, unsigned int *result_len TSRMLS_DC)
 		return mmc_prepare_key_ex(Z_STRVAL_P(key), Z_STRLEN_P(key), result, result_len TSRMLS_CC);
 	} else {
 		int res;
-		zval *keytmp;
-		ALLOC_ZVAL(keytmp);
+		zval keytmp;
 
-		*keytmp = *key;
-		zval_copy_ctor(keytmp);
-		convert_to_string(keytmp);
+		keytmp = *key;
+		zval_copy_ctor(&keytmp);
+		convert_to_string(&keytmp);
 
-		res = mmc_prepare_key_ex(Z_STRVAL_P(keytmp), Z_STRLEN_P(keytmp), result, result_len TSRMLS_CC);
+		res = mmc_prepare_key_ex(Z_STRVAL(keytmp), Z_STRLEN(keytmp), result, result_len TSRMLS_CC);
 
-		zval_dtor(keytmp);
-		FREE_ZVAL(keytmp);
+		zval_dtor(&keytmp);
 		
 		return res;
 	}
@@ -806,7 +789,9 @@ int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const
 	request_len += sizeof("\r\n") - 1; 		
 
 	request[request_len] = '\0';
-	
+
+	pool->hash->find_server(pool->hash_state, key, key_len);
+
 	while (result < 0 && (mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC)) != NULL) {
 		if ((result = mmc_server_store(mmc, request, request_len TSRMLS_CC)) < 0) {
 			mmc_server_failure(mmc TSRMLS_CC);
@@ -896,29 +881,32 @@ static int mmc_uncompress(char **result, unsigned long *result_len, const char *
 
 static int mmc_get_pool(zval *id, mmc_pool_t **pool TSRMLS_DC) /* {{{ */
 {
-	zval **connection;
-	int resource_type;
+	zval *zv;
 
-	if (Z_TYPE_P(id) != IS_OBJECT || zend_hash_find(Z_OBJPROP_P(id), "connection", sizeof("connection"), (void **) &connection) == FAILURE) {
+	if (Z_TYPE_P(id) != IS_OBJECT || (zv = zend_hash_str_find(Z_OBJPROP_P(id), "connection", sizeof("connection")-1)) == NULL) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "No servers added to memcache connection");
 		return 0;
 	}
 
-	*pool = (mmc_pool_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
+	if ((*pool = zend_fetch_resource_ex(zv, "connection", le_memcache_pool)) == NULL) {
+			php_error_docref(NULL TSRMLS_CC, E_WARNING, "No pool on memcache connection");
+			return 0;
+	}
 
-	if (!*pool || resource_type != le_memcache_pool) {
+	if (!*pool) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Invalid Memcache->connection member variable");
 		return 0;
 	}
 
-	return Z_LVAL_PP(connection);
+	return 1;
 }
 /* }}} */
 
 static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* {{{ */
 {
 	struct timeval tv;
-	char *hostname = NULL, *hash_key = NULL, *errstr = NULL;
+	char *hostname = NULL, *hash_key = NULL;
+	zend_string *errstr = NULL;
 	int	hostname_len, err = 0;
 
 	/* close open stream */
@@ -944,31 +932,10 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 		spprintf(&hash_key, 0, "memcache:%s", hostname);
 	}
 
-#if PHP_API_VERSION > 20020918
 	mmc->stream = php_stream_xport_create( hostname, hostname_len,
-										   ENFORCE_SAFE_MODE | REPORT_ERRORS,
+										   REPORT_ERRORS,
 										   STREAM_XPORT_CLIENT | STREAM_XPORT_CONNECT,
 										   hash_key, &tv, NULL, &errstr, &err);
-#else
-	if (mmc->persistent) {
-		switch(php_stream_from_persistent_id(hash_key, &(mmc->stream) TSRMLS_CC)) {
-			case PHP_STREAM_PERSISTENT_SUCCESS:
-				if (php_stream_eof(mmc->stream)) {
-					php_stream_pclose(mmc->stream);
-					mmc->stream = NULL;
-					break;
-				}
-			case PHP_STREAM_PERSISTENT_FAILURE:
-				break;
-		}
-	}
-
-	if (!mmc->stream) {
-		int socktype = SOCK_STREAM;
-		mmc->stream = php_stream_sock_open_host(mmc->host, mmc->port, socktype, &tv, hash_key);
-	}
-
-#endif
 
 	efree(hostname);
 	if (mmc->persistent) {
@@ -977,16 +944,15 @@ static int _mmc_open(mmc_t *mmc, char **error_string, int *errnum TSRMLS_DC) /* 
 
 	if (!mmc->stream) {
 		MMC_DEBUG(("_mmc_open: can't open socket to host"));
-		mmc_server_seterror(mmc, errstr != NULL ? errstr : "Connection failed", err);
+		mmc_server_seterror(mmc, errstr != NULL ? ZSTR_VAL(errstr) : "Connection failed", err);
 		mmc_server_deactivate(mmc TSRMLS_CC);
 
 		if (errstr) {
 			if (error_string) {
-				*error_string = errstr;
+				// TODO: speedup string copy
+				spprintf(error_string, 0, "%s", ZSTR_VAL(errstr));
 			}
-			else {
-				efree(errstr);
-			}
+			zend_string_release(errstr);
 		}
 		if (errnum) {
 			*errnum = err;
@@ -1023,7 +989,7 @@ int mmc_open(mmc_t *mmc, int force_connect, char **error_string, int *errnum TSR
 		case MMC_STATUS_UNKNOWN:
 			/* check connection if needed */
 			if (force_connect) {
-				char *version;
+				zend_string *version;
 				if ((version = mmc_get_version(mmc TSRMLS_CC)) == NULL && !_mmc_open(mmc, error_string, errnum TSRMLS_CC)) {
 					break;
 				}
@@ -1067,39 +1033,37 @@ void mmc_server_deactivate(mmc_t *mmc TSRMLS_DC) /* 	disconnect and marks the se
 	mmc->status = MMC_STATUS_FAILED;
 	mmc->failed = (long)time(NULL);
 
-	if (mmc->failure_callback != NULL) {
-		zval *retval = NULL;
+	if (!Z_ISUNDEF(mmc->failure_callback)) {
+		zval retval;
 		zval *host, *tcp_port, *udp_port, *error, *errnum;
-		zval **params[5];
+		zval params[5];
 
-		params[0] = &host;
-		params[1] = &tcp_port;
-		params[2] = &udp_port;
-		params[3] = &error;
-		params[4] = &errnum;
+		ZVAL_UNDEF(&retval);
 
-		MAKE_STD_ZVAL(host);
-		MAKE_STD_ZVAL(tcp_port); MAKE_STD_ZVAL(udp_port);
-		MAKE_STD_ZVAL(error); MAKE_STD_ZVAL(errnum);
+		host = &params[0];
+		tcp_port = &params[1];
+		udp_port = &params[2];
+		error = &params[3];
+		errnum = &params[4];
 
-		ZVAL_STRING(host, mmc->host, 1);
+		ZVAL_STRING(host, mmc->host);
 		ZVAL_LONG(tcp_port, mmc->port); ZVAL_LONG(udp_port, 0);
 		
 		if (mmc->error != NULL) {
-			ZVAL_STRING(error, mmc->error, 1);
+			ZVAL_STRING(error, mmc->error);
 		}
 		else {
 			ZVAL_NULL(error);
 		}
 		ZVAL_LONG(errnum, mmc->errnum);
 
-		call_user_function_ex(EG(function_table), NULL, mmc->failure_callback, &retval, 5, params, 0, NULL TSRMLS_CC);
+		call_user_function_ex(EG(function_table), NULL, &mmc->failure_callback, &retval, 5, params, 0, NULL TSRMLS_CC);
 
-		zval_ptr_dtor(&host);
-		zval_ptr_dtor(&tcp_port); zval_ptr_dtor(&udp_port);
-		zval_ptr_dtor(&error); zval_ptr_dtor(&errnum);
+		zval_ptr_dtor(host);
+		zval_ptr_dtor(tcp_port); zval_ptr_dtor(udp_port);
+		zval_ptr_dtor(error); zval_ptr_dtor(errnum);
 		
-		if (retval != NULL) {
+		if (Z_TYPE(retval) != IS_UNDEF) {
 			zval_ptr_dtor(&retval);
 		}
 	}
@@ -1134,9 +1098,8 @@ static int mmc_readline(mmc_t *mmc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
+static zend_string *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
 {
-	char *version_str;
 	int response_len;
 
 	if (mmc_sendcmd(mmc, "version", sizeof("version") - 1 TSRMLS_CC) < 0) {
@@ -1148,8 +1111,7 @@ static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
 	}
 
 	if (mmc_str_left(mmc->inbuf, "VERSION ", response_len, sizeof("VERSION ") - 1)) {
-		version_str = estrndup(mmc->inbuf + sizeof("VERSION ") - 1, response_len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1) );
-		return version_str;
+		return zend_string_init(mmc->inbuf + sizeof("VERSION ") - 1, response_len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1) - 1, 0);
 	}
 
 	mmc_server_seterror(mmc, "Malformed version string", 0);
@@ -1159,7 +1121,7 @@ static char *mmc_get_version(mmc_t *mmc TSRMLS_DC) /* {{{ */
 
 static int mmc_str_left(char *haystack, char *needle, int haystack_len, int needle_len) /* {{{ */
 {
-	char *found;
+	const char *found;
 
 	found = php_memnstr(haystack, needle, needle_len, haystack + haystack_len);
 	if ((found - haystack) == 0) {
@@ -1254,15 +1216,14 @@ static int mmc_parse_response(mmc_t *mmc, char *response, int response_len, char
 }
 /* }}} */
 
-static int mmc_postprocess_value(zval **return_value, char *value, int value_len TSRMLS_DC) /* 
+static int mmc_postprocess_value(zval *return_value, char *value, int value_len TSRMLS_DC) /* 
 	post-process a value into a result zval struct, value will be free()'ed during process {{{ */
 {
 	const char *value_tmp = value;
 	php_unserialize_data_t var_hash;
 	PHP_VAR_UNSERIALIZE_INIT(var_hash);
-
 	if (!php_var_unserialize(return_value, (const unsigned char **)&value_tmp, (const unsigned char *)(value_tmp + value_len), &var_hash TSRMLS_CC)) {
-		ZVAL_FALSE(*return_value);
+		ZVAL_FALSE(return_value);
 		PHP_VAR_UNSERIALIZE_DESTROY(var_hash);
 		efree(value);
 		php_error_docref(NULL TSRMLS_CC, E_NOTICE, "unable to unserialize data");
@@ -1275,7 +1236,7 @@ static int mmc_postprocess_value(zval **return_value, char *value, int value_len
 }
 /* }}} */
 
-int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval **return_value, zval *return_flags TSRMLS_DC) /* {{{ */
+int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval *return_value, zval *return_flags TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 	char *command, *value;
@@ -1294,7 +1255,7 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval 
 
 			/* not found */
 			if (result == 0) {
-				ZVAL_FALSE(*return_value);
+				ZVAL_FALSE(return_value);
 			}
 			/* read "END" */
 			else if ((response_len = mmc_readline(mmc TSRMLS_CC)) < 0 || !mmc_str_left(mmc->inbuf, "END", response_len, sizeof("END")-1)) {
@@ -1302,10 +1263,11 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval 
 				result = -1;
 			}
 			else if (flags & MMC_SERIALIZED ) {
-				result = mmc_postprocess_value(return_value, value, value_len TSRMLS_CC);				
+				result = mmc_postprocess_value(return_value, value, value_len TSRMLS_CC);
 			}
 			else {
-				ZVAL_STRINGL(*return_value, value, value_len, 0);
+				ZVAL_STRINGL(return_value, value, value_len);
+				efree(value);
 			}
 		}
 
@@ -1327,14 +1289,12 @@ int mmc_exec_retrieval_cmd(mmc_pool_t *pool, const char *key, int key_len, zval 
 static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **return_value, zval *return_flags TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
-	HashPosition pos;
-	zval **zkey;
 	char *result_key, *value;
 	char key[MMC_KEY_MAX_SIZE];
 	unsigned int key_len;
+	zval *val;
 	
 	int	i = 0, j, num_requests, result, result_status, result_key_len, value_len, flags;
-	mmc_queue_t serialized = {0};		/* mmc_queue_t<zval *>, pointers to zvals which need unserializing */
 
 	array_init(*return_value);
 	
@@ -1346,31 +1306,29 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 	/* until no retrival errors or all servers have failed */
 	do {
 		result_status = num_requests = 0;
-		zend_hash_internal_pointer_reset_ex(Z_ARRVAL_P(keys), &pos);
 
 		/* first pass to build requests for each server */
-		while (zend_hash_get_current_data_ex(Z_ARRVAL_P(keys), (void **)&zkey, &pos) == SUCCESS) {
-			if (mmc_prepare_key(*zkey, key, &key_len TSRMLS_CC) == MMC_OK) {
-				/* schedule key if first round or if missing from result */
-				if ((!i || !zend_hash_exists(Z_ARRVAL_PP(return_value), key, key_len)) &&
-					(mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC)) != NULL) {
-					if (!(mmc->outbuf.len)) {
-						smart_str_appendl(&(mmc->outbuf), "get", sizeof("get")-1);
-						pool->requests[num_requests++] = mmc;
+		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(keys), val) {
+			if(Z_TYPE_P(val) == IS_STRING) {
+				if(mmc_prepare_key_ex(Z_STRVAL_P(val), Z_STRLEN_P(val), key, &key_len TSRMLS_CC) == MMC_OK) {
+					/* schedule key if first round or if missing from result */
+					if ((!i || !zend_hash_exists(Z_ARRVAL_P(*return_value), Z_STR_P(val))) &&
+						(mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC)) != NULL) {
+						if (!(mmc->outbuf.len)) {
+							smart_string_appendl(&(mmc->outbuf), "get", sizeof("get")-1);
+							pool->requests[num_requests++] = mmc;
+						}
+						smart_string_appendl(&(mmc->outbuf), " ", 1);
+						smart_string_appendl(&(mmc->outbuf), key, key_len);
+						MMC_DEBUG(("mmc_exec_retrieval_cmd_multi: scheduled key '%s' for '%s:%d' request length '%d'", key, mmc->host, mmc->port, mmc->outbuf.len));
 					}
-	
-					smart_str_appendl(&(mmc->outbuf), " ", 1);
-					smart_str_appendl(&(mmc->outbuf), key, key_len);
-					MMC_DEBUG(("mmc_exec_retrieval_cmd_multi: scheduled key '%s' for '%s:%d' request length '%d'", key, mmc->host, mmc->port, mmc->outbuf.len));
 				}
 			}
-			
-			zend_hash_move_forward_ex(Z_ARRVAL_P(keys), &pos);
-		}
+		} ZEND_HASH_FOREACH_END();
 
 		/* second pass to send requests in parallel */
 		for (j=0; j<num_requests; j++) {
-			smart_str_0(&(pool->requests[j]->outbuf));
+			smart_string_0(&(pool->requests[j]->outbuf));
 
 			if ((result = mmc_sendcmd(pool->requests[j], pool->requests[j]->outbuf.c, pool->requests[j]->outbuf.len TSRMLS_CC)) < 0) {
 				mmc_server_failure(pool->requests[j] TSRMLS_CC);
@@ -1383,26 +1341,22 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 			if (pool->requests[j]->status != MMC_STATUS_FAILED) {
 				for (value = NULL; (result = mmc_read_value(pool->requests[j], &result_key, &result_key_len, &value, &value_len, &flags TSRMLS_CC)) > 0; value = NULL) {
 					if (flags & MMC_SERIALIZED) {
-						zval *result;
-						MAKE_STD_ZVAL(result);
-						ZVAL_STRINGL(result, value, value_len, 0);
+						zval result;
 
-						/* don't store duplicate values */
-						if (zend_hash_add(Z_ARRVAL_PP(return_value), result_key, result_key_len + 1, &result, sizeof(result), NULL) == SUCCESS) {
-							mmc_queue_push(&serialized, result);
-						}
-						else {
-							zval_ptr_dtor(&result);
-						}
+						mmc_postprocess_value(&result, value, value_len TSRMLS_CC);
+
+						add_assoc_zval_ex(*return_value, result_key, result_key_len, &result);
+						efree(value);
 					}
 					else {
-						add_assoc_stringl_ex(*return_value, result_key, result_key_len + 1, value, value_len, 0);
+						add_assoc_stringl_ex(*return_value, result_key, result_key_len, value, value_len);
+						efree(value);
 					}
-					
+
 					if (return_flags != NULL) {
-						add_assoc_long_ex(return_flags, result_key, result_key_len + 1, flags);
+						add_assoc_long_ex(return_flags, result_key, result_key_len, flags);
 					}
-					
+
 					efree(result_key);
 				}
 
@@ -1413,20 +1367,9 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 				}
 			}
 
-			smart_str_free(&(pool->requests[j]->outbuf));
+			smart_string_free(&(pool->requests[j]->outbuf));
 		}
 	} while (result_status < 0 && MEMCACHE_G(allow_failover) && i++ < MEMCACHE_G(max_failover_attempts));
-	
-	/* post-process serialized values */
-	if (serialized.len) {
-		zval *value;
-		
-		while ((value = (zval *)mmc_queue_pop(&serialized)) != NULL) {
-			mmc_postprocess_value(&value, Z_STRVAL_P(value), Z_STRLEN_P(value) TSRMLS_CC);
-		}
-		
-		mmc_queue_free(&serialized);
-	}
 
 	return result_status;
 }
@@ -1500,7 +1443,7 @@ int mmc_delete(mmc_t *mmc, const char *key, int key_len, int time TSRMLS_DC) /* 
 	char *command;
 	int command_len, response_len;
 
-	command_len = spprintf(&command, 0, "delete %s %d", key, time);
+	command_len = spprintf(&command, 0, "delete %s", key);
 
 	MMC_DEBUG(("mmc_delete: trying to delete '%s'", key));
 
@@ -1569,9 +1512,10 @@ static int mmc_flush(mmc_t *mmc, int timestamp TSRMLS_DC) /* {{{ */
 /*
  * STAT 6:chunk_size 64
  */
-static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
+static int mmc_stats_parse_stat(const char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
 {
-	char *space, *colon, *key;
+	const char *space, *colon;
+	char *key;
 	long index = 0;
 
 	/* find space delimiting key and value */
@@ -1581,19 +1525,21 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC) 
 
 	/* find colon delimiting subkeys */
 	if ((colon = php_memnstr(start, ":", 1, space - 1)) != NULL) {
-		zval *element, **elem;
+		zval *elem;
+		zval *element;
+		zval new_element;
 		key = estrndup(start, colon - start);
 
 		/* find existing or create subkey array in result */
 		if ((is_numeric_string(key, colon - start, &index, NULL, 0) &&
-			zend_hash_index_find(Z_ARRVAL_P(result), index, (void **) &elem) != FAILURE) ||
-			zend_hash_find(Z_ARRVAL_P(result), key, colon - start + 1, (void **) &elem) != FAILURE) {
-			element = *elem;
+			(elem=zend_hash_index_find(Z_ARRVAL_P(result), index)) != NULL) ||
+			(elem=zend_hash_str_find(Z_ARRVAL_P(result), key, colon - start)) != NULL) {
+			element = elem;
 		}
 		else {
-			MAKE_STD_ZVAL(element);
-			array_init(element);
-			add_assoc_zval_ex(result, key, colon - start + 1, element);
+			array_init(&new_element);
+			add_assoc_zval_ex(result, key, colon - start, &new_element);
+			element = &new_element;
 		}
 
 		efree(key);
@@ -1602,7 +1548,7 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC) 
 
 	/* no more subkeys, add value under last subkey */
 	key = estrndup(start, space - start);
-	add_assoc_stringl_ex(result, key, space - start + 1, space + 1, end - space, 1);
+	add_assoc_stringl_ex(result, key, space - start, (char *) space + 1, end - space);
 	efree(key);
 
 	return 1;
@@ -1614,16 +1560,16 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result TSRMLS_DC) 
  */
 static int mmc_stats_parse_item(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
 {
-	char *space, *value, *value_end, *key;
-	zval *element;
+	const char *space, *value, *value_end;
+	char *key;
+	zval element;
 
 	/* find space delimiting key and value */
 	if ((space = php_memnstr(start, " ", 1, end)) == NULL) {
 		return 0;
 	}
 
-	MAKE_STD_ZVAL(element);
-	array_init(element);
+	array_init(&element);
 
 	/* parse each contained value */
 	for (value = php_memnstr(space, "[", 1, end); value != NULL && value <= end; value = php_memnstr(value + 1, ";", 1, end)) {
@@ -1632,13 +1578,13 @@ static int mmc_stats_parse_item(char *start, char *end, zval *result TSRMLS_DC) 
 		} while (*value == ' ' && value <= end);
 
 		if (value <= end && (value_end = php_memnstr(value, " ", 1, end)) != NULL && value_end <= end) {
-			add_next_index_stringl(element, value, value_end - value, 1);
+			add_next_index_stringl(&element, value, value_end - value);
 		}
 	}
 
 	/* add parsed values under key */
 	key = estrndup(start, space - start);
-	add_assoc_zval_ex(result, key, space - start + 1, element);
+	add_assoc_zval_ex(result, key, space - start + 1, &element);
 	efree(key);
 
 	return 1;
@@ -1647,7 +1593,8 @@ static int mmc_stats_parse_item(char *start, char *end, zval *result TSRMLS_DC) 
 
 static int mmc_stats_parse_generic(char *start, char *end, zval *result TSRMLS_DC)  /* {{{ */
 {
-	char *space, *key;
+	const char *space;
+	char *key;
 
 	/* "stats maps" returns "\n" delimited lines, other commands uses "\r\n" */
 	if (*end == '\r') {
@@ -1657,11 +1604,11 @@ static int mmc_stats_parse_generic(char *start, char *end, zval *result TSRMLS_D
 	if (start <= end) {
 		if ((space = php_memnstr(start, " ", 1, end)) != NULL) {
 			key = estrndup(start, space - start);
-			add_assoc_stringl_ex(result, key, space - start + 1, space + 1, end - space, 1);
+			add_assoc_stringl_ex(result, key, space - start + 1, (char *) space + 1, end - space);
 			efree(key);
 		}
 		else {
-			add_next_index_stringl(result, start, end - start, 1);
+			add_next_index_stringl(result, start, end - start);
 		}
 	}
 
@@ -1812,7 +1759,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 	if (mmc_prepare_key_ex(key, key_len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 		RETURN_FALSE;
 	}
-	
+
 	if (!mmc_get_pool(mmc_object, &pool TSRMLS_CC) || !pool->num_servers) {
 		RETURN_FALSE;
 	}
@@ -1826,7 +1773,8 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 
 		case IS_LONG:
 		case IS_DOUBLE:
-		case IS_BOOL: {
+		case IS_TRUE:
+		case IS_FALSE: {
 			zval value_copy;
 
 			/* FIXME: we should be using 'Z' instead of this, but unfortunately it's PHP5-only */
@@ -1851,10 +1799,10 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 			value_copy_ptr = &value_copy;
 
 			PHP_VAR_SERIALIZE_INIT(value_hash);
-			php_var_serialize(&buf, &value_copy_ptr, &value_hash TSRMLS_CC);
+			php_var_serialize(&buf, value_copy_ptr, &value_hash TSRMLS_CC);
 			PHP_VAR_SERIALIZE_DESTROY(value_hash);
 
-			if (!buf.c) {
+			if (!buf.s) {
 				/* something went really wrong */
 				zval_dtor(&value_copy);
 				php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to serialize value");
@@ -1866,12 +1814,12 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 
 			result = mmc_pool_store(
 				pool, command, command_len, key_tmp, key_tmp_len, flags, expire, 
-				buf.c, buf.len TSRMLS_CC);
+				buf.s->val, buf.s->len TSRMLS_CC);
 		}
 	}
 
 	if (flags & MMC_SERIALIZED) {
-		smart_str_free(&buf);
+		smart_string_free(&buf);
 	}
 
 	if (result > 0) {
@@ -1927,12 +1875,14 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 
 static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{{ */
 {
-	zval **connection, *mmc_object = getThis();
+	zval 	*mmc_object = getThis();
+	zval *zv;
 	mmc_t *mmc = NULL;
 	mmc_pool_t *pool;
-	int resource_type, host_len, errnum = 0, list_id;
+	int resource_type, host_len, errnum = 0;
 	char *host, *error_string = NULL;
 	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, timeoutms = 0;
+	zend_resource *list_res;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lll", &host, &host_len, &port, &timeout, &timeoutms) == FAILURE) {
 		return;
@@ -1969,13 +1919,14 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	if (!mmc_object) {
 		pool = mmc_pool_new(TSRMLS_C);
 		mmc_pool_add(pool, mmc, 1);
-
 		object_init_ex(return_value, memcache_class_entry_ptr);
-		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
-		add_property_resource(return_value, "connection", list_id);
+		list_res = zend_register_resource(pool, le_memcache_pool);
+		add_property_resource(return_value, "connection", list_res);
+		GC_REFCOUNT(list_res)++;
 	}
-	else if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **) &connection) != FAILURE) {
-		pool = (mmc_pool_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
+	else if ((zv=zend_hash_str_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection")-1)) != NULL) {
+		pool = zend_fetch_resource_ex(zv, "connection", le_memcache_pool);
+		resource_type = le_memcache_pool;
 		if (!pool || resource_type != le_memcache_pool) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Unknown connection identifier");
 			RETURN_FALSE;
@@ -1988,8 +1939,10 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 		pool = mmc_pool_new(TSRMLS_C);
 		mmc_pool_add(pool, mmc, 1);
 
-		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
-		add_property_resource(mmc_object, "connection", list_id);
+		list_res = zend_register_resource(pool, le_memcache_pool);
+		add_property_resource(mmc_object, "connection", list_res);
+		GC_REFCOUNT(list_res)++;
+
 		RETURN_TRUE;
 	}
 }
@@ -2019,21 +1972,20 @@ PHP_FUNCTION(memcache_pconnect)
    Adds a connection to the pool. The order in which this function is called is significant */
 PHP_FUNCTION(memcache_add_server)
 {
-	zval **connection, *mmc_object = getThis(), *failure_callback = NULL;
+	zval *connection, *mmc_object = getThis(), *failure_callback = NULL;
 	mmc_pool_t *pool;
 	mmc_t *mmc;
 	long port = MEMCACHE_G(default_port), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY, timeoutms = 0;
 	zend_bool persistent = 1, status = 1;
-	int resource_type, host_len, list_id;
-	char *host;
+	zend_string *host = NULL;
 
 	if (mmc_object) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lblllbzl", &host, &host_len, &port, &persistent, &weight, &timeout, &retry_interval, &status, &failure_callback, &timeoutms) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S|lblllbzl", &host, &port, &persistent, &weight, &timeout, &retry_interval, &status, &failure_callback, &timeoutms) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|lblllbzl", &mmc_object, memcache_class_entry_ptr, &host, &host_len, &port, &persistent, &weight, &timeout, &retry_interval, &status, &failure_callback, &timeoutms) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OS|lblllbzl", &mmc_object, memcache_class_entry_ptr, &host, &port, &persistent, &weight, &timeout, &retry_interval, &status, &failure_callback, &timeoutms) == FAILURE) {
 			return;
 		}
 	}
@@ -2056,11 +2008,11 @@ PHP_FUNCTION(memcache_add_server)
 
 	/* lazy initialization of server struct */
 	if (persistent) {
-		mmc = mmc_find_persistent(host, host_len, port, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_find_persistent(host->val, host->len, port, timeout, retry_interval TSRMLS_CC);
 	}
 	else {
 		MMC_DEBUG(("memcache_add_server: initializing regular struct"));
-		mmc = mmc_server_new(host, host_len, port, 0, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_server_new(host->val, host->len, port, 0, timeout, retry_interval TSRMLS_CC);
 	}
 
 	mmc->connect_timeoutms = timeoutms;
@@ -2071,19 +2023,21 @@ PHP_FUNCTION(memcache_add_server)
 	}
 
 	if (failure_callback != NULL && Z_TYPE_P(failure_callback) != IS_NULL) {
-		mmc->failure_callback = failure_callback;
-		mmc_server_callback_ctor(&mmc->failure_callback TSRMLS_CC);
+		mmc_server_callback_ctor(&mmc->failure_callback, failure_callback TSRMLS_CC);
 	}
 
 	/* initialize pool if need be */
-	if (zend_hash_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection"), (void **) &connection) == FAILURE) {
+	if ((connection=zend_hash_str_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection")-1)) == NULL) {
+
+		zend_resource * list_res;
 		pool = mmc_pool_new(TSRMLS_C);
-		list_id = MEMCACHE_LIST_INSERT(pool, le_memcache_pool);
-		add_property_resource(mmc_object, "connection", list_id);
+		list_res = zend_register_resource(pool, le_memcache_pool);
+		add_property_resource(mmc_object, "connection", list_res);
+		GC_REFCOUNT(list_res)++;
 	}
 	else {
-		pool = (mmc_pool_t *) zend_list_find(Z_LVAL_PP(connection), &resource_type);
-		if (!pool || resource_type != le_memcache_pool) {
+		pool = zend_fetch_resource_ex(connection, "connection", le_memcache_pool);
+		if (!pool) {
 			php_error_docref(NULL TSRMLS_CC, E_WARNING, "Failed to extract 'connection' variable from object");
 			RETURN_FALSE;
 		}
@@ -2151,16 +2105,15 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	if (failure_callback != NULL) {
-		if (mmc->failure_callback != NULL) {
+		if (!Z_ISUNDEF(mmc->failure_callback)) {
 			mmc_server_callback_dtor(&mmc->failure_callback TSRMLS_CC);
 		}
 
 		if (Z_TYPE_P(failure_callback) != IS_NULL) {
-			mmc->failure_callback = failure_callback;
-			mmc_server_callback_ctor(&mmc->failure_callback TSRMLS_CC);
+			mmc_server_callback_ctor(&mmc->failure_callback, failure_callback TSRMLS_CC);
 		}
 		else {
-			mmc->failure_callback = NULL;
+			ZVAL_UNDEF(&mmc->failure_callback);
 		}
 	}
 
@@ -2213,23 +2166,23 @@ PHP_FUNCTION(memcache_get_server_status)
 mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
-	zend_rsrc_list_entry *le;
+	zend_resource *le;
 	char *hash_key;
 	int hash_key_len;
 
 	MMC_DEBUG(("mmc_find_persistent: seeking for persistent connection"));
 	hash_key_len = spprintf(&hash_key, 0, "mmc_connect___%s:%d", host, port);
 
-	if (zend_hash_find(&EG(persistent_list), hash_key, hash_key_len+1, (void **) &le) == FAILURE) {
-		zend_rsrc_list_entry new_le;
+	if ((le=zend_hash_str_find_ptr(&EG(persistent_list), hash_key, hash_key_len)) == NULL) {
 		MMC_DEBUG(("mmc_find_persistent: connection wasn't found in the hash"));
 
 		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval TSRMLS_CC);
-		new_le.type = le_pmemcache;
-		new_le.ptr  = mmc;
+		le = zend_register_resource(mmc, le_pmemcache);
+
+		GC_REFCOUNT(le) = 1;
 
 		/* register new persistent connection */
-		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(zend_rsrc_list_entry), NULL) == FAILURE) {
+		if (zend_hash_str_update_mem(&EG(persistent_list), hash_key, hash_key_len, le, sizeof(*le)) == NULL) {
 			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		} else {
@@ -2237,16 +2190,16 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 		}
 	}
 	else if (le->type != le_pmemcache || le->ptr == NULL) {
-		zend_rsrc_list_entry new_le;
 		MMC_DEBUG(("mmc_find_persistent: something was wrong, reconnecting.."));
-		zend_hash_del(&EG(persistent_list), hash_key, hash_key_len+1);
+		zend_hash_str_del(&EG(persistent_list), hash_key, hash_key_len);
 
 		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval TSRMLS_CC);
-		new_le.type = le_pmemcache;
-		new_le.ptr  = mmc;
+		le->type = le_pmemcache;
+		le->ptr  = mmc;
+		GC_REFCOUNT(le) = 1;
 
 		/* register new persistent connection */
-		if (zend_hash_update(&EG(persistent_list), hash_key, hash_key_len+1, (void *) &new_le, sizeof(zend_rsrc_list_entry), NULL) == FAILURE) {
+		if (zend_hash_str_update_mem(&EG(persistent_list), hash_key, hash_key_len, le, sizeof(*le)) == NULL) {
 			mmc_server_free(mmc TSRMLS_CC);
 			mmc = NULL;
 		}
@@ -2276,7 +2229,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 PHP_FUNCTION(memcache_get_version)
 {
 	mmc_pool_t *pool;
-	char *version;
+	zend_string *version;
 	int i;
 	zval *mmc_object = getThis();
 
@@ -2293,7 +2246,7 @@ PHP_FUNCTION(memcache_get_version)
 	for (i=0; i<pool->num_servers; i++) {
 		if (mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC)) {
 			if ((version = mmc_get_version(pool->servers[i] TSRMLS_CC)) != NULL) {
-				RETURN_STRING(version, 0);
+				RETURN_STR(version);
 			}
 			else {
 				mmc_server_failure(pool->servers[i] TSRMLS_CC);
@@ -2355,7 +2308,7 @@ PHP_FUNCTION(memcache_get)
 
 	if (Z_TYPE_P(zkey) != IS_ARRAY) {
 		if (mmc_prepare_key(zkey, key, &key_len TSRMLS_CC) == MMC_OK) {
-			if (mmc_exec_retrieval_cmd(pool, key, key_len, &return_value, flags TSRMLS_CC) < 0) {
+			if (mmc_exec_retrieval_cmd(pool, key, key_len, return_value, flags TSRMLS_CC) < 0) {
 				zval_dtor(return_value);
 				RETVAL_FALSE;
 			}
@@ -2495,7 +2448,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 	mmc_pool_t *pool;
 	char *hostname;
 	int i, hostname_len;
-	zval *mmc_object = getThis(), *stats;
+	zval *mmc_object = getThis(), stats;
 
 	char *type = NULL;
 	int type_len = 0;
@@ -2518,21 +2471,20 @@ PHP_FUNCTION(memcache_get_extended_stats)
 
 	array_init(return_value);
 	for (i=0; i<pool->num_servers; i++) {
-		MAKE_STD_ZVAL(stats);
 
 		hostname_len = spprintf(&hostname, 0, "%s:%d", pool->servers[i]->host, pool->servers[i]->port);
 
 		if (mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC)) {
-			if (mmc_get_stats(pool->servers[i], type, slabid, limit, stats TSRMLS_CC) < 0) {
+			if (mmc_get_stats(pool->servers[i], type, slabid, limit, &stats TSRMLS_CC) < 0) {
 				mmc_server_failure(pool->servers[i] TSRMLS_CC);
-				ZVAL_FALSE(stats);
+				ZVAL_FALSE(&stats);
 			}
 		}
 		else {
-			ZVAL_FALSE(stats);
+			ZVAL_FALSE(&stats);
 		}
 
-		add_assoc_zval_ex(return_value, hostname, hostname_len + 1, stats);
+		add_assoc_zval_ex(return_value, hostname, hostname_len , &stats);
 		efree(hostname);
 	}
 }

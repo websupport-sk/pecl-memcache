@@ -1,8 +1,8 @@
 /*
   +----------------------------------------------------------------------+
-  | PHP Version 5                                                        |
+  | PHP Version 7                                                        |
   +----------------------------------------------------------------------+
-  | Copyright (c) 1997-2004 The PHP Group                                |
+  | Copyright (c) 1997-2015 The PHP Group                                |
   +----------------------------------------------------------------------+
   | This source file is subject to version 3.0 of the PHP license,       |
   | that is bundled with this package in the file LICENSE, and is        |
@@ -14,6 +14,8 @@
   +----------------------------------------------------------------------+
   | Authors: Antony Dovgal <tony@daylessday.org>                         |
   |          Mikael Johansson <mikael AT synd DOT info>                  |
+  |                                                                      |
+  | Port to PHP7: Szabolcs Balogh <baloghsz@szabi.org>                   |
   +----------------------------------------------------------------------+
 */
 
@@ -48,7 +50,7 @@ PS_OPEN_FUNC(memcache)
 	mmc_t *mmc;
 
 	php_url *url;
-	zval *params, **param;
+	zval params, *param;
 	int i, j, path_len;
 
 	pool = mmc_pool_new(TSRMLS_C);
@@ -91,29 +93,28 @@ PS_OPEN_FUNC(memcache)
 			
 			/* parse parameters */
 			if (url->query != NULL) {
-				MAKE_STD_ZVAL(params);
-				array_init(params);
+				array_init(&params);
 
-				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), params TSRMLS_CC);
+				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params TSRMLS_CC);
 
-				if (zend_hash_find(Z_ARRVAL_P(params), "persistent", sizeof("persistent"), (void **) &param) != FAILURE) {
+				if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent")-1)) != NULL) {
 					convert_to_boolean_ex(param);
-					persistent = Z_BVAL_PP(param);
+					persistent = Z_TYPE_P(param)==IS_TRUE;
 				}
 
-				if (zend_hash_find(Z_ARRVAL_P(params), "weight", sizeof("weight"), (void **) &param) != FAILURE) {
+				if ((param = zend_hash_str_find(Z_ARRVAL(params), "weight", sizeof("weight")-1)) != NULL) {
 					convert_to_long_ex(param);
-					weight = Z_LVAL_PP(param);
+					weight = Z_LVAL_P(param);
 				}
 
-				if (zend_hash_find(Z_ARRVAL_P(params), "timeout", sizeof("timeout"), (void **) &param) != FAILURE) {
+				if ((param = zend_hash_str_find(Z_ARRVAL(params), "timeout", sizeof("timeout"))) != NULL) {
 					convert_to_long_ex(param);
-					timeout = Z_LVAL_PP(param);
+					timeout = Z_LVAL_P(param);
 				}
 
-				if (zend_hash_find(Z_ARRVAL_P(params), "retry_interval", sizeof("retry_interval"), (void **) &param) != FAILURE) {
+				if ((param =zend_hash_str_find(Z_ARRVAL(params), "retry_interval", sizeof("retry_interval"))) != NULL) {
 					convert_to_long_ex(param);
-					retry_interval = Z_LVAL_PP(param);
+					retry_interval = Z_LVAL_P(param);
 				}
 
 				zval_ptr_dtor(&params);
@@ -189,27 +190,25 @@ PS_CLOSE_FUNC(memcache)
 PS_READ_FUNC(memcache)
 {
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
-	zval *result;
+	zval result;
 
 	if (pool) {
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key, strlen(key), key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key->val, key->len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 
-		MAKE_STD_ZVAL(result);
-		ZVAL_NULL(result);
+		ZVAL_NULL(&result);
 
-		if (mmc_exec_retrieval_cmd(pool, key_tmp, key_tmp_len, &result, NULL TSRMLS_CC) <= 0 || Z_TYPE_P(result) != IS_STRING) {
+		if (mmc_exec_retrieval_cmd(pool, key_tmp, key_tmp_len, &result, NULL TSRMLS_CC) <= 0 || Z_TYPE(result) != IS_STRING) {
 			zval_ptr_dtor(&result);
 			return FAILURE;
 		}
 
-		*val = Z_STRVAL_P(result);
-		*vallen = Z_STRLEN_P(result);
-		FREE_ZVAL(result);
+		*val = zend_string_init(Z_STRVAL(result), Z_STRLEN(result), 1);
+		zval_ptr_dtor(&result);
 		return SUCCESS;
 	}
 
@@ -227,11 +226,11 @@ PS_WRITE_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key, strlen(key), key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key->val, key->len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}			
 		
-		if (mmc_pool_store(pool, "set", sizeof("set")-1, key_tmp, key_tmp_len, 0, INI_INT("session.gc_maxlifetime"), val, vallen TSRMLS_CC)) {
+		if (mmc_pool_store(pool, "set", sizeof("set")-1, key_tmp, key_tmp_len, 0, INI_INT("session.gc_maxlifetime"), val->val, val->len TSRMLS_CC)) {
 			return SUCCESS;
 		}
 	}
@@ -253,7 +252,7 @@ PS_DESTROY_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key, strlen(key), key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key->val, key->len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 		
