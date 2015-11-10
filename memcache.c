@@ -54,6 +54,17 @@ static zend_class_entry *memcache_class_entry_ptr;
 
 ZEND_DECLARE_MODULE_GLOBALS(memcache)
 
+ZEND_BEGIN_ARG_INFO(arginfo_memcache_get, 1)
+	ZEND_ARG_PASS_INFO(0)
+	ZEND_ARG_PASS_INFO(0)
+	ZEND_ARG_PASS_INFO(1)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO(arginfo_memcache_object_get, 1)
+	ZEND_ARG_PASS_INFO(0)
+	ZEND_ARG_PASS_INFO(1)
+ZEND_END_ARG_INFO()
+
 /* {{{ memcache_functions[]
  */
 zend_function_entry memcache_functions[] = {
@@ -66,7 +77,7 @@ zend_function_entry memcache_functions[] = {
 	PHP_FE(memcache_add,			NULL)
 	PHP_FE(memcache_set,			NULL)
 	PHP_FE(memcache_replace,		NULL)
-	PHP_FE(memcache_get,			NULL)
+	PHP_FE(memcache_get,			arginfo_memcache_get)
 	PHP_FE(memcache_delete,			NULL)
 	PHP_FE(memcache_debug,			NULL)
 	PHP_FE(memcache_get_stats,		NULL)
@@ -90,7 +101,7 @@ static zend_function_entry php_memcache_class_functions[] = {
 	PHP_FALIAS(add,				memcache_add,				NULL)
 	PHP_FALIAS(set,				memcache_set,				NULL)
 	PHP_FALIAS(replace,			memcache_replace,			NULL)
-	PHP_FALIAS(get,				memcache_get,				NULL)
+	PHP_FALIAS(get,				memcache_get,				arginfo_memcache_object_get)
 	PHP_FALIAS(delete,			memcache_delete,			NULL)
 	PHP_FALIAS(getstats,		memcache_get_stats,			NULL)
 	PHP_FALIAS(getextendedstats,		memcache_get_extended_stats,		NULL)
@@ -2292,12 +2303,12 @@ PHP_FUNCTION(memcache_get)
 	unsigned int key_len;
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz|z", &mmc_object, memcache_class_entry_ptr, &zkey, &flags) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Oz|z/", &mmc_object, memcache_class_entry_ptr, &zkey, &flags) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z|z", &zkey, &flags) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z|z/", &zkey, &flags) == FAILURE) {
 			return;
 		}
 	}
