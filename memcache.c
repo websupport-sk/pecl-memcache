@@ -142,10 +142,11 @@ ZEND_GET_MODULE(memcache)
 
 static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 {
-	long int lval;
+	zend_long val;
+	char *endptr = NULL;
 
-	lval = strtol(new_value->val, NULL, 10);
-	if (lval <= 0) {
+	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
+	if (!endptr || (*endptr != '\0') || val <= 0) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.chunk_size must be a positive integer ('%s' given)", new_value->val);
 		return FAILURE;
 	}
@@ -156,10 +157,11 @@ static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 
 static PHP_INI_MH(OnUpdateFailoverAttempts) /* {{{ */
 {
-	long int lval;
+	zend_long val;
+	char *endptr = NULL;
 
-	lval = strtol(new_value->val, NULL, 10);
-	if (lval <= 0) {
+	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
+	if (!endptr || (*endptr != '\0') || val <= 0) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.max_failover_attempts must be a positive integer ('%s' given)", new_value->val);
 		return FAILURE;
 	}
@@ -204,14 +206,16 @@ static PHP_INI_MH(OnUpdateHashFunction) /* {{{ */
 
 static PHP_INI_MH(OnUpdateDefaultTimeout) /* {{{ */
 {
-	long int lval;
+	zend_long val;
+	char *endptr = NULL;
 
-	lval = strtol(new_value->val, NULL, 10);
-	if (lval <= 0) {
+	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
+	if (!endptr || (*endptr != '\0') || val <= 0) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.default_timeout must be a positive number greater than or equal to 1 ('%s' given)", new_value->val);
 		return FAILURE;
 	}
-	MEMCACHE_G(default_timeout_ms) = lval;
+
+	MEMCACHE_G(default_timeout_ms) = val;
 	return SUCCESS;
 }
 /* }}} */
@@ -418,6 +422,7 @@ mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persist
 static void mmc_server_callback_dtor(zval *callback TSRMLS_DC) /* {{{ */
 {
 	if (!callback) return;
+
 	if (!Z_ISUNDEF_P(callback)) {
 	  zval_ptr_dtor(callback);
 	}
