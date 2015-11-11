@@ -38,7 +38,7 @@ typedef struct mmc_standard_state {
 void *mmc_standard_create_state(mmc_hash_function hash) /* {{{ */
 {
 	mmc_standard_state_t *state = emalloc(sizeof(mmc_standard_state_t));
-	memset(state, 0, sizeof(mmc_standard_state_t));
+	ZEND_SECURE_ZERO(state, sizeof(mmc_standard_state_t));
 	state->hash = hash;
 	return state;
 }

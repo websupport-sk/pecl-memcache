@@ -396,7 +396,7 @@ static void _mmc_pserver_list_dtor(zend_resource *rsrc) /* {{{ */
 mmc_t *mmc_server_new(zend_string *host, unsigned short port, int persistent, zend_long timeout, zend_long retry_interval) /* {{{ */
 {
 	mmc_t *mmc = pemalloc(sizeof(mmc_t), persistent);
-	memset(mmc, 0, sizeof(*mmc));
+	ZEND_SECURE_ZERO(mmc, sizeof(*mmc));
 	
 	mmc->host = pemalloc(ZSTR_LEN(host) + 1, persistent);
 	memcpy(mmc->host, ZSTR_VAL(host), ZSTR_LEN(host));
