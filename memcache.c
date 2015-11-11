@@ -250,10 +250,10 @@ static int mmc_sendcmd(mmc_t *, const char *, int TSRMLS_DC);
 static int mmc_parse_response(mmc_t *mmc, char *, int, char **, int *, int *, int *);
 static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *, zval *, zval **, zval * TSRMLS_DC);
 static int mmc_read_value(mmc_t *, char **, int *, char **, int *, int * TSRMLS_DC);
-static int mmc_flush(mmc_t *, int TSRMLS_DC);
+static int mmc_flush(mmc_t *, zend_long TSRMLS_DC);
 static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *, int);
-static int mmc_get_stats(mmc_t *, char *, int, int, zval * TSRMLS_DC);
-static int mmc_incr_decr(mmc_t *, int, char *, int, int, long * TSRMLS_DC);
+static int mmc_get_stats(mmc_t *, char *, zend_long, zend_long, zval * TSRMLS_DC);
+static int mmc_incr_decr(mmc_t *, int, char *, int, zend_long, zend_long * TSRMLS_DC);
 static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int);
 static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, int);
 /* }}} */
@@ -371,7 +371,7 @@ void mmc_debug(const char *format, ...) /* {{{ */
 /* }}} */
 #endif
 
-static struct timeval _convert_timeoutms_to_ts(long msecs) /* {{{ */
+static struct timeval _convert_timeoutms_to_ts(zend_long msecs) /* {{{ */
 {
 	struct timeval tv;
 	int secs = 0;
@@ -395,7 +395,7 @@ static void _mmc_pserver_list_dtor(zend_resource *rsrc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-mmc_t *mmc_server_new(zend_string *host, unsigned short port, int persistent, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
+mmc_t *mmc_server_new(zend_string *host, unsigned short port, int persistent, zend_long timeout, zend_long retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc = pemalloc(sizeof(mmc_t), persistent);
 	memset(mmc, 0, sizeof(*mmc));
@@ -749,7 +749,7 @@ static int mmc_pool_close(mmc_pool_t *pool TSRMLS_DC) /* disconnects and removes
 }
 /* }}} */
 
-int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const char *key, int key_len, int flags, int expire, const char *value, int value_len TSRMLS_DC) /* {{{ */
+int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const char *key, int key_len, zend_long flags, zend_long expire, const char *value, int value_len TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 	char *request;
@@ -1460,7 +1460,7 @@ static int mmc_read_value(mmc_t *mmc, char **key, int *key_len, char **value, in
 }
 /* }}} */
 
-int mmc_delete(mmc_t *mmc, const char *key, int key_len, int time TSRMLS_DC) /* {{{ */
+int mmc_delete(mmc_t *mmc, const char *key, int key_len, zend_long time TSRMLS_DC) /* {{{ */
 {
 	char *command;
 	int command_len, response_len;
@@ -1495,7 +1495,7 @@ int mmc_delete(mmc_t *mmc, const char *key, int key_len, int time TSRMLS_DC) /* 
 }
 /* }}} */
 
-static int mmc_flush(mmc_t *mmc, int timestamp TSRMLS_DC) /* {{{ */
+static int mmc_flush(mmc_t *mmc, zend_long timestamp TSRMLS_DC) /* {{{ */
 {
 	char *command;
 	int command_len, response_len;
@@ -1503,7 +1503,7 @@ static int mmc_flush(mmc_t *mmc, int timestamp TSRMLS_DC) /* {{{ */
 	MMC_DEBUG(("mmc_flush: flushing the cache"));
 
 	if (timestamp) {
-		command_len = spprintf(&command, 0, "flush_all %d", timestamp);
+		command_len = spprintf(&command, 0, "flush_all %ld", timestamp);
 	}
 	else {
 		command_len = spprintf(&command, 0, "flush_all");
@@ -1538,7 +1538,7 @@ static int mmc_stats_parse_stat(const char *start, char *end, zval *result TSRML
 {
 	const char *space, *colon;
 	char *key;
-	long index = 0;
+	zend_long index = 0;
 
 	/* find space delimiting key and value */
 	if ((space = php_memnstr(start, " ", 1, end)) == NULL) {
@@ -1638,7 +1638,7 @@ static int mmc_stats_parse_generic(char *start, char *end, zval *result TSRMLS_D
 }
 /* }}} */
 
-static int mmc_get_stats(mmc_t *mmc, char *type, int slabid, int limit, zval *result TSRMLS_DC) /* {{{ */
+static int mmc_get_stats(mmc_t *mmc, char *type, zend_long slabid, zend_long limit, zval *result TSRMLS_DC) /* {{{ */
 {
 	char *command;
 	int command_len, response_len;
@@ -1713,7 +1713,7 @@ static int mmc_get_stats(mmc_t *mmc, char *type, int slabid, int limit, zval *re
 }
 /* }}} */
 
-static int mmc_incr_decr(mmc_t *mmc, int cmd, char *key, int key_len, int value, long *number TSRMLS_DC) /* {{{ */
+static int mmc_incr_decr(mmc_t *mmc, int cmd, char *key, int key_len, zend_long value, zend_long *number TSRMLS_DC) /* {{{ */
 {
 	char *command;
 	int  command_len, response_len;
@@ -1760,7 +1760,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 
 	int result;
 	zend_string *key;
-	long flags = 0, expire = 0;
+	zend_long flags = 0, expire = 0;
 	char key_tmp[MMC_KEY_MAX_SIZE];
 	unsigned int key_tmp_len;
 
@@ -1857,7 +1857,7 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 	mmc_t *mmc;
 	mmc_pool_t *pool;
 	int result = -1;
-	long value = 1, number;
+	zend_long value = 1, number;
 	zend_string *key;
 	zval *mmc_object = getThis();
 	char key_tmp[MMC_KEY_MAX_SIZE];
@@ -1903,7 +1903,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	mmc_pool_t *pool;
 	int resource_type, errnum = 0;
 	char *error_string = NULL;
-	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, timeoutms = 0;
+	zend_long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, timeoutms = 0;
 	zend_string *host;
 	zend_resource *list_res;
 
@@ -1998,7 +1998,7 @@ PHP_FUNCTION(memcache_add_server)
 	zval *connection, *mmc_object = getThis(), *failure_callback = NULL;
 	mmc_pool_t *pool;
 	mmc_t *mmc;
-	long port = MEMCACHE_G(default_port), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY, timeoutms = 0;
+	zend_long port = MEMCACHE_G(default_port), weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY, timeoutms = 0;
 	zend_bool persistent = 1, status = 1;
 	zend_string *host = NULL;
 
@@ -2078,7 +2078,7 @@ PHP_FUNCTION(memcache_set_server_params)
 	zval *mmc_object = getThis(), *failure_callback = NULL;
 	mmc_pool_t *pool;
 	mmc_t *mmc = NULL;
-	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+	zend_long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool status = 1;
 	int i;
 	zend_string *host;
@@ -2151,7 +2151,7 @@ PHP_FUNCTION(memcache_get_server_status)
 	zval *mmc_object = getThis();
 	mmc_pool_t *pool;
 	mmc_t *mmc = NULL;
-	long port = MEMCACHE_G(default_port);
+	zend_long port = MEMCACHE_G(default_port);
 	int i;
 	zend_string *host;
 
@@ -2186,7 +2186,7 @@ PHP_FUNCTION(memcache_get_server_status)
 }
 /* }}} */
 
-mmc_t *mmc_find_persistent(zend_string *host, int port, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
+mmc_t *mmc_find_persistent(zend_string *host, zend_long port, zend_long timeout, zend_long retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 	zend_resource *le;
@@ -2359,7 +2359,7 @@ PHP_FUNCTION(memcache_delete)
 	int result = -1;
 	zval *mmc_object = getThis();
 	zend_string *key;
-	long time = 0;
+	zend_long time = 0;
 	char key_tmp[MMC_KEY_MAX_SIZE];
 	unsigned int key_tmp_len;
 
@@ -2425,7 +2425,7 @@ PHP_FUNCTION(memcache_get_stats)
 	zval *mmc_object = getThis();
 
 	zend_string *type = NULL;
-	long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
+	zend_long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
 
 	if (mmc_object == NULL) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|Sll", &mmc_object, memcache_class_entry_ptr, &type, &slabid, &limit) == FAILURE) {
@@ -2474,7 +2474,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 
 	char *type = NULL;
 	int type_len = 0;
-	long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
+	zend_long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
 
 	if (mmc_object == NULL) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|sll", &mmc_object, memcache_class_entry_ptr, &type, &type_len, &slabid, &limit) == FAILURE) {
@@ -2518,7 +2518,7 @@ PHP_FUNCTION(memcache_set_compress_threshold)
 {
 	mmc_pool_t *pool;
 	zval *mmc_object = getThis();
-	long threshold;
+	zend_long threshold;
 	double min_savings = MMC_DEFAULT_SAVINGS;
 
 	if (mmc_object == NULL) {
@@ -2604,7 +2604,7 @@ PHP_FUNCTION(memcache_flush)
 	mmc_pool_t *pool;
 	int i, failures = 0;
 	zval *mmc_object = getThis();
-	long timestamp = 0;
+	zend_long timestamp = 0;
 
 	if (mmc_object == NULL) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|l", &mmc_object, memcache_class_entry_ptr, &timestamp) == FAILURE) {
@@ -2648,7 +2648,7 @@ PHP_FUNCTION(memcache_setoptimeout)
 	mmc_t *mmc;
 	int i;
 	zval *mmc_object = getThis();
-	long timeoutms = 0;
+	zend_long timeoutms = 0;
 
 	if (mmc_object == NULL) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Ol", &mmc_object, memcache_class_entry_ptr, &timeoutms) == FAILURE) {

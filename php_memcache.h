@@ -102,11 +102,11 @@ typedef struct mmc {
 	smart_string				outbuf;
 	char					*host;
 	unsigned short			port;
-	long					timeout;
-	long					timeoutms; /* takes precedence over timeout */
-	long					connect_timeoutms; /* takes precedence over timeout */
-	long					failed;
-	long					retry_interval;
+	zend_long				timeout;
+	zend_long				timeoutms; /* takes precedence over timeout */
+	zend_long				connect_timeoutms; /* takes precedence over timeout */
+	zend_long				failed;
+	zend_long				retry_interval;
 	int						persistent;
 	int						status;
 	char					*error;					/* last error message */
@@ -149,16 +149,16 @@ typedef struct mmc_pool {
 
 /* our globals */
 ZEND_BEGIN_MODULE_GLOBALS(memcache)
-	long debug_mode;
-	long default_port;
-	long num_persistent;
-	long compression_level;
-	long allow_failover;
-	long chunk_size;
-	long max_failover_attempts;
-	long hash_strategy;
-	long hash_function;
-	long default_timeout_ms;
+	zend_long debug_mode;
+	zend_long default_port;
+	zend_long num_persistent;
+	zend_long compression_level;
+	zend_long allow_failover;
+	zend_long chunk_size;
+	zend_long max_failover_attempts;
+	zend_long hash_strategy;
+	zend_long hash_function;
+	zend_long default_timeout_ms;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION >= 3)
@@ -174,8 +174,8 @@ ZEND_END_MODULE_GLOBALS(memcache)
 #endif
 
 /* internal functions */
-mmc_t *mmc_server_new(zend_string *, unsigned short, int, int, int TSRMLS_DC);
-mmc_t *mmc_find_persistent(zend_string *, int, int, int TSRMLS_DC);
+mmc_t *mmc_server_new(zend_string *, unsigned short, int, zend_long, zend_long TSRMLS_DC);
+mmc_t *mmc_find_persistent(zend_string *, zend_long, zend_long, zend_long TSRMLS_DC);
 int mmc_server_failure(mmc_t * TSRMLS_DC);
 void mmc_server_deactivate(mmc_t * TSRMLS_DC);
 
@@ -185,10 +185,10 @@ int mmc_prepare_key_ex(zend_string *, char *, unsigned int * TSRMLS_DC);
 mmc_pool_t *mmc_pool_new(TSRMLS_D);
 void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
 void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
-int mmc_pool_store(mmc_pool_t *, const char *, int, const char *, int, int, int, const char *, int TSRMLS_DC);
+int mmc_pool_store(mmc_pool_t *, const char *, int, const char *, int, zend_long, zend_long, const char *, int TSRMLS_DC);
 int mmc_open(mmc_t *, int, char **, int * TSRMLS_DC);
 int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval *, zval * TSRMLS_DC);
-int mmc_delete(mmc_t *, const char *, int, int TSRMLS_DC);
+int mmc_delete(mmc_t *, const char *, int, zend_long TSRMLS_DC);
 
 /* session handler struct */
 #if HAVE_MEMCACHE_SESSION
