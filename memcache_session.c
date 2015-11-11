@@ -68,6 +68,7 @@ PS_OPEN_FUNC(memcache)
 
 		if (i < j) {
 			int persistent = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+			zend_string *host;
 			
 			/* translate unix: into file: */
 			if (!strncmp(save_path+i, "unix:", sizeof("unix:")-1)) {
@@ -122,22 +123,23 @@ PS_OPEN_FUNC(memcache)
 			}
 			
 			if (url->scheme && url->path && !strcmp(url->scheme, "file")) {
-				char *host;
-				int host_len = spprintf(&host, 0, "unix://%s", url->path);
+				host = strpprintf(0, "unix://%s", url->path);
 
 				/* chop off trailing :0 port specifier */
-				if (!strcmp(host + host_len - 2, ":0")) {
-					host_len -= 2;
+				if (!strcmp(ZSTR_VAL(host) + ZSTR_LEN(host) - 2, ":0")) {
+					host = zend_string_realloc(host, ZSTR_LEN(host)-2, 0);
+					ZSTR_VAL(host)[ZSTR_LEN(host)] = '\0';
+					zend_string_forget_hash_val(host);
 				}
 				
 				if (persistent) {
-					mmc = mmc_find_persistent(host, host_len, 0, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_find_persistent(host, 0, timeout, retry_interval TSRMLS_CC);
 				}
 				else {
-					mmc = mmc_server_new(host, host_len, 0, 0, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_server_new(host, 0, 0, timeout, retry_interval TSRMLS_CC);
 				}
 				
-				efree(host);
+				zend_string_release(host);
 			}
 			else {
 				if (url->host == NULL || weight <= 0 || timeout <= 0) {
@@ -147,12 +149,16 @@ PS_OPEN_FUNC(memcache)
 					return FAILURE;
 				}
 
+				host = zend_string_init(url->host, strlen(url->host), 0);
+
 				if (persistent) {
-					mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_find_persistent(host, url->port, timeout, retry_interval TSRMLS_CC);
 				}
 				else {
-					mmc = mmc_server_new(url->host, strlen(url->host), url->port, 0, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_server_new(host, url->port, 0, timeout, retry_interval TSRMLS_CC);
 				}
+
+				zend_string_release(host);
 			}
 
 			mmc_pool_add(pool, mmc, weight);

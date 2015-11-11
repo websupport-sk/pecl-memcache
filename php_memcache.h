@@ -174,8 +174,8 @@ ZEND_END_MODULE_GLOBALS(memcache)
 #endif
 
 /* internal functions */
-mmc_t *mmc_server_new(char *, int, unsigned short, int, int, int TSRMLS_DC);
-mmc_t *mmc_find_persistent(char *, int, int, int, int TSRMLS_DC);
+mmc_t *mmc_server_new(zend_string *, unsigned short, int, int, int TSRMLS_DC);
+mmc_t *mmc_find_persistent(zend_string *, int, int, int TSRMLS_DC);
 int mmc_server_failure(mmc_t * TSRMLS_DC);
 void mmc_server_deactivate(mmc_t * TSRMLS_DC);
 

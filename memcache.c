@@ -395,14 +395,14 @@ static void _mmc_pserver_list_dtor(zend_resource *rsrc TSRMLS_DC) /* {{{ */
 }
 /* }}} */
 
-mmc_t *mmc_server_new(char *host, int host_len, unsigned short port, int persistent, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
+mmc_t *mmc_server_new(zend_string *host, unsigned short port, int persistent, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc = pemalloc(sizeof(mmc_t), persistent);
 	memset(mmc, 0, sizeof(*mmc));
 	
-	mmc->host = pemalloc(host_len + 1, persistent);
-	memcpy(mmc->host, host, host_len);
-	mmc->host[host_len] = '\0';
+	mmc->host = pemalloc(ZSTR_LEN(host) + 1, persistent);
+	memcpy(mmc->host, ZSTR_VAL(host), ZSTR_LEN(host));
+	mmc->host[ZSTR_LEN(host)] = '\0';
 	
 	mmc->port = port;
 	mmc->status = MMC_STATUS_DISCONNECTED;
@@ -1897,16 +1897,17 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 
 static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{{ */
 {
-	zval 	*mmc_object = getThis();
+	zval *mmc_object = getThis();
 	zval *zv;
 	mmc_t *mmc = NULL;
 	mmc_pool_t *pool;
-	int resource_type, host_len, errnum = 0;
-	char *host, *error_string = NULL;
+	int resource_type, errnum = 0;
+	char *error_string = NULL;
 	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, timeoutms = 0;
+	zend_string *host;
 	zend_resource *list_res;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lll", &host, &host_len, &port, &timeout, &timeoutms) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S|lll", &host, &port, &timeout, &timeoutms) == FAILURE) {
 		return;
 	}
 
@@ -1916,18 +1917,18 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 
 	/* initialize and connect server struct */
 	if (persistent) {
-		mmc = mmc_find_persistent(host, host_len, port, timeout, MMC_DEFAULT_RETRY TSRMLS_CC);
+		mmc = mmc_find_persistent(host, port, timeout, MMC_DEFAULT_RETRY TSRMLS_CC);
 	}
 	else {
 		MMC_DEBUG(("php_mmc_connect: creating regular connection"));
-		mmc = mmc_server_new(host, host_len, port, 0, timeout, MMC_DEFAULT_RETRY TSRMLS_CC);
+		mmc = mmc_server_new(host, port, 0, timeout, MMC_DEFAULT_RETRY TSRMLS_CC);
 	}
 
 	mmc->timeout = timeout;
 	mmc->connect_timeoutms = timeoutms;
 
 	if (!mmc_open(mmc, 1, &error_string, &errnum TSRMLS_CC)) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%ld, %s (%d)", host, port, error_string ? error_string : "Unknown error", errnum);
+		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Can't connect to %s:%ld, %s (%d)", ZSTR_VAL(host), port, error_string ? error_string : "Unknown error", errnum);
 		if (!persistent) {
 			mmc_server_free(mmc TSRMLS_CC);
 		}
@@ -2030,11 +2031,11 @@ PHP_FUNCTION(memcache_add_server)
 
 	/* lazy initialization of server struct */
 	if (persistent) {
-		mmc = mmc_find_persistent(host->val, host->len, port, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_find_persistent(host, port, timeout, retry_interval TSRMLS_CC);
 	}
 	else {
 		MMC_DEBUG(("memcache_add_server: initializing regular struct"));
-		mmc = mmc_server_new(host->val, host->len, port, 0, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_server_new(host, port, 0, timeout, retry_interval TSRMLS_CC);
 	}
 
 	mmc->connect_timeoutms = timeoutms;
@@ -2079,16 +2080,16 @@ PHP_FUNCTION(memcache_set_server_params)
 	mmc_t *mmc = NULL;
 	long port = MEMCACHE_G(default_port), timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
 	zend_bool status = 1;
-	int host_len, i;
-	char *host;
+	int i;
+	zend_string *host;
 
 	if (mmc_object) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lllbz", &host, &host_len, &port, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S|lllbz", &host, &port, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|lllbz", &mmc_object, memcache_class_entry_ptr, &host, &host_len, &port, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OS|lllbz", &mmc_object, memcache_class_entry_ptr, &host, &port, &timeout, &retry_interval, &status, &failure_callback) == FAILURE) {
 			return;
 		}
 	}
@@ -2098,7 +2099,7 @@ PHP_FUNCTION(memcache_set_server_params)
 	}
 
 	for (i=0; i<pool->num_servers; i++) {
-		if (!strcmp(pool->servers[i]->host, host) && pool->servers[i]->port == port) {
+		if (!strcmp(pool->servers[i]->host, ZSTR_VAL(host)) && pool->servers[i]->port == port) {
 			mmc = pool->servers[i];
 			break;
 		}
@@ -2151,16 +2152,16 @@ PHP_FUNCTION(memcache_get_server_status)
 	mmc_pool_t *pool;
 	mmc_t *mmc = NULL;
 	long port = MEMCACHE_G(default_port);
-	int host_len, i;
-	char *host;
+	int i;
+	zend_string *host;
 
 	if (mmc_object) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &host, &host_len, &port) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S|l", &host, &port) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|l", &mmc_object, memcache_class_entry_ptr, &host, &host_len, &port) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OS|l", &mmc_object, memcache_class_entry_ptr, &host, &port) == FAILURE) {
 			return;
 		}
 	}
@@ -2170,7 +2171,7 @@ PHP_FUNCTION(memcache_get_server_status)
 	}
 
 	for (i=0; i<pool->num_servers; i++) {
-		if (!strcmp(pool->servers[i]->host, host) && pool->servers[i]->port == port) {
+		if (!strcmp(pool->servers[i]->host, ZSTR_VAL(host)) && pool->servers[i]->port == port) {
 			mmc = pool->servers[i];
 			break;
 		}
@@ -2185,7 +2186,7 @@ PHP_FUNCTION(memcache_get_server_status)
 }
 /* }}} */
 
-mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
+mmc_t *mmc_find_persistent(zend_string *host, int port, int timeout, int retry_interval TSRMLS_DC) /* {{{ */
 {
 	mmc_t *mmc;
 	zend_resource *le;
@@ -2193,12 +2194,12 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 	int hash_key_len;
 
 	MMC_DEBUG(("mmc_find_persistent: seeking for persistent connection"));
-	hash_key_len = spprintf(&hash_key, 0, "mmc_connect___%s:%d", host, port);
+	hash_key_len = spprintf(&hash_key, 0, "mmc_connect___%s:%d", ZSTR_VAL(host), port);
 
 	if ((le=zend_hash_str_find_ptr(&EG(persistent_list), hash_key, hash_key_len)) == NULL) {
 		MMC_DEBUG(("mmc_find_persistent: connection wasn't found in the hash"));
 
-		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_server_new(host, port, 1, timeout, retry_interval TSRMLS_CC);
 		le = zend_register_resource(mmc, le_pmemcache);
 
 		GC_REFCOUNT(le) = 1;
@@ -2215,7 +2216,7 @@ mmc_t *mmc_find_persistent(char *host, int host_len, int port, int timeout, int 
 		MMC_DEBUG(("mmc_find_persistent: something was wrong, reconnecting.."));
 		zend_hash_str_del(&EG(persistent_list), hash_key, hash_key_len);
 
-		mmc = mmc_server_new(host, host_len, port, 1, timeout, retry_interval TSRMLS_CC);
+		mmc = mmc_server_new(host, port, 1, timeout, retry_interval TSRMLS_CC);
 		le->type = le_pmemcache;
 		le->ptr  = mmc;
 		GC_REFCOUNT(le) = 1;
@@ -2423,17 +2424,16 @@ PHP_FUNCTION(memcache_get_stats)
 	int i, failures = 0;
 	zval *mmc_object = getThis();
 
-	char *type = NULL;
-	int type_len = 0;
+	zend_string *type = NULL;
 	long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|sll", &mmc_object, memcache_class_entry_ptr, &type, &type_len, &slabid, &limit) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "O|Sll", &mmc_object, memcache_class_entry_ptr, &type, &slabid, &limit) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|sll", &type, &type_len, &slabid, &limit) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|Sll", &type, &slabid, &limit) == FAILURE) {
 			return;
 		}
 	}
@@ -2444,7 +2444,7 @@ PHP_FUNCTION(memcache_get_stats)
 
 	for (i=0; i<pool->num_servers; i++) {
 		if (mmc_open(pool->servers[i], 1, NULL, NULL TSRMLS_CC)) {
-			if (mmc_get_stats(pool->servers[i], type, slabid, limit, return_value TSRMLS_CC) < 0) {
+			if (mmc_get_stats(pool->servers[i], (type==NULL ? NULL:ZSTR_VAL(type)), slabid, limit, return_value TSRMLS_CC) < 0) {
 				mmc_server_failure(pool->servers[i] TSRMLS_CC);
 				failures++;
 			}
