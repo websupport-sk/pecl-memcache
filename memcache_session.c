@@ -54,7 +54,7 @@ PS_OPEN_FUNC(memcache)
 	zval params, *param;
 	int i, j, path_len;
 
-	pool = mmc_pool_new(TSRMLS_C);
+	pool = mmc_pool_new();
 
 	for (i=0,j=0,path_len=strlen(save_path); i<path_len; i=j+1) {
 		/* find beginning of url */
@@ -84,11 +84,11 @@ PS_OPEN_FUNC(memcache)
 
 			if (!url) {
 				char *path = estrndup(save_path+i, j-i);
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, 
+				php_error_docref(NULL, E_WARNING,
 					"Failed to parse session.save_path (error at offset %d, url was '%s')", i, path);
 				efree(path);
 				
-				mmc_pool_free(pool TSRMLS_CC);
+				mmc_pool_free(pool);
 				PS_SET_MOD_DATA(NULL);
 				return FAILURE;
 			}
@@ -97,7 +97,7 @@ PS_OPEN_FUNC(memcache)
 			if (url->query != NULL) {
 				array_init(&params);
 
-				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params TSRMLS_CC);
+				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params);
 
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent")-1)) != NULL) {
 					convert_to_boolean_ex(param);
@@ -133,10 +133,10 @@ PS_OPEN_FUNC(memcache)
 				}
 				
 				if (persistent) {
-					mmc = mmc_find_persistent(host, 0, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_find_persistent(host, 0, timeout, retry_interval);
 				}
 				else {
-					mmc = mmc_server_new(host, 0, 0, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_server_new(host, 0, 0, timeout, retry_interval);
 				}
 				
 				zend_string_release(host);
@@ -144,7 +144,7 @@ PS_OPEN_FUNC(memcache)
 			else {
 				if (url->host == NULL || weight <= 0 || timeout <= 0) {
 					php_url_free(url);
-					mmc_pool_free(pool TSRMLS_CC);
+					mmc_pool_free(pool);
 					PS_SET_MOD_DATA(NULL);
 					return FAILURE;
 				}
@@ -152,10 +152,10 @@ PS_OPEN_FUNC(memcache)
 				host = zend_string_init(url->host, strlen(url->host), 0);
 
 				if (persistent) {
-					mmc = mmc_find_persistent(host, url->port, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_find_persistent(host, url->port, timeout, retry_interval);
 				}
 				else {
-					mmc = mmc_server_new(host, url->port, 0, timeout, retry_interval TSRMLS_CC);
+					mmc = mmc_server_new(host, url->port, 0, timeout, retry_interval);
 				}
 
 				zend_string_release(host);
@@ -171,7 +171,7 @@ PS_OPEN_FUNC(memcache)
 		return SUCCESS;
 	}
 
-	mmc_pool_free(pool TSRMLS_CC);
+	mmc_pool_free(pool);
 	PS_SET_MOD_DATA(NULL);
 	return FAILURE;
 }
@@ -184,7 +184,7 @@ PS_CLOSE_FUNC(memcache)
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
 
 	if (pool) {
-		mmc_pool_free(pool TSRMLS_CC);
+		mmc_pool_free(pool);
 		PS_SET_MOD_DATA(NULL);
 	}
 
@@ -203,13 +203,13 @@ PS_READ_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len) != MMC_OK) {
 			return FAILURE;
 		}
 
 		ZVAL_NULL(&result);
 
-		if (mmc_exec_retrieval_cmd(pool, key_tmp, key_tmp_len, &result, NULL TSRMLS_CC) <= 0 || Z_TYPE(result) != IS_STRING) {
+		if (mmc_exec_retrieval_cmd(pool, key_tmp, key_tmp_len, &result, NULL) <= 0 || Z_TYPE(result) != IS_STRING) {
 			zval_ptr_dtor(&result);
 			return FAILURE;
 		}
@@ -233,11 +233,11 @@ PS_WRITE_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len) != MMC_OK) {
 			return FAILURE;
 		}			
 		
-		if (mmc_pool_store(pool, "set", sizeof("set")-1, key_tmp, key_tmp_len, 0, INI_INT("session.gc_maxlifetime"), val->val, val->len TSRMLS_CC)) {
+		if (mmc_pool_store(pool, "set", sizeof("set")-1, key_tmp, key_tmp_len, 0, INI_INT("session.gc_maxlifetime"), val->val, val->len)) {
 			return SUCCESS;
 		}
 	}
@@ -259,13 +259,13 @@ PS_DESTROY_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len) != MMC_OK) {
 			return FAILURE;
 		}
 		
-		while (result < 0 && (mmc = mmc_pool_find(pool, key_tmp, key_tmp_len TSRMLS_CC)) != NULL) {
-			if ((result = mmc_delete(mmc, key_tmp, key_tmp_len, 0 TSRMLS_CC)) < 0) {
-				mmc_server_failure(mmc TSRMLS_CC);
+		while (result < 0 && (mmc = mmc_pool_find(pool, key_tmp, key_tmp_len)) != NULL) {
+			if ((result = mmc_delete(mmc, key_tmp, key_tmp_len, 0)) < 0) {
+				mmc_server_failure(mmc);
 			}
 		}
 

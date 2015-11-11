@@ -119,7 +119,7 @@ typedef struct mmc {
 typedef unsigned int (*mmc_hash_function)(const char *, int);
 typedef void * (*mmc_hash_create_state)(mmc_hash_function);
 typedef void (*mmc_hash_free_state)(void *);
-typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int TSRMLS_DC);
+typedef mmc_t * (*mmc_hash_find_server)(void *, const char *, int);
 typedef void (*mmc_hash_add_server)(void *, mmc_t *, unsigned int);
 
 #define mmc_pool_find(pool, key, key_len) \
@@ -161,34 +161,25 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	zend_long default_timeout_ms;
 ZEND_END_MODULE_GLOBALS(memcache)
 
-#if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION >= 3)
-#   define MEMCACHE_IS_CALLABLE(cb_zv, flags, cb_sp) zend_is_callable((cb_zv), (flags), (cb_sp) TSRMLS_CC)
-#else
-#   define MEMCACHE_IS_CALLABLE(cb_zv, flags, cb_sp) zend_is_callable((cb_zv), (flags), (cb_sp))
-#endif
-
-#if (PHP_MAJOR_VERSION == 5) && (PHP_MINOR_VERSION >= 4)
-#    define MEMCACHE_LIST_INSERT(item, list) zend_list_insert(item, list TSRMLS_CC);
-#else
-#    define MEMCACHE_LIST_INSERT(item, list) zend_list_insert(item, list);
-#endif
+#define MEMCACHE_IS_CALLABLE(cb_zv, flags, cb_sp) zend_is_callable((cb_zv), (flags), (cb_sp))
+#define MEMCACHE_LIST_INSERT(item, list) zend_list_insert(item, list);
 
 /* internal functions */
-mmc_t *mmc_server_new(zend_string *, unsigned short, int, zend_long, zend_long TSRMLS_DC);
-mmc_t *mmc_find_persistent(zend_string *, zend_long, zend_long, zend_long TSRMLS_DC);
-int mmc_server_failure(mmc_t * TSRMLS_DC);
-void mmc_server_deactivate(mmc_t * TSRMLS_DC);
+mmc_t *mmc_server_new(zend_string *, unsigned short, int, zend_long, zend_long);
+mmc_t *mmc_find_persistent(zend_string *, zend_long, zend_long, zend_long);
+int mmc_server_failure(mmc_t *);
+void mmc_server_deactivate(mmc_t *);
 
-int mmc_prepare_key(zval *, char *, unsigned int * TSRMLS_DC);
-int mmc_prepare_key_ex(zend_string *, char *, unsigned int * TSRMLS_DC);
+int mmc_prepare_key(zval *, char *, unsigned int *);
+int mmc_prepare_key_ex(zend_string *, char *, unsigned int *);
 
-mmc_pool_t *mmc_pool_new(TSRMLS_D);
-void mmc_pool_free(mmc_pool_t * TSRMLS_DC);
+mmc_pool_t *mmc_pool_new();
+void mmc_pool_free(mmc_pool_t *);
 void mmc_pool_add(mmc_pool_t *, mmc_t *, unsigned int);
-int mmc_pool_store(mmc_pool_t *, const char *, int, const char *, int, zend_long, zend_long, const char *, int TSRMLS_DC);
-int mmc_open(mmc_t *, int, char **, int * TSRMLS_DC);
-int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval *, zval * TSRMLS_DC);
-int mmc_delete(mmc_t *, const char *, int, zend_long TSRMLS_DC);
+int mmc_pool_store(mmc_pool_t *, const char *, int, const char *, int, zend_long, zend_long, const char *, int);
+int mmc_open(mmc_t *, int, char **, int *);
+int mmc_exec_retrieval_cmd(mmc_pool_t *, const char *, int, zval *, zval *);
+int mmc_delete(mmc_t *, const char *, int, zend_long);
 
 /* session handler struct */
 #if HAVE_MEMCACHE_SESSION
@@ -220,7 +211,7 @@ void mmc_debug(const char *format, ...);
 /* }}} */
 
 #ifdef ZTS
-#define MEMCACHE_G(v) TSRMG(memcache_globals_id, zend_memcache_globals *, v)
+#define MEMCACHE_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(memcache, v)
 #else
 #define MEMCACHE_G(v) (memcache_globals.v)
 #endif

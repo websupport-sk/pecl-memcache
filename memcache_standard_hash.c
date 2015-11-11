@@ -63,7 +63,7 @@ static unsigned int mmc_hash(mmc_standard_state_t *state, const char *key, int k
 }
 /* }}} */
 
-mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
+mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
 	mmc_t *mmc;
@@ -73,7 +73,7 @@ mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC)
 		mmc = state->buckets[hash % state->num_buckets];
 
 		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
+		for (i=0; !mmc_open(mmc, 0, NULL, NULL) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
 			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
 			int next_len = sprintf(next_key, "%d%s", i+1, key);
 			MMC_DEBUG(("mmc_standard_find_server: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
@@ -86,7 +86,7 @@ mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC)
 	}
 	else {
 		mmc = state->buckets[0];
-		mmc_open(mmc, 0, NULL, NULL TSRMLS_CC);
+		mmc_open(mmc, 0, NULL, NULL);
 	}
 
 	return mmc->status != MMC_STATUS_FAILED ? mmc : NULL;
