@@ -558,19 +558,19 @@ static int mmc_server_store(mmc_t *mmc, const char *request, int request_len TSR
 }
 /* }}} */
 
-int mmc_prepare_key_ex(const char *key, unsigned int key_len, char *result, unsigned int *result_len TSRMLS_DC)  /* {{{ */
+int mmc_prepare_key_ex(zend_string *key, char *result, unsigned int *result_len TSRMLS_DC)  /* {{{ */
 {
 	unsigned int i;
-	if (key_len == 0) {
+	if (ZSTR_LEN(key) == 0) {
 		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Key cannot be empty");
 		return MMC_REQUEST_FAILURE;
 	}
 
-	*result_len = key_len < MMC_KEY_MAX_SIZE ? key_len : MMC_KEY_MAX_SIZE;
+	*result_len = ZSTR_LEN(key) < MMC_KEY_MAX_SIZE ? ZSTR_LEN(key) : MMC_KEY_MAX_SIZE;
 	result[*result_len] = '\0';
 	
 	for (i=0; i<*result_len; i++) {
-		result[i] = ((unsigned char)key[i]) > ' ' ? key[i] : '_';
+		result[i] = ((unsigned char)ZSTR_VAL(key)[i]) > ' ' ? ZSTR_VAL(key)[i] : '_';
 	}
 	
 	return MMC_OK;
@@ -579,22 +579,28 @@ int mmc_prepare_key_ex(const char *key, unsigned int key_len, char *result, unsi
 
 int mmc_prepare_key(zval *key, char *result, unsigned int *result_len TSRMLS_DC)  /* {{{ */
 {
+	int res;
+	zend_string *strkey = NULL;
+
 	if (Z_TYPE_P(key) == IS_STRING) {
-		return mmc_prepare_key_ex(Z_STRVAL_P(key), Z_STRLEN_P(key), result, result_len TSRMLS_CC);
+		strkey = zval_get_string(key);
+
+		res = mmc_prepare_key_ex(strkey, result, result_len TSRMLS_CC);
 	} else {
-		int res;
 		zval keytmp;
 
 		keytmp = *key;
 		zval_copy_ctor(&keytmp);
 		convert_to_string(&keytmp);
-
-		res = mmc_prepare_key_ex(Z_STRVAL(keytmp), Z_STRLEN(keytmp), result, result_len TSRMLS_CC);
-
+		strkey = zval_get_string(&keytmp);
 		zval_dtor(&keytmp);
-		
-		return res;
+
+		res = mmc_prepare_key_ex(strkey, result, result_len TSRMLS_CC);
 	}
+
+	zend_string_release(strkey);
+
+	return res;
 }
 /* }}} */
 
@@ -1326,7 +1332,7 @@ static int mmc_exec_retrieval_cmd_multi(mmc_pool_t *pool, zval *keys, zval **ret
 		/* first pass to build requests for each server */
 		ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(keys), val) {
 			if(Z_TYPE_P(val) == IS_STRING) {
-				if(mmc_prepare_key_ex(Z_STRVAL_P(val), Z_STRLEN_P(val), key, &key_len TSRMLS_CC) == MMC_OK) {
+				if(mmc_prepare_key(val, key, &key_len TSRMLS_CC) == MMC_OK) {
 					/* schedule key if first round or if missing from result */
 					if ((!i || !zend_hash_exists(Z_ARRVAL_P(*return_value), Z_STR_P(val))) &&
 						(mmc = mmc_pool_find(pool, key, key_len TSRMLS_CC)) != NULL) {
@@ -1752,8 +1758,8 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 	mmc_pool_t *pool;
 	zval *value, *mmc_object = getThis();
 
-	int result, key_len;
-	char *key;
+	int result;
+	zend_string *key;
 	long flags = 0, expire = 0;
 	char key_tmp[MMC_KEY_MAX_SIZE];
 	unsigned int key_tmp_len;
@@ -1762,17 +1768,17 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 	smart_str buf = {0};
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Osz|ll", &mmc_object, memcache_class_entry_ptr, &key, &key_len, &value, &flags, &expire) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OSz|ll", &mmc_object, memcache_class_entry_ptr, &key, &value, &flags, &expire) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|ll", &key, &key_len, &value, &flags, &expire) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Sz|ll", &key, &value, &flags, &expire) == FAILURE) {
 			return;
 		}
 	}
 
-	if (mmc_prepare_key_ex(key, key_len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+	if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 		RETURN_FALSE;
 	}
 
@@ -1850,20 +1856,20 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 {
 	mmc_t *mmc;
 	mmc_pool_t *pool;
-	int result = -1, key_len;
+	int result = -1;
 	long value = 1, number;
-	char *key;
+	zend_string *key;
 	zval *mmc_object = getThis();
 	char key_tmp[MMC_KEY_MAX_SIZE];
 	unsigned int key_tmp_len;
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|l", &mmc_object, memcache_class_entry_ptr, &key, &key_len, &value) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OS|l", &mmc_object, memcache_class_entry_ptr, &key, &value) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &key, &key_len, &value) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S|l", &key, &value) == FAILURE) {
 			return;
 		}
 	}
@@ -1872,7 +1878,7 @@ static void php_mmc_incr_decr(INTERNAL_FUNCTION_PARAMETERS, int cmd) /* {{{ */
 		RETURN_FALSE;
 	}
 
-	if (mmc_prepare_key_ex(key, key_len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+	if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 		RETURN_FALSE;
 	}
 
@@ -2349,20 +2355,20 @@ PHP_FUNCTION(memcache_delete)
 {
 	mmc_t *mmc;
 	mmc_pool_t *pool;
-	int result = -1, key_len;
+	int result = -1;
 	zval *mmc_object = getThis();
-	char *key;
+	zend_string *key;
 	long time = 0;
 	char key_tmp[MMC_KEY_MAX_SIZE];
 	unsigned int key_tmp_len;
 
 	if (mmc_object == NULL) {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "Os|l", &mmc_object, memcache_class_entry_ptr, &key, &key_len, &time) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "OS|l", &mmc_object, memcache_class_entry_ptr, &key, &time) == FAILURE) {
 			return;
 		}
 	}
 	else {
-		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &key, &key_len, &time) == FAILURE) {
+		if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "S|l", &key, &time) == FAILURE) {
 			return;
 		}
 	}
@@ -2371,7 +2377,7 @@ PHP_FUNCTION(memcache_delete)
 		RETURN_FALSE;
 	}
 
-	if (mmc_prepare_key_ex(key, key_len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+	if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 		RETURN_FALSE;
 	}
 

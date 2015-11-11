@@ -29,6 +29,7 @@
 #include "php.h"
 #include "php_ini.h"
 #include "php_variables.h"
+#include "session/php_session.h"
 
 #include "SAPI.h"
 #include "ext/standard/url.h"
@@ -196,7 +197,7 @@ PS_READ_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key->val, key->len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 
@@ -226,7 +227,7 @@ PS_WRITE_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key->val, key->len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}			
 		
@@ -252,7 +253,7 @@ PS_DESTROY_FUNC(memcache)
 		char key_tmp[MMC_KEY_MAX_SIZE];
 		unsigned int key_tmp_len;
 
-		if (mmc_prepare_key_ex(key->val, key->len, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
+		if (mmc_prepare_key_ex(key, key_tmp, &key_tmp_len TSRMLS_CC) != MMC_OK) {
 			return FAILURE;
 		}
 		
