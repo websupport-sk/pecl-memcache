@@ -237,7 +237,7 @@ PS_WRITE_FUNC(memcache)
 			return FAILURE;
 		}			
 		
-		if (mmc_pool_store(pool, "set", sizeof("set")-1, key_tmp, key_tmp_len, 0, INI_INT("session.gc_maxlifetime"), val->val, val->len)) {
+		if (mmc_pool_store(pool, "set", sizeof("set")-1, key_tmp, key_tmp_len, 0, INI_INT("session.gc_maxlifetime"), ZSTR_VAL(val), ZSTR_LEN(val))) {
 			return SUCCESS;
 		}
 	}

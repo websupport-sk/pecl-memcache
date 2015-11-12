@@ -147,7 +147,7 @@ static PHP_INI_MH(OnUpdateChunkSize) /* {{{ */
 
 	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
 	if (!endptr || (*endptr != '\0') || val <= 0) {
-		php_error_docref(NULL, E_WARNING, "memcache.chunk_size must be a positive integer ('%s' given)", new_value->val);
+		php_error_docref(NULL, E_WARNING, "memcache.chunk_size must be a positive integer ('%s' given)", ZSTR_VAL(new_value));
 		return FAILURE;
 	}
 
@@ -162,7 +162,7 @@ static PHP_INI_MH(OnUpdateFailoverAttempts) /* {{{ */
 
 	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
 	if (!endptr || (*endptr != '\0') || val <= 0) {
-		php_error_docref(NULL, E_WARNING, "memcache.max_failover_attempts must be a positive integer ('%s' given)", new_value->val);
+		php_error_docref(NULL, E_WARNING, "memcache.max_failover_attempts must be a positive integer ('%s' given)", ZSTR_VAL(new_value));
 		return FAILURE;
 	}
 
@@ -172,14 +172,14 @@ static PHP_INI_MH(OnUpdateFailoverAttempts) /* {{{ */
 
 static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
 {
-	if (!strcasecmp(new_value->val, "standard")) {
+	if (!strcasecmp(ZSTR_VAL(new_value), "standard")) {
 		MEMCACHE_G(hash_strategy) = MMC_STANDARD_HASH;
 	}
-	else if (!strcasecmp(new_value->val, "consistent")) {
+	else if (!strcasecmp(ZSTR_VAL(new_value), "consistent")) {
 		MEMCACHE_G(hash_strategy) = MMC_CONSISTENT_HASH;
 	}
 	else {
-		php_error_docref(NULL, E_WARNING, "memcache.hash_strategy must be in set {standard, consistent} ('%s' given)", new_value->val);
+		php_error_docref(NULL, E_WARNING, "memcache.hash_strategy must be in set {standard, consistent} ('%s' given)", ZSTR_VAL(new_value));
 		return FAILURE;
 	}
 
@@ -189,14 +189,14 @@ static PHP_INI_MH(OnUpdateHashStrategy) /* {{{ */
 
 static PHP_INI_MH(OnUpdateHashFunction) /* {{{ */
 {
-	if (!strcasecmp(new_value->val, "crc32")) {
+	if (!strcasecmp(ZSTR_VAL(new_value), "crc32")) {
 		MEMCACHE_G(hash_function) = MMC_HASH_CRC32;
 	}
-	else if (!strcasecmp(new_value->val, "fnv")) {
+	else if (!strcasecmp(ZSTR_VAL(new_value), "fnv")) {
 		MEMCACHE_G(hash_function) = MMC_HASH_FNV1A;
 	}
 	else {
-		php_error_docref(NULL, E_WARNING, "memcache.hash_function must be in set {crc32, fnv} ('%s' given)", new_value->val);
+		php_error_docref(NULL, E_WARNING, "memcache.hash_function must be in set {crc32, fnv} ('%s' given)", ZSTR_VAL(new_value));
 		return FAILURE;
 	}
 
@@ -211,7 +211,7 @@ static PHP_INI_MH(OnUpdateDefaultTimeout) /* {{{ */
 
 	val = ZEND_STRTOL(ZSTR_VAL(new_value), &endptr, 10);
 	if (!endptr || (*endptr != '\0') || val <= 0) {
-		php_error_docref(NULL, E_WARNING, "memcache.default_timeout must be a positive number greater than or equal to 1 ('%s' given)", new_value->val);
+		php_error_docref(NULL, E_WARNING, "memcache.default_timeout must be a positive number greater than or equal to 1 ('%s' given)", ZSTR_VAL(new_value));
 		return FAILURE;
 	}
 
