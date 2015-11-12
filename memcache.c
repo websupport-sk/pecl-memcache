@@ -335,7 +335,7 @@ PHP_MINFO_FUNCTION(memcache)
 {
 	char buf[MAX_LENGTH_OF_LONG + 1];
 
-	sprintf(buf, "%ld", MEMCACHE_G(num_persistent));
+	sprintf(buf, ZEND_LONG_FMT, MEMCACHE_G(num_persistent));
 
 	php_info_print_table_start();
 	php_info_print_table_header(2, "memcache support", "enabled");
@@ -800,7 +800,7 @@ int mmc_pool_store(mmc_pool_t *pool, const char *command, int command_len, const
 			+ 1 		
 			); 		
 
-	request_len = sprintf(request, "%s %s %d %d %d\r\n", command, key, flags, expire, value_len);
+	request_len = sprintf(request, "%s %s " ZEND_LONG_FMT " " ZEND_LONG_FMT " %d\r\n", command, key, flags, expire, value_len);
 
 	memcpy(request + request_len, value, value_len); 		
 	request_len += value_len; 		
@@ -1501,7 +1501,7 @@ static int mmc_flush(mmc_t *mmc, zend_long timestamp) /* {{{ */
 	MMC_DEBUG(("mmc_flush: flushing the cache"));
 
 	if (timestamp) {
-		command_len = spprintf(&command, 0, "flush_all %ld", timestamp);
+		command_len = spprintf(&command, 0, "flush_all " ZEND_LONG_FMT, timestamp);
 	}
 	else {
 		command_len = spprintf(&command, 0, "flush_all");
@@ -1642,7 +1642,7 @@ static int mmc_get_stats(mmc_t *mmc, char *type, zend_long slabid, zend_long lim
 	int command_len, response_len;
 
 	if (slabid) {
-		command_len = spprintf(&command, 0, "stats %s %d %d", type, slabid, limit);
+		command_len = spprintf(&command, 0, "stats %s " ZEND_LONG_FMT " " ZEND_LONG_FMT, type, slabid, limit);
 	}
 	else if (type) {
 		command_len = spprintf(&command, 0, "stats %s", type);
@@ -1717,10 +1717,10 @@ static int mmc_incr_decr(mmc_t *mmc, int cmd, char *key, int key_len, zend_long 
 	int  command_len, response_len;
 
 	if (cmd > 0) {
-		command_len = spprintf(&command, 0, "incr %s %d", key, value);
+		command_len = spprintf(&command, 0, "incr %s " ZEND_LONG_FMT, key, value);
 	}
 	else {
-		command_len = spprintf(&command, 0, "decr %s %d", key, value);
+		command_len = spprintf(&command, 0, "decr %s " ZEND_LONG_FMT, key, value);
 	}
 
 	if (mmc_sendcmd(mmc, command, command_len) < 0) {
@@ -1926,7 +1926,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 	mmc->connect_timeoutms = timeoutms;
 
 	if (!mmc_open(mmc, 1, &error_string, &errnum)) {
-		php_error_docref(NULL, E_WARNING, "Can't connect to %s:%ld, %s (%d)", ZSTR_VAL(host), port, error_string ? error_string : "Unknown error", errnum);
+		php_error_docref(NULL, E_WARNING, "Can't connect to %s:" ZEND_LONG_FMT ", %s (%d)", ZSTR_VAL(host), port, error_string ? error_string : "Unknown error", errnum);
 		if (!persistent) {
 			mmc_server_free(mmc);
 		}
@@ -2192,7 +2192,7 @@ mmc_t *mmc_find_persistent(zend_string *host, zend_long port, zend_long timeout,
 	int hash_key_len;
 
 	MMC_DEBUG(("mmc_find_persistent: seeking for persistent connection"));
-	hash_key_len = spprintf(&hash_key, 0, "mmc_connect___%s:%d", ZSTR_VAL(host), port);
+	hash_key_len = spprintf(&hash_key, 0, "mmc_connect___%s:" ZEND_LONG_FMT, ZSTR_VAL(host), port);
 
 	if ((le=zend_hash_str_find_ptr(&EG(persistent_list), hash_key, hash_key_len)) == NULL) {
 		MMC_DEBUG(("mmc_find_persistent: connection wasn't found in the hash"));
