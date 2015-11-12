@@ -1131,7 +1131,7 @@ static zend_string *mmc_get_version(mmc_t *mmc) /* {{{ */
 	}
 
 	if (mmc_str_left(mmc->inbuf, "VERSION ", response_len, sizeof("VERSION ") - 1)) {
-		return zend_string_init(mmc->inbuf + sizeof("VERSION ") - 1, response_len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1) - 1, 0);
+		return zend_string_init(mmc->inbuf + sizeof("VERSION ") - 1, response_len - (sizeof("VERSION ") - 1) - (sizeof("\r\n") - 1), 0);
 	}
 
 	mmc_server_seterror(mmc, "Malformed version string", 0);
