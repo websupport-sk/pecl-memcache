@@ -27,5 +27,5 @@ var_dump($result5);
 string(%d) "%d"
 string(5) "16384"
 string(5) "32768"
-string(5) "32768"
-string(5) "32768"
+bool(false)
+bool(false)
