@@ -1,8 +1,8 @@
 --TEST--
-memcache->getStats() with arguments (memcached < 1.4.0)
+memcache->getStats() with arguments (memcached >= 1.4.0)
 --SKIPIF--
 <?php include 'connect.inc'; ?>
-<?php if(version_compare(preg_split("/ /", memcache_get_version($memcache))[0], "1.4.0", ">=")) { die('skip'); } ?>
+<?php if(version_compare(preg_split("/ /", memcache_get_version($memcache))[0], "1.4.0", "<")) { die('skip'); } ?>
 --FILE--
 <?php
 
@@ -19,9 +19,6 @@ var_dump($result);
 
 $result = $memcache->getStats('reset');
 var_dump($result);
-
-$result = $memcache->getStats('malloc');
-var_dump($result['arena_size']);
 
 $result = $memcache->getStats('slabs');
 var_dump($result[key($result)]['chunk_size']);
@@ -52,7 +49,6 @@ bool(true)
 string(%d) "%d"
 bool(false)
 bool(true)
-string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
 string(%d) "%d"
