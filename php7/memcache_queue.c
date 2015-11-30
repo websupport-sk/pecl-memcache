@@ -91,7 +91,7 @@ MMC_QUEUE_INLINE void mmc_queue_free(mmc_queue_t *queue) {
 	if (queue->items != NULL) {
 		efree(queue->items);
 	}
-	memset(queue, 0, sizeof(*queue));
+	ZEND_SECURE_ZERO(queue, sizeof(*queue));
 }
 
 MMC_QUEUE_INLINE void mmc_queue_copy(mmc_queue_t *target, mmc_queue_t *source) {

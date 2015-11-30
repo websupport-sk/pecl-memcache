@@ -34,7 +34,7 @@
 #include <netinet/in.h>
 #endif
 #include "memcache_pool.h"
-#include "ext/standard/php_smart_str.h"
+#include "ext/standard/php_smart_string.h"
 
 #ifndef PHP_WIN32
 #if __BYTE_ORDER == __BIG_ENDIAN
@@ -147,7 +147,7 @@ typedef struct mmc_response_header {
 	uint16_t	status;
 	uint32_t	length;				/* trailing body length (not including this header) */
 	uint32_t	reqid;				/* echo'ed from request */
-	uint64_t    cas;
+	uint64_t	cas;
 } mmc_response_header_t;
 
 typedef struct mmc_get_response_header {
@@ -158,39 +158,38 @@ typedef struct mmc_mutate_response_header {
 	uint64_t				value;
 } mmc_mutate_response_header_t;
 
-static int mmc_request_read_response(mmc_t *, mmc_request_t * TSRMLS_DC);
-static int mmc_request_parse_value(mmc_t *, mmc_request_t * TSRMLS_DC);
-static int mmc_request_read_value(mmc_t *, mmc_request_t * TSRMLS_DC);
+static int mmc_request_read_response(mmc_t *, mmc_request_t *);
+static int mmc_request_parse_value(mmc_t *, mmc_request_t *);
+static int mmc_request_read_value(mmc_t *, mmc_request_t *);
 
 void mmc_binary_hexdump(void *mem, unsigned int len)
 {
 #	define HEXDUMP_COLS 4
-        unsigned int i, j;
-        
-        for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
-                if(i % HEXDUMP_COLS == 0) {
-					printf("%06i: ", i);
-                }
- 
-                if(i < len) {
-                        printf("%02x ", 0xFF & ((char*)mem)[i]);
-                } else {
-                        printf("   ");
-                }
-                
-                if(i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
-                        for(j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
-                                if(j >= len) {
-                                        putchar(' ');
-                                } else if(isprint(((char*)mem)[j])) {
-                                        putchar(0xFF & ((char*)mem)[j]);        
-                                } else {
-                                        putchar('.');
-                                }
-                        }
-                        putchar('\n');
-                }
-        }
+	unsigned int i, j;
+	for(i = 0; i < len + ((len % HEXDUMP_COLS) ? (HEXDUMP_COLS - len % HEXDUMP_COLS) : 0); i++) {
+		if(i % HEXDUMP_COLS == 0) {
+			printf("%06i: ", i);
+		}
+
+		if(i < len) {
+			printf("%02x ", 0xFF & ((char*)mem)[i]);
+		} else {
+			printf("   ");
+		}
+
+		if(i % HEXDUMP_COLS == (HEXDUMP_COLS - 1)) {
+			for(j = i - (HEXDUMP_COLS - 1); j <= i; j++) {
+				if(j >= len) {
+					putchar(' ');
+				} else if(isprint(((char*)mem)[j])) {
+					putchar(0xFF & ((char*)mem)[j]);
+				} else {
+					putchar('.');
+				}
+			}
+			putchar('\n');
+		}
+	}
 }
 #ifdef PHP_WIN32
 uint64_t mmc_htonll(uint64_t value)
@@ -213,10 +212,10 @@ uint64_t mmc_htonll(uint64_t value)
 }
 #endif
 
-static inline char *mmc_stream_get(mmc_stream_t *io, size_t bytes TSRMLS_DC) /*
+static inline char *mmc_stream_get(mmc_stream_t *io, size_t bytes) /*
 	attempts to read a number of bytes from server, returns the a pointer to the buffer on success, NULL if the complete number of bytes could not be read {{{ */
 {
-	io->input.idx += io->read(io, io->input.value + io->input.idx, bytes - io->input.idx TSRMLS_CC);
+	io->input.idx += io->read(io, io->input.value + io->input.idx, bytes - io->input.idx);
 
 	if (io->input.idx >= bytes) {
 		io->input.idx = 0;
@@ -227,18 +226,18 @@ static inline char *mmc_stream_get(mmc_stream_t *io, size_t bytes TSRMLS_DC) /*
 }
 /* }}} */
 
-static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
+static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request) /*
 	reads a generic response header and reads the response body {{{ */
 {
 	mmc_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	size_t size_header = sizeof(mmc_response_header_t);
 
-	header = (mmc_response_header_t *)mmc_stream_get(request->io, sizeof(mmc_response_header_t) TSRMLS_CC);
+	header = (mmc_response_header_t *)mmc_stream_get(request->io, sizeof(mmc_response_header_t));
 
 	if (header != NULL) {
 		if (header->magic != MMC_RESPONSE_MAGIC) {
-			return mmc_server_failure(mmc, request->io, "Malformed server response (invalid magic byte)", 0 TSRMLS_CC);
+			return mmc_server_failure(mmc, request->io, "Malformed server response (invalid magic byte)", 0);
 		}
 
 		if (header->opcode == MMC_OP_NOOP) {
@@ -252,7 +251,7 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 		req->value.cas = ntohll(header->cas);
 
 		if (req->value.length == 0) {
-			return request->response_handler(mmc, request, req->command.error, "", 0, request->response_handler_param TSRMLS_CC);
+			return request->response_handler(mmc, request, req->command.error, "", 0, request->response_handler_param);
 		}
 
 		/* allow read_response handler to read the response body */
@@ -278,46 +277,45 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request TSRMLS_
 }
 /* }}}*/
 
-static int mmc_request_parse_null(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
+static int mmc_request_parse_null(mmc_t *mmc, mmc_request_t *request) /*
 	always returns MMC_REQUEST_DONE {{{ */
 {
 	return MMC_REQUEST_DONE;
 }
 
-static int mmc_request_read_response(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
+static int mmc_request_read_response(mmc_t *mmc, mmc_request_t *request) /*
 	read the response body into the buffer and delegates to response_handler {{{ */
 {
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 
 	request->readbuf.idx +=
-		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx TSRMLS_CC);
+		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx);
 
 	/* done reading? */
 	if (request->readbuf.idx >= req->value.length) {
 		request->readbuf.value.c[req->value.length] = '\0';
-		return request->response_handler(mmc, request, req->command.error, request->readbuf.value.c, req->value.length, request->response_handler_param TSRMLS_CC);
+		return request->response_handler(mmc, request, req->command.error, request->readbuf.value.c, req->value.length, request->response_handler_param);
 	}
 
 	return MMC_REQUEST_MORE;
 }
 /* }}}*/
 
-static int mmc_request_read_mutate(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
+static int mmc_request_read_mutate(mmc_t *mmc, mmc_request_t *request) /*
 	reads and parses the mutate response header {{{ */
 {
 	mmc_mutate_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 
-	header = (mmc_mutate_response_header_t *)mmc_stream_get(request->io, sizeof(*header) TSRMLS_CC);
+	header = (mmc_mutate_response_header_t *)mmc_stream_get(request->io, sizeof(*header));
 	if (header != NULL) {
 		int result;
-		zval *key, *value;
+		zval *key, value;
 
 		/* convert remembered key to string and unpack value */
 		key = (zval *)mmc_queue_item(&(req->keys), req->command.reqid);
 
-		MAKE_STD_ZVAL(value);
-		ZVAL_LONG(value, ntohll(header->value));
+		ZVAL_LONG(&value, ntohll(header->value));
 
 		if (Z_TYPE_P(key) != IS_STRING) {
 			zval keytmp = *key;
@@ -327,15 +325,15 @@ static int mmc_request_read_mutate(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 			convert_to_string(&keytmp);
 
 			result = request->value_handler(
-				Z_STRVAL(keytmp), Z_STRLEN(keytmp), value,
-				req->value.flags, req->value.cas, request->value_handler_param TSRMLS_CC);
+				Z_STRVAL(keytmp), Z_STRLEN(keytmp), &value,
+				req->value.flags, req->value.cas, request->value_handler_param);
 
 			zval_dtor(&keytmp);
 		}
 		else {
 			result = request->value_handler(
-				Z_STRVAL_P(key), Z_STRLEN_P(key), value,
-				req->value.flags, req->value.cas, request->value_handler_param TSRMLS_CC);
+				Z_STRVAL_P(key), Z_STRLEN_P(key), &value,
+				req->value.flags, req->value.cas, request->value_handler_param);
 		}
 
 		return result;
@@ -345,13 +343,13 @@ static int mmc_request_read_mutate(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 }
 /* }}}*/
 
-static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
+static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request) /*
 	reads and parses the value response header and then reads the value body {{{ */
 {
 	mmc_get_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 
-	header = (mmc_get_response_header_t *)mmc_stream_get(request->io, sizeof(mmc_get_response_header_t) TSRMLS_CC);
+	header = (mmc_get_response_header_t *)mmc_stream_get(request->io, sizeof(mmc_get_response_header_t));
 	if (header != NULL) {
 		//req->value.cas = ntohll(header->cas);
 		req->value.flags = ntohl(header->flags);
@@ -367,13 +365,13 @@ static int mmc_request_parse_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC)
 }
 /* }}}*/
 
-static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) /*
+static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request) /*
 	read the value body into the buffer {{{ */
 {
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 
 	request->readbuf.idx +=
-		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx TSRMLS_CC);
+		request->io->read(request->io, request->readbuf.value.c + request->readbuf.idx, req->value.length - request->readbuf.idx);
 
 	/* done reading? */
 	if (request->readbuf.idx >= req->value.length) {
@@ -400,14 +398,14 @@ static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request TSRMLS_DC) 
 
 			result = mmc_unpack_value(
 				mmc, request, &(request->readbuf), Z_STRVAL(keytmp), Z_STRLEN(keytmp),
-				req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
+				req->value.flags, req->value.cas, req->value.length);
 
 			zval_dtor(&keytmp);
 		}
 		else {
 			result = mmc_unpack_value(
 				mmc, request, &(request->readbuf), Z_STRVAL_P(key), Z_STRLEN_P(key),
-				req->value.flags, req->value.cas, req->value.length TSRMLS_CC);
+				req->value.flags, req->value.cas, req->value.length);
 		}
 
 		if (result == MMC_REQUEST_DONE && (req->command.opcode == MMC_OP_GET || req->command.reqid >= req->keys.len)) {
@@ -437,7 +435,7 @@ static inline void mmc_pack_header(mmc_request_header_t *header, uint8_t opcode,
 static mmc_request_t *mmc_binary_create_request() /* {{{ */
 {
 	mmc_binary_request_t *request = emalloc(sizeof(mmc_binary_request_t));
-	memset(request, 0, sizeof(mmc_binary_request_t));
+	ZEND_SECURE_ZERO(request, sizeof(mmc_binary_request_t));
 	return (mmc_request_t *)request;
 }
 /* }}} */
@@ -484,8 +482,8 @@ static void mmc_binary_append_get(mmc_request_t *request, zval *zkey, const char
 
 	/* reqid/opaque is the index into the collection of key pointers */
 	mmc_pack_header(&header, MMC_OP_GETQ, req->keys.len, key_len, 0, 0);
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(mmc_request_header_t));
-	smart_str_appendl(&(request->sendbuf.value), key, key_len);
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(mmc_request_header_t));
+	smart_string_appendl(&(request->sendbuf.value), key, key_len);
 
 	/* store key to be used by the response handler */
 	mmc_queue_push(&(req->keys), zkey);
@@ -497,7 +495,7 @@ static void mmc_binary_end_get(mmc_request_t *request) /* {{{ */
 	mmc_request_header_t header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	mmc_pack_header(&header, MMC_OP_NOOP, req->keys.len, 0, 0, 0);
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 }
 /* }}} */
 
@@ -513,8 +511,8 @@ static void mmc_binary_get(mmc_request_t *request, int op, zval *zkey, const cha
 	mmc_pack_header(&(header.base), MMC_OP_GET, req->keys.len, key_len, 0, 0);
 	header.base.cas = 0x0;
 
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(mmc_get_request_header_t));
-	smart_str_appendl(&(request->sendbuf.value), key, key_len);
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(mmc_get_request_header_t));
+	smart_string_appendl(&(request->sendbuf.value), key, key_len);
 #if MMC_DEBUG
 	mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
 #endif
@@ -525,7 +523,7 @@ static void mmc_binary_get(mmc_request_t *request, int op, zval *zkey, const cha
 
 static int mmc_binary_store(
 	mmc_pool_t *pool, mmc_request_t *request, int op, const char *key, unsigned int key_len,
-	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value TSRMLS_DC) /* {{{ */
+	unsigned int flags, unsigned int exptime, unsigned long cas, zval *value) /* {{{ */
 {
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
 	int status, prevlen, valuelen;
@@ -551,10 +549,10 @@ static int mmc_binary_store(
 		request->sendbuf.value.len += sizeof(mmc_store_append_header_t);
 
 		/* append key and data */
-		smart_str_appendl(&(request->sendbuf.value), key, key_len);
+		smart_string_appendl(&(request->sendbuf.value), key, key_len);
 
 		valuelen = request->sendbuf.value.len;
-		status = mmc_pack_value(pool, &(request->sendbuf), value, &flags TSRMLS_CC);
+		status = mmc_pack_value(pool, &(request->sendbuf), value, &flags);
 
 		if (status != MMC_OK) {
 			return status;
@@ -580,10 +578,10 @@ static int mmc_binary_store(
 		request->sendbuf.value.len += sizeof(mmc_store_request_header_t);
 
 		/* append key and data */
-		smart_str_appendl(&(request->sendbuf.value), key, key_len);
+		smart_string_appendl(&(request->sendbuf.value), key, key_len);
 
 		valuelen = request->sendbuf.value.len;
-		status = mmc_pack_value(pool, &(request->sendbuf), value, &flags TSRMLS_CC);
+		status = mmc_pack_value(pool, &(request->sendbuf), value, &flags);
 
 		if (status != MMC_OK) {
 			return status;
@@ -618,8 +616,8 @@ static void mmc_binary_delete(mmc_request_t *request, const char *key, unsigned 
 	mmc_pack_header(&(header.base), MMC_OP_DELETE, 0, key_len, sizeof(header) - sizeof(header.base), 0);
 	header.exptime = htonl(exptime);
 
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
-	smart_str_appendl(&(request->sendbuf.value), key, key_len);
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
+	smart_string_appendl(&(request->sendbuf.value), key, key_len);
 }
 /* }}} */
 
@@ -661,8 +659,8 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 	}
 
 	/* mutate request is 43 bytes */
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, 44);
-	smart_str_appendl(&(request->sendbuf.value), key, key_len);
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, 44);
+	smart_string_appendl(&(request->sendbuf.value), key, key_len);
 
 #if MMC_DEBUG
 	mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
@@ -682,7 +680,7 @@ static void mmc_binary_flush(mmc_request_t *request, unsigned int exptime) /* {{
 	req->next_parse_handler = mmc_request_read_response;
 
 	mmc_pack_header(&header, MMC_OP_FLUSH, 0, 0, 0, 0);
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 }
 /* }}} */
 
@@ -696,7 +694,7 @@ static void mmc_binary_version(mmc_request_t *request) /* {{{ */
 
 	mmc_pack_header(&(header.base), MMC_OP_VERSION, 0, 0, 0, 0);
 	header.base.cas = 0x0;
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 }
 /* }}} */
 
@@ -710,11 +708,11 @@ static void mmc_binary_stats(mmc_request_t *request, const char *type, long slab
 	req->next_parse_handler = mmc_request_read_response;
 
 	mmc_pack_header(&header, MMC_OP_NOOP, 0, 0, 0, 0);
-	smart_str_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
+	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 }
 /* }}} */
 
-static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, const char *user,  const char *password TSRMLS_DC) /* {{{ */
+static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, const char *user,  const char *password) /* {{{ */
 {
 	const char *key = "PLAIN";
 	const unsigned int key_len = 5;
@@ -735,7 +733,7 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	request->sendbuf.value.len += sizeof(*header);
 
 	/* append key and data */
-	smart_str_appendl(&(request->sendbuf.value), "PLAIN", 5);
+	smart_string_appendl(&(request->sendbuf.value), "PLAIN", 5);
 	valuelen = request->sendbuf.value.len;
 
 	/* initialize header */
@@ -752,10 +750,10 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 	(header->base).reqid = htonl(0);
 	header->base.cas = 0x0;
 
-	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
-	smart_str_appendl(&(request->sendbuf.value), user, strlen(user));
-	smart_str_appendl(&(request->sendbuf.value), "\0", 1);
-	smart_str_appendl(&(request->sendbuf.value), password, strlen(password));
+	smart_string_appendl(&(request->sendbuf.value), "\0", 1);
+	smart_string_appendl(&(request->sendbuf.value), user, strlen(user));
+	smart_string_appendl(&(request->sendbuf.value), "\0", 1);
+	smart_string_appendl(&(request->sendbuf.value), password, strlen(password));
 
 #if MMC_DEBUG
 	mmc_binary_hexdump(request->sendbuf.value.c, request->sendbuf.value.len);
