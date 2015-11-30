@@ -55,24 +55,38 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </notes>
   <contents>
     <dir name="/">
+      <dir name="php5">
+        <file name="memcache.c" role="src" />
+        <file name="memcache_pool.c" role="src" />
+        <file name="memcache_queue.c" role="src" />
+        <file name="memcache_session.c" role="src" />
+        <file name="memcache_ascii_protocol.c" role="src" />
+        <file name="memcache_binary_protocol.c" role="src" />
+        <file name="memcache_standard_hash.c" role="src" />
+        <file name="memcache_consistent_hash.c" role="src" />
+        <file name="php_memcache.h" role="src" />
+        <file name="memcache_pool.h" role="src" />
+        <file name="memcache_queue.h" role="src" />
+      </dir>
+      <dir name="php7">
+        <file name="memcache.c" role="src" />
+        <file name="memcache_pool.c" role="src" />
+        <file name="memcache_queue.c" role="src" />
+        <file name="memcache_session.c" role="src" />
+        <file name="memcache_ascii_protocol.c" role="src" />
+        <file name="memcache_binary_protocol.c" role="src" />
+        <file name="memcache_standard_hash.c" role="src" />
+        <file name="memcache_consistent_hash.c" role="src" />
+        <file name="php_memcache.h" role="src" />
+        <file name="memcache_pool.h" role="src" />
+        <file name="memcache_queue.h" role="src" />
+      </dir>
       <file name="config.m4" role="src" />
       <file name="config9.m4" role="src" />
       <file name="config.w32" role="src" />
       <file name="CREDITS" role="doc" />
       <file name="LICENSE" role="doc" />
       <file name="example.php" role="doc" />
-      <file name="memcache.c" role="src" />
-      <file name="memcache_pool.c" role="src" />
-      <file name="memcache_queue.c" role="src" />
-      <file name="memcache_session.c" role="src" />
-      <file name="memcache_ascii_protocol.c" role="src" />
-      <file name="memcache_binary_protocol.c" role="src" />
-      <file name="memcache_standard_hash.c" role="src" />
-      <file name="memcache_consistent_hash.c" role="src" />
-      <file name="memcache.dsp" role="src" />
-      <file name="php_memcache.h" role="src" />
-      <file name="memcache_pool.h" role="src" />
-      <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />
       <file name="memcache.php" role="doc" />
       <file name ="tests/connect.inc" role="test" />

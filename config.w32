@@ -5,6 +5,18 @@ ARG_ENABLE("memcache", "memcache support", "no");
 
 if (PHP_MEMCACHE != "no") {
 	if (!PHP_ZLIB_SHARED || CHECK_LIB("zlib_a.lib", "memcache", PHP_MEMCACHE)) {
+
+		var dll = get_define('PHPDLL');
+		var old_conf_dir = configure_module_dirname;
+
+		if (dll.match(/^php7/) != null) {
+			configure_module_dirname = configure_module_dirname + "\\php7";
+		} else if (dll.match(/^php5/) != null) {
+			configure_module_dirname = configure_module_dirname + "\\php5";
+		} else {
+			ERROR("Cannot determine PHP version from:'" + dll + "'");
+		}
+
 		EXTENSION("memcache", " \
 			memcache.c \
 			memcache_ascii_protocol.c \
@@ -14,6 +26,9 @@ if (PHP_MEMCACHE != "no") {
 			memcache_queue.c \
 			memcache_session.c \
 			memcache_standard_hash.c");
+
+		configure_module_dirname = old_conf_dir;
+
 		AC_DEFINE('HAVE_MEMCACHE', 1, 'Have memcache support');
 		ADD_FLAG("CFLAGS_MEMCACHE", "/D HAVE_MEMCACHE_SESSION=1");
 	} else {
