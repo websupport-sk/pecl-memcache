@@ -321,7 +321,6 @@ static int mmc_request_read_mutate(mmc_t *mmc, mmc_request_t *request) /*
 			zval keytmp = *key;
 
 			zval_copy_ctor(&keytmp);
-			INIT_PZVAL(&keytmp);
 			convert_to_string(&keytmp);
 
 			result = request->value_handler(
@@ -393,7 +392,6 @@ static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request) /*
 			zval keytmp = *key;
 
 			zval_copy_ctor(&keytmp);
-			INIT_PZVAL(&keytmp);
 			convert_to_string(&keytmp);
 
 			result = mmc_unpack_value(
