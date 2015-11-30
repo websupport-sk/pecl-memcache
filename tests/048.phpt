@@ -11,7 +11,8 @@ $result = $memcache->set('test_key', 'a');
 var_dump($result);
 
 $cas = null;
-$result = $memcache->get('test_key', null, $cas);
+$flags = null;
+$result = $memcache->get('test_key', $flags, $cas);
 var_dump($result);
 var_dump($cas);
 
