@@ -37,6 +37,8 @@
 #endif
 #include "php_memcache.h"
 
+static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param);
+
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
 ps_module ps_mod_memcache = {
@@ -54,17 +56,23 @@ PS_OPEN_FUNC(memcache)
 	zval params, *param;
 	int i, j, path_len;
 
+	char *path = MEMCACHE_G(session_save_path);
+	if (!path) {
+		PS_SET_MOD_DATA(NULL);
+		return FAILURE;
+	}
+
 	pool = mmc_pool_new();
 
-	for (i=0,j=0,path_len=strlen(save_path); i<path_len; i=j+1) {
+	for (i=0,j=0,path_len=strlen(path); i<path_len; i=j+1) {
 		/* find beginning of url */
-		while (i<path_len && (isspace(save_path[i]) || save_path[i] == ',')) {
+		while (i<path_len && (isspace(path[i]) || path[i] == ',')) {
 			i++;
 		}
 
 		/* find end of url */
 		j = i;
-		while (j<path_len && !isspace(save_path[j]) && save_path[j] != ',') {
+		while (j<path_len && !isspace(path[j]) && path[j] != ',') {
 			 j++;
 		}
 
@@ -73,12 +81,12 @@ PS_OPEN_FUNC(memcache)
 			double timeout = MMC_DEFAULT_TIMEOUT;
 
 			/* translate unix: into file: */
-			if (!strncmp(save_path+i, "unix:", sizeof("unix:")-1)) {
+			if (!strncmp(path+i, "unix:", sizeof("unix:")-1)) {
 				int len = j-i;
-				char *path = estrndup(save_path+i, len);
-				memcpy(path, "file:", sizeof("file:")-1);
-				url = php_url_parse_ex(path, len);
-				efree(path);
+				char *path2 = estrndup(path+i, len);
+				memcpy(path2, "file:", sizeof("file:")-1);
+				url = php_url_parse_ex(path2, len);
+				efree(path2);
 			}
 			else {
 				int len = j-i;
@@ -89,7 +97,7 @@ PS_OPEN_FUNC(memcache)
 
 			if (!url) {
 				php_error_docref(NULL, E_WARNING,
-					"Failed to parse session.save_path (error at offset %d, url was '%s')", i, path);
+					"Failed to parse memcache.save_path (error at offset %d, url was '%s')", i, path);
 				efree(path);
 
 				mmc_pool_free(pool);
@@ -237,7 +245,7 @@ static int php_mmc_session_read_request(
 		mmc_pool_failover_handler_null, NULL);
 
 	/* prepare key */
-	if (mmc_prepare_key_ex(Z_STRVAL_P(zkey), Z_STRLEN_P(zkey), dreq->key, &(dreq->key_len)) != MMC_OK) {
+	if (mmc_prepare_key_ex(Z_STRVAL_P(zkey), Z_STRLEN_P(zkey), dreq->key, &(dreq->key_len), MEMCACHE_G(session_key_prefix)) != MMC_OK) {
 		mmc_pool_release(pool, lreq);
 		mmc_pool_release(pool, areq);
 		mmc_pool_release(pool, dreq);
@@ -403,7 +411,7 @@ PS_WRITE_FUNC(memcache)
 				pool, MMC_PROTO_TCP, mmc_stored_handler, &dataresult,
 				mmc_pool_failover_handler_null, NULL);
 
-			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len)) != MMC_OK) {
+			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len), MEMCACHE_G(session_key_prefix)) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
 				break;
 			}
@@ -502,7 +510,7 @@ PS_DESTROY_FUNC(memcache)
 				pool, MMC_PROTO_TCP, mmc_deleted_handler, &dataresult,
 				mmc_pool_failover_handler_null, NULL);
 
-			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len)) != MMC_OK) {
+			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len), MEMCACHE_G(session_key_prefix)) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
 				break;
 			}

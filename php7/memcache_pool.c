@@ -1644,18 +1644,35 @@ void mmc_pool_run(mmc_pool_t *pool)  /*
 }
 /* }}} */
 
-MMC_POOL_INLINE int mmc_prepare_key_ex(const char *key, unsigned int key_len, char *result, unsigned int *result_len)  /* {{{ */
+MMC_POOL_INLINE int mmc_prepare_key_ex(const char *key, unsigned int key_len, char *result, unsigned int *result_len, char *prefix)  /* {{{ */
 {
-	unsigned int i;
+	unsigned int i, j, prefix_len=0;
+
 	if (key_len == 0) {
 		return MMC_REQUEST_FAILURE;
 	}
 
-	*result_len = key_len < MMC_MAX_KEY_LEN ? key_len : MMC_MAX_KEY_LEN;
+	if (prefix) {
+		prefix_len = strlen(prefix);
+	}
+
+	*result_len = (prefix_len + key_len) < MMC_MAX_KEY_LEN ? (prefix_len + key_len) : MMC_MAX_KEY_LEN;
 	result[*result_len] = '\0';
 
-	for (i=0; i<*result_len; i++) {
-		result[i] = ((unsigned char)key[i]) > ' ' ? key[i] : '_';
+	if (prefix_len) {
+		for (i=0; i<prefix_len; i++) {
+			result[i] = ((unsigned char)prefix[i]) > ' ' ? prefix[i] : '_';
+		}
+
+		for (j=0; j+i<*result_len; j++) {
+			result[j+i] = ((unsigned char)key[j]) > ' ' ? key[j] : '_';
+		}
+
+		result[*result_len] = '\0';
+	} else {
+		for (i=0; i<*result_len; i++) {
+			result[i] = ((unsigned char)key[i]) > ' ' ? key[i] : '_';
+		}
 	}
 
 	return MMC_OK;
@@ -1665,7 +1682,7 @@ MMC_POOL_INLINE int mmc_prepare_key_ex(const char *key, unsigned int key_len, ch
 MMC_POOL_INLINE int mmc_prepare_key(zval *key, char *result, unsigned int *result_len)  /* {{{ */
 {
 	if (Z_TYPE_P(key) == IS_STRING) {
-		return mmc_prepare_key_ex(Z_STRVAL_P(key), Z_STRLEN_P(key), result, result_len);
+		return mmc_prepare_key_ex(Z_STRVAL_P(key), Z_STRLEN_P(key), result, result_len, MEMCACHE_G(key_prefix));
 	} else {
 		int res;
 		zval keytmp = *key;
@@ -1673,7 +1690,7 @@ MMC_POOL_INLINE int mmc_prepare_key(zval *key, char *result, unsigned int *resul
 		zval_copy_ctor(&keytmp);
 		convert_to_string(&keytmp);
 
-		res = mmc_prepare_key_ex(Z_STRVAL(keytmp), Z_STRLEN(keytmp), result, result_len);
+		res = mmc_prepare_key_ex(Z_STRVAL(keytmp), Z_STRLEN(keytmp), result, result_len, MEMCACHE_G(key_prefix));
 
 		zval_dtor(&keytmp);
 		return res;

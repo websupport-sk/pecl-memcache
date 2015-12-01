@@ -12,7 +12,7 @@ $memcache->connect($domainsocket, 0);
 
 $session_save_path = ",  $domainsocket:0?weight=1, ";
 ini_set('session.save_handler', 'memcache');
-ini_set('session.save_path', $session_save_path);
+ini_set('memcache.session_save_path', $session_save_path);
 
 $result1 = session_start();
 $id = session_id();

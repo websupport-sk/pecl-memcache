@@ -11,7 +11,7 @@ $childcount = 50;
 $sid = md5(rand());
 
 ini_set('session.save_handler', 'memcache');
-ini_set('session.save_path', "tcp://$host:$port?udp_port=$udpPort;tcp://$host2:$host2?udp_port=$udpPort2;tcp://$nonExistingHost:$nonExistingPort");
+ini_set('memcache.session_save_path', "tcp://$host:$port?udp_port=$udpPort;tcp://$host2:$host2?udp_port=$udpPort2;tcp://$nonExistingHost:$nonExistingPort");
 ini_set('memcache.session_redundancy', 10);
 
 $pids = array();

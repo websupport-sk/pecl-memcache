@@ -414,6 +414,17 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long session_redundancy;
 	long compress_threshold;
 	long lock_timeout;
+	char *session_key_prefix;
+	char *session_prefix_host_key;
+	char *session_prefix_host_key_remove_www;
+	char *session_prefix_host_key_remove_subdomain;
+	char *session_prefix_static_key;
+	char *session_save_path;
+	char *key_prefix;
+	char *prefix_host_key;
+	char *prefix_host_key_remove_www;
+	char *prefix_host_key_remove_subdomain;
+	char *prefix_static_key;
 ZEND_END_MODULE_GLOBALS(memcache)
 
 #ifdef ZTS

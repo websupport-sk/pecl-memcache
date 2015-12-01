@@ -33,6 +33,7 @@ extern zend_module_entry memcache_module_entry;
 
 #include "memcache_pool.h"
 
+PHP_RINIT_FUNCTION(memcache);
 PHP_MINIT_FUNCTION(memcache);
 PHP_MSHUTDOWN_FUNCTION(memcache);
 PHP_MINFO_FUNCTION(memcache);
