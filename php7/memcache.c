@@ -897,7 +897,7 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result)  /* {{{ */
 {
 	char *key;
 	const char *space, *colon;
-	long index = 0;
+	zend_long index = 0;
 
 	if (Z_TYPE_P(result) != IS_ARRAY) {
 		array_init(result);
@@ -927,12 +927,12 @@ static int mmc_stats_parse_stat(char *start, char *end, zval *result)  /* {{{ */
 		}
 
 		efree(key);
-		return mmc_stats_parse_stat(colon + 1, end, element);
+		return mmc_stats_parse_stat(((char *) colon) + 1, end, element);
 	}
 
 	/* no more subkeys, add value under last subkey */
 	key = estrndup(start, space - start);
-	add_assoc_stringl_ex(result, key, space - start, space + 1, end - space);
+	add_assoc_stringl_ex(result, key, ((char *) space) - start, ((char *) space) + 1, end - ((char *) space));
 	efree(key);
 
 	return 1;
@@ -991,7 +991,7 @@ static int mmc_stats_parse_generic(char *start, char *end, zval *result)  /* {{{
 	if (start < end) {
 		if ((space = php_memnstr(start, " ", 1, end)) != NULL) {
 			key = estrndup(start, space - start);
-			add_assoc_stringl_ex(result, key, space - start + 1, space + 1, end - space);
+			add_assoc_stringl_ex(result, key, ((char *) space) - start + 1, ((char *) space) + 1, end - ((char *) space));
 			efree(key);
 		}
 		else {
