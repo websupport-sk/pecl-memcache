@@ -2471,7 +2471,7 @@ PHP_FUNCTION(memcache_get_extended_stats)
 	zval *mmc_object = getThis(), stats;
 
 	char *type = NULL;
-	int type_len = 0;
+	size_t type_len = 0;
 	zend_long slabid = 0, limit = MMC_DEFAULT_CACHEDUMP_LIMIT;
 
 	if (mmc_object == NULL) {
