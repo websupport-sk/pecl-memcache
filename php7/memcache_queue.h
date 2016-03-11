@@ -46,12 +46,12 @@ typedef struct mmc_queue {
 #define MMC_QUEUE_INLINE inline
 #endif
 
-MMC_QUEUE_INLINE void mmc_queue_push(mmc_queue_t *, void *);
-MMC_QUEUE_INLINE void *mmc_queue_pop(mmc_queue_t *);
-MMC_QUEUE_INLINE int mmc_queue_contains(mmc_queue_t *, void *);
-MMC_QUEUE_INLINE void mmc_queue_free(mmc_queue_t *);
-MMC_QUEUE_INLINE void mmc_queue_copy(mmc_queue_t *, mmc_queue_t *);
-MMC_QUEUE_INLINE void mmc_queue_remove(mmc_queue_t *, void *);
+void mmc_queue_push(mmc_queue_t *, void *);
+void *mmc_queue_pop(mmc_queue_t *);
+int mmc_queue_contains(mmc_queue_t *, void *);
+void mmc_queue_free(mmc_queue_t *);
+void mmc_queue_copy(mmc_queue_t *, mmc_queue_t *);
+void mmc_queue_remove(mmc_queue_t *, void *);
 
 #endif /*MEMCACHE_QUEUE_H_*/
 
