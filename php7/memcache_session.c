@@ -69,7 +69,8 @@ PS_OPEN_FUNC(memcache)
 		}
 
 		if (i < j) {
-			int persistent = 0, udp_port = 0, weight = 1, timeout = MMC_DEFAULT_TIMEOUT, retry_interval = MMC_DEFAULT_RETRY;
+			int persistent = 0, udp_port = 0, weight = 1, retry_interval = MMC_DEFAULT_RETRY;
+			double timeout = MMC_DEFAULT_TIMEOUT;
 
 			/* translate unix: into file: */
 			if (!strncmp(save_path+i, "unix:", sizeof("unix:")-1)) {
@@ -116,8 +117,8 @@ PS_OPEN_FUNC(memcache)
 				}
 
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "timeout", sizeof("timeout")-1)) != NULL) {
-					convert_to_long_ex(param);
-					timeout = Z_LVAL_P(param);
+					convert_to_double_ex(param);
+					timeout = Z_DVAL_P(param);
 				}
 
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "retry_interval", sizeof("retry_interval")-1)) != NULL) {
