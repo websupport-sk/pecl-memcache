@@ -127,7 +127,9 @@ typedef struct mmc_buffer {
 #define mmc_buffer_release(b) ZEND_SECURE_ZERO((b), sizeof(*(b)))
 #define mmc_buffer_reset(b) (b)->value.len = (b)->idx = 0
 
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#ifdef PHP_WIN32
+#define MMC_POOL_INLINE
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
 /* see https://gcc.gnu.org/gcc-5/porting_to.html */
 #define MMC_POOL_INLINE extern inline
 #else
