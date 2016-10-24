@@ -254,6 +254,7 @@ static int php_mmc_session_read_request(
  */
 PS_READ_FUNC(memcache)
 {
+	*val = ZSTR_EMPTY_ALLOC();
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
 
 	if (pool != NULL) {
@@ -290,7 +291,7 @@ PS_READ_FUNC(memcache)
 
 			/* create requests */
 			if (php_mmc_session_read_request(pool, &zkey, lockparam, &addresult, dataparam, &lockrequest, &addrequest, &datarequest) != MMC_OK) {
-				break;
+				return FAILURE;
 			}
 
 			/* find next server in line */
@@ -341,9 +342,13 @@ PS_READ_FUNC(memcache)
 
 		mmc_queue_free(&skip_servers);
 		zval_dtor(&dataresult);
-	}
 
+		return SUCCESS;
+	}
+	else
+	{
 	return FAILURE;
+	}
 }
 /* }}} */
 
@@ -529,3 +534,4 @@ PS_GC_FUNC(memcache)
  * vim600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
+
