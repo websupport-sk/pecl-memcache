@@ -1,5 +1,7 @@
 --TEST--
 PECL bug #16442 (memcache_set fail with integer value)
+--SKIPIF--
+<?php include 'connect.inc'; ?>
 --FILE--
 <?php
 
