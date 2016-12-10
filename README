@@ -1,3 +1,12 @@
+This is not an official repository. 
+
+This repository contains modified pecl-memcache plugin ported to PHP7, 
+which was originally developed for the need of hosting company in Slovakia (Websupport.sk). 
+
+Feel free to use it and post patches. 
+
+Original README:
+
 memcached module for PHP
 ------------------------
 This module requires zlib library, used for on-the-fly data (de)compression.
