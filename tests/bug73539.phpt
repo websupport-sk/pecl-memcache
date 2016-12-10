@@ -6,7 +6,7 @@ memcache multi host save path function
 <?php
 
 
-$session_save_path = "tcp://$host:port,tcp://$host2:$port2";
+$session_save_path = "tcp://$host:$port,tcp://$host2:$port2";
 ini_set('session.save_handler', 'memcache');
 ini_set('session.save_path', $session_save_path);
 
@@ -43,7 +43,4 @@ array(1) {
   int(42)
 }
 
-Warning: %s parameter%s
-
-Warning: %s parameter%s
 Done
