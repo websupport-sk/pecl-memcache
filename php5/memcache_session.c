@@ -85,7 +85,10 @@ PS_OPEN_FUNC(memcache)
 				efree(path);
 			}
 			else {
-				url = php_url_parse_ex(save_path+i, j-i);
+				int len = j-i;
+				char *path = estrndup(save_path+i, len);
+				url = php_url_parse_ex(path, strlen(path));
+				efree(path);
 			}
 
 			if (!url) {
