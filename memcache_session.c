@@ -75,7 +75,11 @@ PS_OPEN_FUNC(memcache)
 				efree(path);
 			}
 			else {
-				url = php_url_parse_ex(save_path+i, j-i);
+				//duplicate string as workaround to php bug 73539, affects php 5.6.28+
+				int len = j-i;
+				char *path = estrndup(save_path+i, len);
+				url = php_url_parse_ex(path, strlen(path));
+				efree(path);
 			}
 
 			if (!url) {
