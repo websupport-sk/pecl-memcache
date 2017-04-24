@@ -103,7 +103,7 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(close,					memcache_close,						NULL)
 	PHP_FALIAS(flush,					memcache_flush,						NULL)
 	PHP_FALIAS(setSaslAuthData,			memcache_set_sasl_auth_data,				NULL)
-	
+
 	{NULL, NULL, NULL}
 };
 
@@ -458,22 +458,29 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 		zend_ulong index;
 
 		ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(keys), index, key, val ) {
+			zend_string *str_key = NULL;
 			if (key == NULL) {
-				key = strpprintf(0, ZEND_ULONG_FMT, index);
+				str_key = strpprintf(0, ZEND_ULONG_FMT, index);
+			} else {
+				str_key = key;
 			}
 
 			/* allocate request */
 			request = mmc_pool_request(pool, MMC_PROTO_TCP,
 					mmc_stored_handler, return_value, mmc_pool_failover_handler, NULL);
 
-			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), request->key, &(request->key_len)) != MMC_OK) {
+			if (mmc_prepare_key_ex(ZSTR_VAL(str_key), ZSTR_LEN(str_key), request->key, &(request->key_len)) != MMC_OK) {
 				php_error_docref(NULL, E_WARNING, "Invalid key");
 				mmc_pool_release(pool, request);
-				zend_string_release(key);
+				if (key == NULL) {
+					zend_string_release(str_key);
+				}
 				continue;
 			}
 
-			zend_string_release(key);
+			if (key == NULL) {
+				zend_string_release(str_key);
+			}
 
 			/* assemble command */
 			if (pool->protocol->store(pool, request, op, request->key, request->key_len, flags, exptime, cas, val) != MMC_OK) {
