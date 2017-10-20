@@ -37,14 +37,7 @@ typedef struct mmc_queue {
 #define mmc_queue_reset(q) (q)->len = (q)->head = (q)->tail = 0
 #define mmc_queue_item(q, i) ((q)->tail + (i) < (q)->alloc ? (q)->items[(q)->tail + (i)] : (q)->items[(i) - ((q)->alloc - (q)->tail)]) 
 
-#ifdef PHP_WIN32
 #define MMC_QUEUE_INLINE
-#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
-/* see https://gcc.gnu.org/gcc-5/porting_to.html */
-#define MMC_QUEUE_INLINE extern inline
-#else
-#define MMC_QUEUE_INLINE inline
-#endif
 
 void mmc_queue_push(mmc_queue_t *, void *);
 void *mmc_queue_pop(mmc_queue_t *);

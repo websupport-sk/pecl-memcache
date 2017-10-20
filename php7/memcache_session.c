@@ -330,7 +330,7 @@ PS_READ_FUNC(memcache)
 				mmc_queue_push(&skip_servers, mmc);
 				
 				/* if it is the last server in pool and connection was ok return success and empty string due to php70 changes */
-				if (skip_servers.len = pool->num_servers && skip_servers.len < MEMCACHE_G(session_redundancy)) {
+				if (skip_servers.len == pool->num_servers && skip_servers.len < MEMCACHE_G(session_redundancy)) {
 					*val = ZSTR_EMPTY_ALLOC();
 					mmc_queue_free(&skip_servers);
 					zval_ptr_dtor(&dataresult);

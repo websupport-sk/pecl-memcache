@@ -28,9 +28,8 @@ for ($i=0; $i<$count; $i++) {
 	$memcache->close();
 }
 
-$end = time();
-printf("%d seconds", $end - $start);
+print "Done\n";
 
 ?>
 --EXPECT--
-0 seconds
+Done

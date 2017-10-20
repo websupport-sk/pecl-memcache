@@ -28,7 +28,7 @@ sleep(1);
 $result = $memcache->get('test_key');
 var_dump($result);
 
-sleep(2);
+sleep(3);
 
 $result = $memcache->get('test_key');
 var_dump($result);

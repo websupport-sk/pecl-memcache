@@ -1,6 +1,7 @@
 --TEST--
 memcache->get() over UDP
 --SKIPIF--
+skip known bug
 <?php include 'connect.inc'; if (empty($udpPort)) print 'skip UDP is not enabled in connect.inc'; ?>
 --FILE--
 <?php
