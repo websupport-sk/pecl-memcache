@@ -102,7 +102,11 @@ PS_OPEN_FUNC(memcache)
 			if (url->query != NULL) {
 				array_init(&params);
 
+#if PHP_VERSION_ID < 70300
 				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params);
+#else
+				sapi_module.treat_data(PARSE_STRING, estrdup(ZSTR_VAL(url->query)), &params);
+#endif
 
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent")-1)) != NULL) {
 					convert_to_boolean_ex(param);
@@ -132,9 +136,15 @@ PS_OPEN_FUNC(memcache)
 				zval_ptr_dtor(&params);
 			}
 
+#if PHP_VERSION_ID < 70300
 			if (url->scheme && url->path && !strcmp(url->scheme, "file")) {
 				char *host;
 				int host_len = spprintf(&host, 0, "unix://%s", url->path);
+#else
+			if (url->scheme && url->path && !strcmp(ZSTR_VAL(url->scheme), "file")) {
+				char *host;
+				int host_len = spprintf(&host, 0, "unix://%s", ZSTR_VAL(url->path));
+#endif
 
 				/* chop off trailing :0 port specifier */
 				if (!strcmp(host + host_len - 2, ":0")) {
@@ -158,14 +168,21 @@ PS_OPEN_FUNC(memcache)
 					return FAILURE;
 				}
 
+#if PHP_VERSION_ID < 70300
 				if (persistent) {
 					mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval);
 				}
 				else {
 					mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval);
 				}
+#else
+				if (persistent) {
+					mmc = mmc_find_persistent(ZSTR_VAL(url->host), ZSTR_LEN(url->host), url->port, udp_port, timeout, retry_interval);
+				} else {
+					mmc = mmc_server_new(ZSTR_VAL(url->host), ZSTR_LEN(url->host), url->port, udp_port, 0, timeout, retry_interval);
+				}
+#endif
 			}
-
 			mmc_pool_add(pool, mmc, weight);
 			php_url_free(url);
 		}
