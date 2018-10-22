@@ -101,9 +101,11 @@ PS_OPEN_FUNC(memcache)
 			/* parse parameters */
 			if (url->query != NULL) {
 				array_init(&params);
-
+#if (PHP_VERSION_ID >= 70300)
+				sapi_module.treat_data(PARSE_STRING, estrndup(ZSTR_VAL(url->query), ZSTR_LEN(url->query)), &params);
+#else
 				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params);
-
+#endif
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent")-1)) != NULL) {
 					convert_to_boolean_ex(param);
 					persistent = Z_TYPE_P(param) == IS_TRUE;
@@ -140,7 +142,6 @@ PS_OPEN_FUNC(memcache)
 				if (!strcmp(host + host_len - 2, ":0")) {
 					host_len -= 2;
 				}
-
 				if (persistent) {
 					mmc = mmc_find_persistent(host, host_len, 0, 0, timeout, retry_interval);
 				}
@@ -158,12 +159,22 @@ PS_OPEN_FUNC(memcache)
 					return FAILURE;
 				}
 
+#if (PHP_VERSION_ID >= 70300)
 				if (persistent) {
-					mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval);
+					mmc = mmc_find_persistent(ZSTR_VAL(url->host), ZSTR_LEN(url->host), url->port, udp_port, timeout, retry_interval);
 				}
 				else {
-					mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval);
+					mmc = mmc_server_new(ZSTR_VAL(url->host), ZSTR_LEN(url->host), url->port, udp_port, 0, timeout, retry_interval);
 				}
+#else 
+				if (persistent) {
+                       mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval);
+				}
+				else {
+                       mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval);
+				}
+#endif
+
 			}
 
 			mmc_pool_add(pool, mmc, weight);
@@ -376,6 +387,7 @@ PS_WRITE_FUNC(memcache)
 		mmc_t *mmc;
 		mmc_request_t *lockrequest, *datarequest;
 		mmc_queue_t skip_servers = {0};
+		size_t lifetime = (size_t)time(NULL) + INI_INT("session.gc_maxlifetime");
 		unsigned int last_index = 0;
 
 		ZVAL_NULL(&lockresult);
@@ -405,8 +417,8 @@ PS_WRITE_FUNC(memcache)
 			ZVAL_STR(&value, val);
 
 			/* assemble commands to store data and reset lock */
-			if (pool->protocol->store(pool, datarequest, MMC_OP_SET, datarequest->key, datarequest->key_len, 0, INI_INT("session.gc_maxlifetime"), 0, &value) != MMC_OK ||
-				pool->protocol->store(pool, lockrequest, MMC_OP_SET, lockrequest->key, lockrequest->key_len, 0, MEMCACHE_G(lock_timeout), 0, &lockvalue) != MMC_OK) {
+			if (pool->protocol->store(pool, datarequest, MMC_OP_SET, datarequest->key, datarequest->key_len, 0, lifetime, 0, &value) != MMC_OK ||
+					pool->protocol->store(pool, lockrequest, MMC_OP_SET, lockrequest->key, lockrequest->key_len, 0, MEMCACHE_G(lock_timeout), 0, &lockvalue) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
 				mmc_pool_release(pool, lockrequest);
 				mmc_queue_push(&skip_servers, mmc);
