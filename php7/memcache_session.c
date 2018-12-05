@@ -337,7 +337,7 @@ PS_READ_FUNC(memcache)
 				if (Z_TYPE(dataresult) == IS_STRING) {
 					/* break if successfully locked with existing value */
 					mmc_queue_free(&skip_servers);
-					*val = zend_string_init(Z_STRVAL(dataresult), Z_STRLEN(dataresult), 1);
+					*val = zend_string_init(Z_STRVAL(dataresult), Z_STRLEN(dataresult), 0);
 					zval_ptr_dtor(&dataresult);
 					return SUCCESS;
 				}
