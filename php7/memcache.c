@@ -916,8 +916,6 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 #else
 		GC_SET_REFCOUNT(le, 1);
 #endif
-
-
 		/* register new persistent connection */
 		if (zend_hash_str_update_mem(&EG(persistent_list), key, key_len, le, sizeof(*le)) == NULL) {
 			mmc_server_free(mmc);
