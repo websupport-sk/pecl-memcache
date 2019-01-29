@@ -97,15 +97,13 @@ PS_OPEN_FUNC(memcache)
 				return FAILURE;
 			}
 
+			if (url->query != NULL) {
+				array_init(&params);
 			/* parse parameters */
-#if PHP_VERSION_ID >= 70300
-			if (url->query != NULL) {
-				array_init(&params);
-				sapi_module.treat_data(PARSE_STRING, estrdup(ZSTR_VAL(url->query)), &params);
-#else
-			if (url->query != NULL) {
-				array_init(&params);
+#if PHP_VERSION_ID < 70300
 				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params);
+#else
+				sapi_module.treat_data(PARSE_STRING, estrdup(ZSTR_VAL(url->query)), &params);
 #endif
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent")-1)) != NULL) {
 					convert_to_boolean_ex(param);
@@ -134,14 +132,14 @@ PS_OPEN_FUNC(memcache)
 
 				zval_ptr_dtor(&params);
 			}
-#if PHP_VERSION_ID >= 70300
-			if (url->scheme && url->path && !strcmp(ZSTR_VAL(url->scheme), "file")) {
-				char *host;
-				int host_len = spprintf(&host, 0, "unix://%s", ZSTR_VAL(url->path));
-#else
+#if PHP_VERSION_ID < 70300
 			if (url->scheme && url->path && !strcmp(url->scheme, "file")) {
 				char *host;
 				int host_len = spprintf(&host, 0, "unix://%s", url->path);
+#else
+			if (url->scheme && url->path && !strcmp(ZSTR_VAL(url->scheme), "file")) {
+				char *host;
+				int host_len = spprintf(&host, 0, "unix://%s", ZSTR_VAL(url->path));
 #endif
 
 				/* chop off trailing :0 port specifier */
