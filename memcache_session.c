@@ -101,7 +101,7 @@ PS_OPEN_FUNC(memcache)
 			if (url->query != NULL) {
 				array_init(&params);
 
-				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params);
+				sapi_module.treat_data(PARSE_STRING, estrdup(ZSTR_VAL(url->query)), &params);
 
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent")-1)) != NULL) {
 					convert_to_boolean_ex(param);
@@ -126,8 +126,8 @@ PS_OPEN_FUNC(memcache)
 				zval_ptr_dtor(&params);
 			}
 			
-			if (url->scheme && url->path && !strcmp(url->scheme, "file")) {
-				host = strpprintf(0, "unix://%s", url->path);
+			if (url->scheme && url->path && !strcmp(ZSTR_VAL(url->scheme), "file")) {
+				host = strpprintf(0, "unix://%s", ZSTR_VAL(url->path));
 
 				/* chop off trailing :0 port specifier */
 				if (!strcmp(ZSTR_VAL(host) + ZSTR_LEN(host) - 2, ":0")) {
@@ -153,7 +153,7 @@ PS_OPEN_FUNC(memcache)
 					return FAILURE;
 				}
 
-				host = zend_string_init(url->host, strlen(url->host), 0);
+				host = zend_string_init(ZSTR_VAL(url->host), ZSTR_LEN(url->host), 0);
 
 				if (persistent) {
 					mmc = mmc_find_persistent(host, url->port, timeout, retry_interval);

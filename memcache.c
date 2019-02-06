@@ -40,12 +40,19 @@
 #include "ext/standard/php_string.h"
 #include "ext/standard/php_var.h"
 #include "ext/standard/php_smart_string.h"
+#include "zend_smart_str.h"
 #include "php_network.h"
 #include "php_memcache.h"
 #include "memcache_queue.h"
 
 #if HAVE_MEMCACHE_SESSION
 #include "ext/session/php_session.h"
+#endif
+
+#if PHP_VERSION_ID < 70300
+#define GC_ADDREF(p)            ++GC_REFCOUNT(p)
+#define GC_DELREF(p)            --GC_REFCOUNT(p)
+#define GC_SET_REFCOUNT(p, rc)  GC_REFCOUNT(p) = rc
 #endif
 
 /* True global resources - no need for thread safety here */
@@ -114,7 +121,8 @@ static zend_function_entry php_memcache_class_functions[] = {
 	{NULL, NULL, NULL}
 };
 
-/* }}} */
+/* }
+ * }} */
 
 /* {{{ memcache_module_entry
  */
@@ -1839,7 +1847,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, char *command, int comma
 	}
 
 	if (flags & MMC_SERIALIZED) {
-		smart_string_free(&buf);
+		smart_str_free(&buf);
 	}
 
 	if (result > 0) {
@@ -1943,7 +1951,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 		object_init_ex(return_value, memcache_class_entry_ptr);
 		list_res = zend_register_resource(pool, le_memcache_pool);
 		add_property_resource(return_value, "connection", list_res);
-		GC_REFCOUNT(list_res)++;
+		GC_ADDREF(list_res);
 	}
 	else if ((zv=zend_hash_str_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection")-1)) != NULL) {
 		pool = zend_fetch_resource_ex(zv, "connection", le_memcache_pool);
@@ -1962,7 +1970,7 @@ static void php_mmc_connect (INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{
 
 		list_res = zend_register_resource(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_res);
-		GC_REFCOUNT(list_res)++;
+		GC_ADDREF(list_res);
 
 		RETURN_TRUE;
 	}
@@ -2054,7 +2062,7 @@ PHP_FUNCTION(memcache_add_server)
 		pool = mmc_pool_new();
 		list_res = zend_register_resource(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_res);
-		GC_REFCOUNT(list_res)++;
+		GC_REFCOUNT(list_res);
 	}
 	else {
 		pool = zend_fetch_resource_ex(connection, "connection", le_memcache_pool);
@@ -2200,7 +2208,7 @@ mmc_t *mmc_find_persistent(zend_string *host, zend_long port, zend_long timeout,
 		mmc = mmc_server_new(host, port, 1, timeout, retry_interval);
 		le = zend_register_resource(mmc, le_pmemcache);
 
-		GC_REFCOUNT(le) = 1;
+		GC_SET_REFCOUNT(le, 1);
 
 		/* register new persistent connection */
 		if (zend_hash_str_update_mem(&EG(persistent_list), hash_key, hash_key_len, le, sizeof(*le)) == NULL) {
@@ -2217,7 +2225,7 @@ mmc_t *mmc_find_persistent(zend_string *host, zend_long port, zend_long timeout,
 		mmc = mmc_server_new(host, port, 1, timeout, retry_interval);
 		le->type = le_pmemcache;
 		le->ptr  = mmc;
-		GC_REFCOUNT(le) = 1;
+		GC_SET_REFCOUNT(le, 1);
 
 		/* register new persistent connection */
 		if (zend_hash_str_update_mem(&EG(persistent_list), hash_key, hash_key_len, le, sizeof(*le)) == NULL) {
