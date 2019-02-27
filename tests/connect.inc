@@ -12,11 +12,11 @@ error_reporting(E_ALL);
 
 $host = "localhost";
 $port = 11211;
-$udpPort = 11211;
+//$udpPort = 11211;
 
 $host2 = "localhost";
 $port2 = 11212;
-$udpPort2 = 11212;
+//$udpPort2 = 11212;
 
 //ini_set('memcache.hash_strategy', 'standard');
 //ini_set('memcache.hash_function', 'fnv');

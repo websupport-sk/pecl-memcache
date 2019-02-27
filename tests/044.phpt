@@ -1,7 +1,14 @@
 --TEST--
 ini_set('memcache.session_redundancy')
 --SKIPIF--
-<?php include 'connect.inc'; ?>
+<?php
+include 'connect.inc';
+include 'version.inc';
+if (defined('PHP_VERSION_ID') && !(PHP_VERSION_ID < 70300)) {
+    die("skip");
+}
+?>
+
 --FILE--
 <?php
 
@@ -9,7 +16,7 @@ include 'connect.inc';
 
 ini_set('memcache.session_redundancy', 10);
 ini_set('session.save_handler', 'memcache');
-ini_set('session.save_path', "tcp://$host:$port?udp_port=$udpPort, tcp://$host2:$port2?udp_port=$udpPort2");
+ini_set('memcache.session_save_path', "tcp://$host:$port?udp_port=$udpPort, tcp://$host2:$port2?udp_port=$udpPort2");
 
 $memcache1 = test_connect1();
 $memcache2 = test_connect2();

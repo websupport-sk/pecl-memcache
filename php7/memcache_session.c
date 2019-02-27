@@ -37,6 +37,8 @@
 #endif
 #include "php_memcache.h"
 
+static int mmc_deleted_handler(mmc_t *mmc, mmc_request_t *request, int response, const char *message, unsigned int message_len, void *param);
+
 ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
 ps_module ps_mod_memcache = {
@@ -54,17 +56,23 @@ PS_OPEN_FUNC(memcache)
 	zval params, *param;
 	int i, j, path_len;
 
+	char *path = MEMCACHE_G(session_save_path);
+	if (!path) {
+		PS_SET_MOD_DATA(NULL);
+		return FAILURE;
+	}
+
 	pool = mmc_pool_new();
 
-	for (i=0,j=0,path_len=strlen(save_path); i<path_len; i=j+1) {
+	for (i=0,j=0,path_len=strlen(path); i<path_len; i=j+1) {
 		/* find beginning of url */
-		while (i<path_len && (isspace(save_path[i]) || save_path[i] == ',')) {
+		while (i<path_len && (isspace(path[i]) || path[i] == ',')) {
 			i++;
 		}
 
 		/* find end of url */
 		j = i;
-		while (j<path_len && !isspace(save_path[j]) && save_path[j] != ',') {
+		while (j<path_len && !isspace(path[j]) && path[j] != ',') {
 			 j++;
 		}
 
@@ -73,24 +81,23 @@ PS_OPEN_FUNC(memcache)
 			double timeout = MMC_DEFAULT_TIMEOUT;
 
 			/* translate unix: into file: */
-			if (!strncmp(save_path+i, "unix:", sizeof("unix:")-1)) {
+			if (!strncmp(path+i, "unix:", sizeof("unix:")-1)) {
 				int len = j-i;
-				char *path = estrndup(save_path+i, len);
-				memcpy(path, "file:", sizeof("file:")-1);
-				url = php_url_parse_ex(path, len);
-				efree(path);
+				char *path2 = estrndup(path+i, len);
+				memcpy(path2, "file:", sizeof("file:")-1);
+				url = php_url_parse_ex(path2, len);
+				efree(path2);
 			}
 			else {
 				int len = j-i;
-                		char *path = estrndup(save_path+i, len);
-                		url = php_url_parse_ex(path, strlen(path));
-                		efree(path);
+				char *path2 = estrndup(path+i, len);
+				url = php_url_parse_ex(path2, strlen(path2));
+				efree(path2);
 			}
 
 			if (!url) {
-				char *path = estrndup(save_path+i, j-i);
 				php_error_docref(NULL, E_WARNING,
-					"Failed to parse session.save_path (error at offset %d, url was '%s')", i, path);
+					"Failed to parse memcache.save_path (error at offset %d, url was '%s')", i, path);
 				efree(path);
 
 				mmc_pool_free(pool);
@@ -98,12 +105,14 @@ PS_OPEN_FUNC(memcache)
 				return FAILURE;
 			}
 
-			/* parse parameters */
 			if (url->query != NULL) {
 				array_init(&params);
-
+			/* parse parameters */
+#if PHP_VERSION_ID < 70300
 				sapi_module.treat_data(PARSE_STRING, estrdup(url->query), &params);
-
+#else
+				sapi_module.treat_data(PARSE_STRING, estrdup(ZSTR_VAL(url->query)), &params);
+#endif
 				if ((param = zend_hash_str_find(Z_ARRVAL(params), "persistent", sizeof("persistent")-1)) != NULL) {
 					convert_to_boolean_ex(param);
 					persistent = Z_TYPE_P(param) == IS_TRUE;
@@ -131,16 +140,20 @@ PS_OPEN_FUNC(memcache)
 
 				zval_ptr_dtor(&params);
 			}
-
+#if PHP_VERSION_ID < 70300
 			if (url->scheme && url->path && !strcmp(url->scheme, "file")) {
 				char *host;
 				int host_len = spprintf(&host, 0, "unix://%s", url->path);
+#else
+			if (url->scheme && url->path && !strcmp(ZSTR_VAL(url->scheme), "file")) {
+				char *host;
+				int host_len = spprintf(&host, 0, "unix://%s", ZSTR_VAL(url->path));
+#endif
 
 				/* chop off trailing :0 port specifier */
 				if (!strcmp(host + host_len - 2, ":0")) {
 					host_len -= 2;
 				}
-
 				if (persistent) {
 					mmc = mmc_find_persistent(host, host_len, 0, 0, timeout, retry_interval);
 				}
@@ -158,12 +171,22 @@ PS_OPEN_FUNC(memcache)
 					return FAILURE;
 				}
 
+#if PHP_VERSION_ID < 70300
 				if (persistent) {
-					mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval);
+                       mmc = mmc_find_persistent(url->host, strlen(url->host), url->port, udp_port, timeout, retry_interval);
 				}
 				else {
-					mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval);
+                       mmc = mmc_server_new(url->host, strlen(url->host), url->port, udp_port, 0, timeout, retry_interval);
 				}
+#else 
+				if (persistent) {
+					mmc = mmc_find_persistent(ZSTR_VAL(url->host), ZSTR_LEN(url->host), url->port, udp_port, timeout, retry_interval);
+				}
+				else {
+					mmc = mmc_server_new(ZSTR_VAL(url->host), ZSTR_LEN(url->host), url->port, udp_port, 0, timeout, retry_interval);
+				}
+#endif
+
 			}
 
 			mmc_pool_add(pool, mmc, weight);
@@ -222,7 +245,7 @@ static int php_mmc_session_read_request(
 		mmc_pool_failover_handler_null, NULL);
 
 	/* prepare key */
-	if (mmc_prepare_key_ex(Z_STRVAL_P(zkey), Z_STRLEN_P(zkey), dreq->key, &(dreq->key_len)) != MMC_OK) {
+	if (mmc_prepare_key_ex(Z_STRVAL_P(zkey), Z_STRLEN_P(zkey), dreq->key, &(dreq->key_len), MEMCACHE_G(session_key_prefix)) != MMC_OK) {
 		mmc_pool_release(pool, lreq);
 		mmc_pool_release(pool, areq);
 		mmc_pool_release(pool, dreq);
@@ -257,6 +280,7 @@ static int php_mmc_session_read_request(
  */
 PS_READ_FUNC(memcache)
 {
+	*val = ZSTR_EMPTY_ALLOC();
 	mmc_pool_t *pool = PS_GET_MOD_DATA();
 
 	if (pool != NULL) {
@@ -293,7 +317,7 @@ PS_READ_FUNC(memcache)
 
 			/* create requests */
 			if (php_mmc_session_read_request(pool, &zkey, lockparam, &addresult, dataparam, &lockrequest, &addrequest, &datarequest) != MMC_OK) {
-				break;
+				return FAILURE;
 			}
 
 			/* find next server in line */
@@ -319,7 +343,7 @@ PS_READ_FUNC(memcache)
 				if (Z_TYPE(dataresult) == IS_STRING) {
 					/* break if successfully locked with existing value */
 					mmc_queue_free(&skip_servers);
-					*val = zend_string_init(Z_STRVAL(dataresult), Z_STRLEN(dataresult), 1);
+					*val = zend_string_init(Z_STRVAL(dataresult), Z_STRLEN(dataresult), 0);
 					zval_ptr_dtor(&dataresult);
 					return SUCCESS;
 				}
@@ -327,6 +351,15 @@ PS_READ_FUNC(memcache)
 				/* if missing value, skip this server and try next */
 				zval_dtor(&dataresult);
 				mmc_queue_push(&skip_servers, mmc);
+				
+				/* if it is the last server in pool and connection was ok return success and empty string due to php70 changes */
+				if (skip_servers.len == pool->num_servers && skip_servers.len < MEMCACHE_G(session_redundancy)) {
+					*val = ZSTR_EMPTY_ALLOC();
+					mmc_queue_free(&skip_servers);
+					zval_ptr_dtor(&dataresult);
+					return SUCCESS;
+
+				}
 			}
 			else {
 				/* if missing lock, back off and retry same server */
@@ -340,13 +373,17 @@ PS_READ_FUNC(memcache)
 					timeout = 1000000;
 				}
 			}
-		} while (skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers && remainingtime > 0);
+		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers && remainingtime > 0);
 
 		mmc_queue_free(&skip_servers);
 		zval_dtor(&dataresult);
-	}
 
+		return SUCCESS;
+	}
+	else
+	{
 	return FAILURE;
+	}
 }
 /* }}} */
 
@@ -362,6 +399,7 @@ PS_WRITE_FUNC(memcache)
 		mmc_t *mmc;
 		mmc_request_t *lockrequest, *datarequest;
 		mmc_queue_t skip_servers = {0};
+		size_t lifetime = (size_t)time(NULL) + INI_INT("session.gc_maxlifetime");
 		unsigned int last_index = 0;
 
 		ZVAL_NULL(&lockresult);
@@ -373,7 +411,7 @@ PS_WRITE_FUNC(memcache)
 				pool, MMC_PROTO_TCP, mmc_stored_handler, &dataresult,
 				mmc_pool_failover_handler_null, NULL);
 
-			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len)) != MMC_OK) {
+			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len), MEMCACHE_G(session_key_prefix)) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
 				break;
 			}
@@ -391,10 +429,11 @@ PS_WRITE_FUNC(memcache)
 			ZVAL_STR(&value, val);
 
 			/* assemble commands to store data and reset lock */
-			if (pool->protocol->store(pool, datarequest, MMC_OP_SET, datarequest->key, datarequest->key_len, 0, INI_INT("session.gc_maxlifetime"), 0, &value) != MMC_OK ||
-				pool->protocol->store(pool, lockrequest, MMC_OP_SET, lockrequest->key, lockrequest->key_len, 0, MEMCACHE_G(lock_timeout), 0, &lockvalue) != MMC_OK) {
+			if (pool->protocol->store(pool, datarequest, MMC_OP_SET, datarequest->key, datarequest->key_len, 0, lifetime, 0, &value) != MMC_OK ||
+					pool->protocol->store(pool, lockrequest, MMC_OP_SET, lockrequest->key, lockrequest->key_len, 0, MEMCACHE_G(lock_timeout), 0, &lockvalue) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
 				mmc_pool_release(pool, lockrequest);
+				mmc_queue_push(&skip_servers, mmc);
 				break;
 			}
 
@@ -409,7 +448,7 @@ PS_WRITE_FUNC(memcache)
 				mmc_pool_release(pool, lockrequest);
 				continue;
 			}
-		} while (skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers);
+		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers);
 
 		mmc_queue_free(&skip_servers);
 
@@ -471,7 +510,7 @@ PS_DESTROY_FUNC(memcache)
 				pool, MMC_PROTO_TCP, mmc_deleted_handler, &dataresult,
 				mmc_pool_failover_handler_null, NULL);
 
-			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len)) != MMC_OK) {
+			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len), MEMCACHE_G(session_key_prefix)) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
 				break;
 			}
@@ -500,7 +539,7 @@ PS_DESTROY_FUNC(memcache)
 				mmc_pool_release(pool, lockrequest);
 				continue;
 			}
-		} while (skip_servers.len < MEMCACHE_G(session_redundancy)-1 && skip_servers.len < pool->num_servers);
+		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers);
 
 		mmc_queue_free(&skip_servers);
 
@@ -532,3 +571,4 @@ PS_GC_FUNC(memcache)
  * vim600: noet sw=4 ts=4 fdm=marker
  * vim<600: noet sw=4 ts=4
  */
+

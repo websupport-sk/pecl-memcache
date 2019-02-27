@@ -239,7 +239,6 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request) /*
 {
 	mmc_response_header_t *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-	size_t size_header = sizeof(mmc_response_header_t);
 
 	header = (mmc_response_header_t *)mmc_stream_get(request->io, sizeof(mmc_response_header_t));
 
@@ -564,7 +563,7 @@ static int mmc_binary_store(
 			return status;
 		}
 
-		header = (mmc_store_request_header_t *)(request->sendbuf.value.c + prevlen);
+		header = (mmc_store_append_header_t *)(request->sendbuf.value.c + prevlen);
 
 		mmc_pack_header(&(header->base), op, 0, key_len, sizeof(mmc_store_append_header_t) - sizeof(mmc_request_header_t), request->sendbuf.value.len - valuelen);
 		header->base.cas = htonll(cas);
@@ -631,7 +630,6 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 {
 	mmc_mutate_request_header_t header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-	const size_t request_header_size = sizeof(mmc_request_header_t);
 	uint8_t op;
 
 	request->parse = mmc_request_parse_response;
@@ -720,12 +718,10 @@ static void mmc_binary_stats(mmc_request_t *request, const char *type, long slab
 
 static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, const char *user,  const char *password) /* {{{ */
 {
-	const char *key = "PLAIN";
 	const unsigned int key_len = 5;
-	int prevlen, valuelen;
+	int prevlen;
 	mmc_sasl_request_header *header;
 	mmc_binary_request_t *req = (mmc_binary_request_t *)request;
-	unsigned int flags = 0;
 
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_response;
@@ -740,7 +736,6 @@ static void mmc_set_sasl_auth_data(mmc_pool_t *pool, mmc_request_t *request, con
 
 	/* append key and data */
 	smart_string_appendl(&(request->sendbuf.value), "PLAIN", 5);
-	valuelen = request->sendbuf.value.len;
 
 	/* initialize header */
 	header = (mmc_sasl_request_header *)(request->sendbuf.value.c + prevlen);

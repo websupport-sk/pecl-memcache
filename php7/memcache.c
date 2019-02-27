@@ -103,7 +103,7 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(close,					memcache_close,						NULL)
 	PHP_FALIAS(flush,					memcache_flush,						NULL)
 	PHP_FALIAS(setSaslAuthData,			memcache_set_sasl_auth_data,				NULL)
-
+	
 	{NULL, NULL, NULL}
 };
 
@@ -124,7 +124,7 @@ zend_module_entry memcache_module_entry = {
 	memcache_functions,
 	PHP_MINIT(memcache),
 	PHP_MSHUTDOWN(memcache),
-	NULL,
+	PHP_RINIT(memcache),
 	NULL,
 	PHP_MINFO(memcache),
 	PHP_MEMCACHE_VERSION,
@@ -262,6 +262,23 @@ static PHP_INI_MH(OnUpdateLockTimeout) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdatePrefixStaticKey) /* {{{ */
+{
+	int i;
+
+	if (new_value) {
+		for (i=0 ; i<ZSTR_LEN(new_value) ; i++) {
+			if (ZSTR_VAL(new_value)[i]=='.') {
+				php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.session_prefix_static_key cannot have dot inside (.)");
+				return FAILURE;
+			}
+		}
+	}
+
+	return OnUpdateString(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
+}
+/* }}} */
+
 /* {{{ PHP_INI */
 PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.allow_failover",		"1",			PHP_INI_ALL, OnUpdateLong,			allow_failover,	zend_memcache_globals,	memcache_globals)
@@ -275,6 +292,15 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.session_redundancy",	"2",			PHP_INI_ALL, OnUpdateRedundancy,	session_redundancy,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.compress_threshold",	"20000",		PHP_INI_ALL, OnUpdateCompressThreshold,	compress_threshold,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.lock_timeout",			"15",			PHP_INI_ALL, OnUpdateLockTimeout,		lock_timeout,		zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.session_prefix_host_key",       			"0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.session_prefix_host_key_remove_www",    	"1",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_www, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.session_prefix_host_key_remove_subdomain",  "0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_subdomain, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.session_prefix_static_key",         		NULL,			PHP_INI_ALL, OnUpdatePrefixStaticKey, session_prefix_static_key, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.session_save_path",         				NULL,			PHP_INI_ALL, OnUpdateString, session_save_path, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.prefix_host_key",       					"0",			PHP_INI_ALL, OnUpdateBool, prefix_host_key, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.prefix_host_key_remove_www",    			"1",			PHP_INI_ALL, OnUpdateBool, prefix_host_key_remove_www, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.prefix_host_key_remove_subdomain",  		"0",			PHP_INI_ALL, OnUpdateBool, prefix_host_key_remove_subdomain, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.prefix_static_key",         				NULL,			PHP_INI_ALL, OnUpdatePrefixStaticKey, prefix_static_key, zend_memcache_globals, memcache_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -291,6 +317,150 @@ static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p)
 {
 	MEMCACHE_G(hash_strategy)	  = MMC_STANDARD_HASH;
 	MEMCACHE_G(hash_function)	  = MMC_HASH_CRC32;
+}
+/* }}} */
+
+/* {{{ get_session_key_prefix
+ */
+static char *get_session_key_prefix() {
+	char *server_name=NULL, *prefix=NULL;
+	int static_key_len=0, server_name_len=0, i;
+	zval *array, *token;
+
+	if (MEMCACHE_G(session_prefix_static_key)) {
+		static_key_len=strlen(MEMCACHE_G(session_prefix_static_key));
+	}
+
+	zend_is_auto_global_str("_SERVER", sizeof("_SERVER")-1);
+
+	if (MEMCACHE_G(session_prefix_host_key)) {
+		if ((array = zend_hash_str_find(&EG(symbol_table), "_SERVER", sizeof("_SERVER")-1)) &&
+				Z_TYPE_P(array) == IS_ARRAY &&
+				(token = zend_hash_str_find(Z_ARRVAL_P(array), "SERVER_NAME", sizeof("SERVER_NAME")-1)) &&
+				Z_TYPE_P(token) == IS_STRING) {
+
+			if (MEMCACHE_G(session_prefix_host_key_remove_www) && !strncasecmp("www.",Z_STRVAL_P(token),4)) {
+				server_name=Z_STRVAL_P(token)+4;
+			} else {
+				server_name=Z_STRVAL_P(token);
+			}
+
+			if(MEMCACHE_G(session_prefix_host_key_remove_subdomain) && server_name) {
+				int dots=0;
+				char *dots_ptr[3]={NULL,NULL,NULL};
+
+				for (i=strlen(server_name) ; i>0 ; i--) {
+					if (dots==sizeof(dots_ptr)) {
+						break;
+					}
+
+					if (server_name[i]=='.') {
+						dots_ptr[dots]=&server_name[i];
+						dots++;
+					}
+				}
+
+				if (dots_ptr[1] && *(dots_ptr[1]+1)) {
+					server_name=dots_ptr[1]+1;
+				}
+
+			}
+
+			server_name_len=(strlen(server_name));
+		}
+	}
+
+	if (!static_key_len && !server_name_len) {
+		return NULL;
+	}
+
+	prefix=emalloc(static_key_len + server_name_len + 1);
+
+	if (static_key_len)
+		memcpy(prefix, MEMCACHE_G(session_prefix_static_key), static_key_len);
+
+	if (server_name_len)
+		memcpy(prefix + static_key_len, server_name, server_name_len);
+
+	prefix[static_key_len + server_name_len]='\0';
+
+	return prefix;
+}
+/* }}} */
+
+/* get_key_prefix
+ */
+static char *get_key_prefix() {
+	char *server_name=NULL, *prefix=NULL;
+	int static_key_len=0, server_name_len=0, i;
+	zval *array, *token;
+
+	if (MEMCACHE_G(prefix_static_key)) {
+		static_key_len=strlen(MEMCACHE_G(prefix_static_key));
+	}
+
+	if (MEMCACHE_G(prefix_host_key)) {
+
+		if ((array = zend_hash_str_find(&EG(symbol_table), "_SERVER", sizeof("_SERVER")-1)) &&
+						Z_TYPE_P(array) == IS_ARRAY &&
+						(token = zend_hash_str_find(Z_ARRVAL_P(array), "SERVER_NAME", sizeof("SERVER_NAME")-1)) &&
+						Z_TYPE_P(token) == IS_STRING) {
+
+			if (MEMCACHE_G(prefix_host_key_remove_www) && !strncasecmp("www.",Z_STRVAL_P(token),4)) {
+				server_name=Z_STRVAL_P(token)+4;
+			} else {
+				server_name=Z_STRVAL_P(token);
+			}
+
+			if(MEMCACHE_G(prefix_host_key_remove_subdomain) && server_name) {
+				int dots=0;
+				char *dots_ptr[3]={NULL,NULL,NULL};
+
+				for (i=strlen(server_name) ; i>0 ; i--) {
+					if (dots==sizeof(dots_ptr)) {
+						break;
+					}
+					if (server_name[i]=='.') {
+						dots_ptr[dots]=&server_name[i];
+						dots++;
+					}
+				}
+
+				if (dots_ptr[1] && *(dots_ptr[1]+1)) {
+					server_name=dots_ptr[1]+1;
+				}
+
+			}
+
+			server_name_len=(strlen(server_name));
+		}
+	}
+
+	if (!static_key_len && !server_name_len) {
+		return NULL;
+	}
+
+	prefix=emalloc(static_key_len + server_name_len + 1);
+
+	if (static_key_len)
+		memcpy(prefix, MEMCACHE_G(prefix_static_key), static_key_len);
+
+	if (server_name_len)
+		memcpy(prefix + static_key_len, server_name, server_name_len);
+
+	prefix[static_key_len + server_name_len]='\0';
+
+	return prefix;
+}
+/* }}} */
+
+/* {{{ PHP_RINIT_FUNCTION
+ */
+PHP_RINIT_FUNCTION(memcache)
+{
+	MEMCACHE_G(session_key_prefix) = get_session_key_prefix(TSRMLS_C);
+
+	return SUCCESS;
 }
 /* }}} */
 
@@ -456,30 +626,31 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 		zend_string *key;
 		zval *val;
 		zend_ulong index;
+		int release;
 
 		ZEND_HASH_FOREACH_KEY_VAL(Z_ARRVAL_P(keys), index, key, val ) {
-			zend_string *str_key = NULL;
 			if (key == NULL) {
-				str_key = strpprintf(0, ZEND_ULONG_FMT, index);
+				key = strpprintf(0, ZEND_ULONG_FMT, index);
+				release = 1;
 			} else {
-				str_key = key;
+				release = 0;
 			}
 
 			/* allocate request */
 			request = mmc_pool_request(pool, MMC_PROTO_TCP,
 					mmc_stored_handler, return_value, mmc_pool_failover_handler, NULL);
 
-			if (mmc_prepare_key_ex(ZSTR_VAL(str_key), ZSTR_LEN(str_key), request->key, &(request->key_len)) != MMC_OK) {
+			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), request->key, &(request->key_len), MEMCACHE_G(key_prefix)) != MMC_OK) {
 				php_error_docref(NULL, E_WARNING, "Invalid key");
 				mmc_pool_release(pool, request);
-				if (key == NULL) {
-					zend_string_release(str_key);
+				if (release) {
+					zend_string_release(key);
 				}
 				continue;
 			}
 
-			if (key == NULL) {
-				zend_string_release(str_key);
+			if (release) {
+				zend_string_release(key);
 			}
 
 			/* assemble command */
@@ -621,7 +792,6 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 
 	if (Z_TYPE_P(keys) == IS_ARRAY) {
 		zval *key;
-		zend_ulong key_index;
 
 		if (deleted) {
 			/* changed to true/false by mmc_numeric_response_handler */
@@ -700,6 +870,17 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 }
 /* }}} */
 
+
+	/*TODO: in php73, we should use zend_register_persistent_resource , e.g.:
+
+	char *persistent_id;
+	persistent_id = pemalloc(key_len + 1, 1);
+	memcpy((char *)persistent_id, key, key_len+1);
+	if (zend_register_persistent_resource ( (char*) persistent_id, key_len, mmc, le_memcache_server) == NULL) ;
+
+	then not forget to pefree, check refcounts in _mmc_server_free / _mmc_server_list_dtor ,  etc. 
+	otherwise we will leak mem with persistent connections /run into other trouble with later versions
+	*/
 mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, unsigned short udp_port, double timeout, int retry_interval) /* {{{ */
 {
 	mmc_t *mmc;
@@ -711,6 +892,7 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 
 	if ((le = zend_hash_str_find_ptr(&EG(persistent_list), key, key_len)) == NULL) {
 		mmc = mmc_server_new(host, host_len, port, udp_port, 1, timeout, retry_interval);
+
 
 		le = zend_register_resource(mmc, le_memcache_server);
 
@@ -728,7 +910,13 @@ mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, 
 		mmc = mmc_server_new(host, host_len, port, udp_port, 1, timeout, retry_interval);
 		le->type = le_memcache_server;
 		le->ptr  = mmc;
+
+#if PHP_VERSION_ID < 70300
 		GC_REFCOUNT(le) = 1;
+#else
+		GC_SET_REFCOUNT(le, 1);
+#endif
+
 
 		/* register new persistent connection */
 		if (zend_hash_str_update_mem(&EG(persistent_list), key, key_len, le, sizeof(*le)) == NULL) {
@@ -783,10 +971,16 @@ static mmc_t *php_mmc_pool_addserver(
 	/* initialize pool if need be */
 	if ((connection = zend_hash_str_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection")-1)) == NULL) {
 		pool = mmc_pool_new();
-		pool->failure_callback = &php_mmc_failure_callback;
+		pool->failure_callback = (mmc_failure_callback) &php_mmc_failure_callback;
 		list_res = zend_register_resource(pool, le_memcache_pool);
 		add_property_resource(mmc_object, "connection", list_res);
+
+#if PHP_VERSION_ID < 70300
 		GC_REFCOUNT(list_res)++;
+#else
+		GC_ADDREF(list_res);
+#endif
+
 	}
 	else {
 		pool = zend_fetch_resource_ex(connection, "connection", le_memcache_pool);
@@ -865,12 +1059,16 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 	if (!mmc_object) {
 		zend_resource *list_res;
 		mmc_pool_t *pool = mmc_pool_new();
-		pool->failure_callback = &php_mmc_failure_callback;
+		pool->failure_callback = (mmc_failure_callback) &php_mmc_failure_callback;
 		list_res = zend_register_resource(pool, le_memcache_pool);
 		mmc_object = return_value;
 		object_init_ex(mmc_object, memcache_ce);
 		add_property_resource(mmc_object, "connection", list_res);
+#if PHP_VERSION_ID < 70300
 		GC_REFCOUNT(list_res)++;
+#else
+		GC_ADDREF(list_res);
+#endif
 	} else {
 		RETVAL_TRUE;
 	}
@@ -1110,6 +1308,8 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_connect)
 	double timeout = MMC_DEFAULT_TIMEOUT;
 	zend_bool persistent = 1;
 
+	MEMCACHE_G(key_prefix)=get_key_prefix();
+
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|llbldl",
 		&host, &host_len, &tcp_port, &udp_port, &persistent, &weight, &timeout, &retry_interval) == FAILURE) {
 		return;
@@ -1143,6 +1343,7 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_connect)
    Connects to server and returns a Memcache object */
 PHP_FUNCTION(memcache_connect)
 {
+	MEMCACHE_G(key_prefix)=get_key_prefix();
 	php_mmc_connect(INTERNAL_FUNCTION_PARAM_PASSTHRU, 0);
 }
 /* }}} */
@@ -1151,6 +1352,7 @@ PHP_FUNCTION(memcache_connect)
    Connects to server and returns a Memcache object */
 PHP_FUNCTION(memcache_pconnect)
 {
+	MEMCACHE_G(key_prefix)=get_key_prefix();
 	php_mmc_connect(INTERNAL_FUNCTION_PARAM_PASSTHRU, 1);
 }
 /* }}} */
@@ -1167,6 +1369,8 @@ PHP_NAMED_FUNCTION(zif_memcache_pool_addserver)
 	zend_long tcp_port = MEMCACHE_G(default_port), udp_port = 0, weight = 1, retry_interval = MMC_DEFAULT_RETRY;
 	double timeout = MMC_DEFAULT_TIMEOUT;
 	zend_bool persistent = 1, status = 1;
+
+	MEMCACHE_G(key_prefix)=get_key_prefix();
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|llbldlb",
 		&host, &host_len, &tcp_port, &udp_port, &persistent, &weight, &timeout, &retry_interval, &status) == FAILURE) {
@@ -1228,6 +1432,8 @@ PHP_FUNCTION(memcache_add_server)
 	zend_long tcp_port = MEMCACHE_G(default_port), weight = 1, retry_interval = MMC_DEFAULT_RETRY;
 	double timeout = MMC_DEFAULT_TIMEOUT;
 	zend_bool persistent = 1, status = 1;
+
+	MEMCACHE_G(key_prefix)=get_key_prefix();
 
 	if (mmc_object) {
 		if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|lbldlbz",

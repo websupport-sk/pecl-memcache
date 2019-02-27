@@ -7,9 +7,9 @@ ini_set('session.save_handler')
 
 include 'connect.inc';
 
-$session_save_path = "tcp://$host:$port?persistent=1&udp_port=0&weight=2&timeout=2&retry_interval=10,  ,tcp://$host:$port  ";
+$session_save_path = "tcp://$host:$port?persistent=1&udp_port=0&weight=2&timeout=2&retry_interval=10,tcp://$host2:$port2";
 ini_set('session.save_handler', 'memcache');
-ini_set('session.save_path', $session_save_path);
+ini_set('memcache.session_save_path', $session_save_path);
 
 
 $result1 = session_start();
@@ -28,12 +28,22 @@ $result6 = $memcache->get($id);
 
 // Test large session
 $session_save_path = "tcp://$host:$port";
-ini_set('session.save_path', $session_save_path);
+ini_set('memcache.session_save_path', $session_save_path);
 
 session_start();
 $largeval = str_repeat('a', 1024*2048);
 $_SESSION['_test_key']= $largeval;
 session_write_close();
+
+// test large cookie lifetime
+ini_set('session.gc_maxlifetime', 1209600);
+$result7 = session_start();
+$id = session_id();
+$_SESSION['_test_key'] = 'Test';
+$result8 = $memcache->get($id);
+session_write_close();
+$result9 = $memcache->get($id);
+
 
 var_dump($result1);
 var_dump($id);
@@ -42,6 +52,9 @@ var_dump($result3);
 var_dump($result4);
 var_dump($result5);
 var_dump($result6);
+var_dump($result7);
+var_dump($result8);
+var_dump($result9);
 
 ?>
 --EXPECTF--
@@ -52,3 +65,6 @@ string(%d) "%s"
 bool(true)
 bool(true)
 bool(false)
+bool(true)
+string(%d) "%s"
+string(%d) "%s"
