@@ -3,9 +3,14 @@ This is not an official repository.
 This repository contains modified pecl-memcache plugin ported to PHP7, 
 which was originally developed for the need of hosting company in Slovakia (Websupport.sk). 
 
-The latest release is 4.0.0 (released: 2019-02-27) with support for PHP 7.3. 
+The latest release is 4.0.2 (released: 2019-02-28) with support for PHP 7.3. 
 
 See: https://github.com/websupport-sk/pecl-memcache/releases/tag/v4.0.0-php73
+
+Important changes in 4.0.0:
+
+ session.save_path is replaced by memcache.session_save_path , syntax remains same
+ memcache.[session_]prefix_ ini settings - prefix stored keys with hostname and/or static key  
 
 Feel free to use it and post patches. 
 
