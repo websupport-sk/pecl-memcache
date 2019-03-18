@@ -4,7 +4,7 @@ memcache multi host save path function
 <?php include 'connect.inc'; ?>
 --FILE--
 <?php
-
+include 'connect.inc';
 
 $session_save_path = "tcp://$host:$port,tcp://$host2:$port2";
 ini_set('session.save_handler', 'memcache');
