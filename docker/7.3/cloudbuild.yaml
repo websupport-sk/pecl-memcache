@@ -1,0 +1,7 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '-t', 'gcr.io/pecl-memcache/php-73', '.' ]
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['run', 'gcr.io/pecl-memcache/php-73']
+images:
+- 'gcr.io/$PROJECT_ID/php-73'
