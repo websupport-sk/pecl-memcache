@@ -26,7 +26,5 @@ RUN set -eux;\
 	./configure ; \
 	make -j2; 
 
-RUN echo "" 
-
 COPY docker/start.sh /
 CMD ["/start.sh"]
