@@ -1,6 +1,6 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '-t', 'gcr.io/pecl-memcache/php-73', '.' ]
+  args: [ 'build', '-t', 'gcr.io/pecl-memcache/php-73', 'docker/7.3/' ]
 - name: 'gcr.io/cloud-builders/docker'
   args: ['run', 'gcr.io/pecl-memcache/php-73']
 images:
