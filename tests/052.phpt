@@ -28,7 +28,7 @@ for ($i=0; $i<$count; $i++) {
 	$memcache->close();
 }
 
-$end = time();	print "Done\n";
+$end = time();
 printf("%d seconds", $end - $start);
 
 ?>
