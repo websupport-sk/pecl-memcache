@@ -1,6 +1,7 @@
 --TEST--
 memcache multi host save path function
 --SKIPIF--
+not relevant for php 7.3
 <?php include 'connect.inc'; ?>
 --FILE--
 <?php
