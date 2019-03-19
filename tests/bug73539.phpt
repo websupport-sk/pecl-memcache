@@ -1,8 +1,13 @@
 --TEST--
 memcache multi host save path function
 --SKIPIF--
-not relevant for php 7.3
-<?php include 'connect.inc'; ?>
+<?php 
+include 'connect.inc'; 
+if (defined('PHP_VERSION_ID') && PHP_VERSION_ID > 70300) {
+	    die("skip not relevant for php 7.3
+");
+}
+?>
 --FILE--
 <?php
 include 'connect.inc';
