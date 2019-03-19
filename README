@@ -5,7 +5,7 @@ which was originally developed for the need of hosting company in Slovakia (Webs
 
 The latest release is 4.0.2 (released: 2019-03-19) with support for PHP 7.0-7.3. 
 
-See: https://github.com/websupport-sk/pecl-memcache/releases/tag/v4.0.2-php73
+See: https://github.com/websupport-sk/pecl-memcache/releases/tag/4.0.2-php73
 
 Feel free to use it and post patches. 
 
