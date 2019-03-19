@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
 RUN mkdir -p /var/run/memcached
 RUN chown memcache:memcache /var/run/memcached
 
-COPY host.conf /etc/host.conf
+COPY docker/host.conf /etc/host.conf
 
 RUN set -eux;\
 	cd /usr/src; \
@@ -28,5 +28,5 @@ RUN set -eux;\
 
 RUN echo "" 
 
-COPY start.sh /
+COPY docker/start.sh /
 CMD ["/start.sh"]
