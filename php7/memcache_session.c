@@ -56,7 +56,12 @@ PS_OPEN_FUNC(memcache)
 	zval params, *param;
 	int i, j, path_len;
 
-	char *path = MEMCACHE_G(session_save_path);
+	const char *path = MEMCACHE_G(session_save_path);
+	if (!path) {
+		/* allow to work with standard session.save_path option
+		   and session_save_path function */
+		path = save_path;
+	}
 	if (!path) {
 		PS_SET_MOD_DATA(NULL);
 		return FAILURE;
@@ -98,7 +103,6 @@ PS_OPEN_FUNC(memcache)
 			if (!url) {
 				php_error_docref(NULL, E_WARNING,
 					"Failed to parse memcache.save_path (error at offset %d, url was '%s')", i, path);
-				efree(path);
 
 				mmc_pool_free(pool);
 				PS_SET_MOD_DATA(NULL);
