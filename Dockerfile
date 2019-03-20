@@ -1,10 +1,10 @@
-FROM php:7.3-stretch
+FROM php:7.2-stretch
 
 ENV CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
 ENV CPPFLAGS="$PHP_CFLAGS"
 ENV LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
 
-ENV PECL_MEMCACHE_URL_GIT="https://github.com/websupport-sk/pecl-memcache.git"
+ENV PECL_MEMCACHE_URL_GIT="https://github.com/thesource93/pecl-memcache.git"
 
 RUN apt-get update && apt-get install -y \ 
 	git \
