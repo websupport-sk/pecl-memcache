@@ -11,10 +11,12 @@ if (defined('PHP_VERSION_ID') && !(PHP_VERSION_ID < 70300)) {
 
 --FILE--
 <?php
+ob_start();
 
 include 'connect.inc';
 
-ini_set('memcache.session_redundancy', 10);
+ini_set('session.use_strict_mode', 0);
+ini_set('memcache.session_redundancy', 2);
 ini_set('session.save_handler', 'memcache');
 ini_set('memcache.session_save_path', "tcp://$host:$port?udp_port=$udpPort, tcp://$host2:$port2?udp_port=$udpPort2");
 
@@ -60,7 +62,7 @@ var_dump($_SESSION);
 session_write_close();
 
 // Test lost session on server2
-session_id($balanceKey1);
+session_id($balanceKey2);
 @session_start();
 $_SESSION['key'] = 'Test3';
 session_write_close();
@@ -69,11 +71,11 @@ unset($_SESSION['key']);
 $result = $memcache2->delete($balanceKey1);
 var_dump($result);
 
-session_id($balanceKey1);
+session_id($balanceKey2);
 @session_start();
 var_dump($_SESSION);
 session_write_close();
-
+ob_flush();
 ?>
 --EXPECTF--
 string(16) "key%sTest1%s"
