@@ -10,6 +10,7 @@ if (defined('PHP_VERSION_ID') && PHP_VERSION_ID > 70300) {
 ?>
 --FILE--
 <?php
+ob_start();
 include 'connect.inc';
 
 $session_save_path = "tcp://$host:$port,tcp://$host2:$port2";
@@ -33,7 +34,7 @@ function test() {
 test();
 
 echo "Done\n";
-
+ob_flush();
 ?>
 --EXPECTF--
 array(1) {
