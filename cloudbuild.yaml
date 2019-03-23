@@ -1,13 +1,36 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '--build-arg', 'PHP_IMAGE=${_PHP_IMAGE_70}', '-t', 'gcr.io/pecl-memcache/${_PHP_IMAGE_70}', '.' ]
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.0-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.0', '.' ]
+  waitFor: ['-']
+  id: 'build-7.0'
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['run', 'gcr.io/pecl-memcache/${_PHP_IMAGE_70}']
-substitutions:
-        _PHP_IMAGE_70: php:7.0-stretch;
-        _PHP_IMAGE_71: php:7.1-stretch;
-        _PHP_IMAGE_72: php:7.2-stretch;
-        _PHP_IMAGE_73: php:7.3-stretch;
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.1-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.1', '.' ]
+  waitFor: ['-']
+  id: 'build-7.1'
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.2-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.2', '.' ]
+  waitFor: ['-']
+  id: 'build-7.2'
+- name: 'gcr.io/cloud-builders/docker'
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.3-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.3', '.' ]
+  waitFor: ['-']
+  id: 'build-7.3'
+
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['run', 'gcr.io/$PROJECT_ID/build-7.0']
+  waitFor: ['build-7.0']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['run', 'gcr.io/$PROJECT_ID/build-7.1']
+  waitFor: ['build-7.1']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['run', 'gcr.io/$PROJECT_ID/build-7.2']
+  waitFor: ['build-7.2']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['run', 'gcr.io/$PROJECT_ID/build-7.3']
+  waitFor: ['build-7.3']
 images: [
-- 'gcr.io/$PROJECT_ID/${_PHP_IMAGE_70}'
+ 'gcr.io/$PROJECT_ID/build-7.0',
+ 'gcr.io/$PROJECT_ID/build-7.1',
+ 'gcr.io/$PROJECT_ID/build-7.2',
+ 'gcr.io/$PROJECT_ID/build-7.3'
 ]
