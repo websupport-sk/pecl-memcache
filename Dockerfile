@@ -1,4 +1,4 @@
-FROM php:7.3-stretch
+FROM php:7.2-stretch
 
 ENV CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
 ENV CPPFLAGS="$PHP_CFLAGS"

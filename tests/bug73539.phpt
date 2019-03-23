@@ -3,13 +3,14 @@ memcache multi host save path function
 --SKIPIF--
 <?php 
 include 'connect.inc'; 
-if (defined('PHP_VERSION_ID') && PHP_VERSION_ID > 70300) {
-	    die("skip not relevant for php 7.3
+if (defined('PHP_VERSION_ID') && PHP_VERSION_ID > 70000) {
+	    die("skip not relevant for php 7.1+
 ");
 }
 ?>
 --FILE--
 <?php
+ob_start();
 include 'connect.inc';
 
 $session_save_path = "tcp://$host:$port,tcp://$host2:$port2";
@@ -33,7 +34,7 @@ function test() {
 test();
 
 echo "Done\n";
-
+ob_flush();
 ?>
 --EXPECTF--
 array(1) {
