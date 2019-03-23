@@ -1,4 +1,5 @@
-FROM php:7.2-stretch
+ARG PHP_IMAGE=php:7.3-stretch
+FROM $PHP_IMAGE
 
 ENV CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
 ENV CPPFLAGS="$PHP_CFLAGS"

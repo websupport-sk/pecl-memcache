@@ -1,7 +1,13 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '-t', 'gcr.io/pecl-memcache/php-73', '.' ]
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=${_PHP_IMAGE_70}', '-t', 'gcr.io/pecl-memcache/${_PHP_IMAGE_70}', '.' ]
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['run', 'gcr.io/pecl-memcache/php-73']
-images:
-- 'gcr.io/$PROJECT_ID/php-73'
+  args: ['run', 'gcr.io/pecl-memcache/${_PHP_IMAGE_70}']
+substitutions:
+        _PHP_IMAGE_70: php:7.0-stretch;
+        _PHP_IMAGE_71: php:7.1-stretch;
+        _PHP_IMAGE_72: php:7.2-stretch;
+        _PHP_IMAGE_73: php:7.3-stretch;
+images: [
+- 'gcr.io/$PROJECT_ID/${_PHP_IMAGE_70}'
+]
