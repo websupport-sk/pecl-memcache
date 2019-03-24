@@ -1,18 +1,18 @@
 steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.0-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.0', '.' ]
+- name: 'gcr.io/kaniko-project/executor:latest'
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.0-stretch', '--destination=gcr.io/$PROJECT_ID/build-7.0', '--cache=true', '--cache-ttl=6h', '.' ]
   waitFor: ['-']
   id: 'build-7.0'
-- name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.1-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.1', '.' ]
+- name: 'gcr.io/kaniko-project/executor:latest'
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.1-stretch', '--destination=gcr.io/$PROJECT_ID/build-7.1', '--cache=true', '--cache-ttl=6h', '.' ]
   waitFor: ['-']
   id: 'build-7.1'
-- name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.2-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.2', '.' ]
+- name: 'gcr.io/kaniko-project/executor:latest'
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.2-stretch', '--destination=gcr.io/$PROJECT_ID/build-7.2', '--cache=true', '--cache-ttl=6h', '.' ]
   waitFor: ['-']
   id: 'build-7.2'
-- name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.3-stretch', '-t', 'gcr.io/$PROJECT_ID/build-7.3', '.' ]
+- name: 'gcr.io/kaniko-project/executor:latest'
+  args: [ 'build', '--build-arg', 'PHP_IMAGE=php:7.3-stretch', '--destination=gcr.io/$PROJECT_ID/build-7.3', '--cache=true', '--cache-ttl=6h', '.' ]
   waitFor: ['-']
   id: 'build-7.3'
 

@@ -17,6 +17,9 @@ phpize
 make -j$(nproc)
 
 # Spawn memcached for tests
+echo "Starting memcached... "
+mkdir -p /var/run/memcached
+chown memcache:memcache /var/run/memcached
 /usr/bin/memcached -m 64 -u memcache -s /var/run/memcached/memcached.sock -d
 /usr/bin/memcached -m 64 -u memcache -U 11211 -l 127.0.0.1 -p 11211 -d
 /usr/bin/memcached -m 64 -u memcache -U 11212 -l 127.0.0.1 -p 11212 -d

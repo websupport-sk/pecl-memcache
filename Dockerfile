@@ -6,9 +6,6 @@ RUN apt-get update && apt-get install -y \
 	zlib1g-dev \
 	memcached ; 
 
-RUN mkdir -p /var/run/memcached
-RUN chown memcache:memcache /var/run/memcached
-
 COPY docker/host.conf /etc/host.conf
 
 COPY docker/start.sh /
