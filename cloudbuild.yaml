@@ -19,15 +19,19 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['run', 'gcr.io/$PROJECT_ID/build-7.0']
   waitFor: ['build-7.0']
+  id: 'run-7.0'
 - name: 'gcr.io/cloud-builders/docker'
   args: ['run', 'gcr.io/$PROJECT_ID/build-7.1']
   waitFor: ['build-7.1']
+  id: 'run-7.1'
 - name: 'gcr.io/cloud-builders/docker'
   args: ['run', 'gcr.io/$PROJECT_ID/build-7.2']
   waitFor: ['build-7.2']
+  id: 'run-7.2'
 - name: 'gcr.io/cloud-builders/docker'
   args: ['run', 'gcr.io/$PROJECT_ID/build-7.3']
   waitFor: ['build-7.3']
+  id: 'run-7.3'
 images: [
  'gcr.io/$PROJECT_ID/build-7.0',
  'gcr.io/$PROJECT_ID/build-7.1',
