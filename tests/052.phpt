@@ -31,7 +31,7 @@ for ($i=0; $i<$count; $i++) {
 $end = time();
 if (($end - $start) < 2) {
 	echo "true";
-else {
+} else {
 	echo "false";
 }
 
