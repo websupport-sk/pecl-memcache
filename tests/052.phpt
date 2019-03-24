@@ -29,8 +29,12 @@ for ($i=0; $i<$count; $i++) {
 }
 
 $end = time();
-printf("%d seconds", $end - $start);
+if (($end - $start) < 2) {
+	echo "true";
+else {
+	echo "false";
+}
 
 ?>
 --EXPECT--
-0 seconds
+true
