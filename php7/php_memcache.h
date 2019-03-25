@@ -67,7 +67,7 @@ PHP_FUNCTION(memcache_close);
 PHP_FUNCTION(memcache_flush);
 PHP_FUNCTION(memcache_set_sasl_auth_data);
 
-#define PHP_MEMCACHE_VERSION "4.0.2"
+#define PHP_MEMCACHE_VERSION "4.0.3"
 
 #define MMC_DEFAULT_TIMEOUT 1				/* seconds */
 #define MMC_DEFAULT_RETRY 15 				/* retry failed server after x seconds */
