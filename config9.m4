@@ -76,7 +76,7 @@ if test "$PHP_MEMCACHE" != "no"; then
       subdir=php7
       AC_MSG_RESULT([PHP 7.x])
     ],
-      AC_MSG_ERROR([PHP 7.x required for pecl-php-memcache ver 4+. Use pecl-php-meachce ver 3.x for PHP 5.x.])
+      AC_MSG_ERROR([PHP 7.x required for pecl-php-memcache ver 4+. Use pecl-php-memcache ver 3.x for PHP 5.x.])
     )
     export CPPFLAGS="$OLD_CPPFLAGS"
   else
