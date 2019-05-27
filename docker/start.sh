@@ -9,7 +9,7 @@ LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
 set -eux
 cd /usr/src
 
-git clone https://github.com/websupport-sk/pecl-memcache.git
+#git clone https://github.com/websupport-sk/pecl-memcache.git
 
 cd pecl-memcache; 
 phpize 
@@ -27,3 +27,6 @@ chown memcache:memcache /var/run/memcached
 # Let's start tests
 cd /usr/src/pecl-memcache
 TEST_PHP_ARGS="--show-diff --keep-all -w fails.log" make test 
+
+# Clean it
+make clean

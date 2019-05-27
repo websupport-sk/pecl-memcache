@@ -53,3 +53,7 @@ ltmain.sh
 missing
 mkinstalldirs
 run-tests.php
+fails.log
+configure.ac
+tests/*.php
+*.code-workspace
