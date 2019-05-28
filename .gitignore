@@ -57,3 +57,4 @@ fails.log
 configure.ac
 tests/*.php
 *.code-workspace
+.vscode/*
