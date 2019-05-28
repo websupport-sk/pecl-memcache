@@ -9,7 +9,7 @@ LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
 set -eux
 cd /usr/src
 
-if [[ -z "${LOCAL_DEV}" ]] 
+if [[ -z "${LOCAL_DEV:-}" ]] 
 then
     git clone https://github.com/websupport-sk/pecl-memcache.git
 fi 
