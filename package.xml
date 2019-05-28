@@ -12,7 +12,20 @@ http://pear.php.net/dtd/package-2.0.xsd">
     storing objects in memory.
     This extension allows you to work with memcached through
     handy OO and procedural interfaces.
+    The extension allows use to store sessions in memcached via memcache.
   </description>
+  <lead>
+    <name>Frantisek Drojak</name>
+    <user>thesource93 (github)</user>
+    <email></email>
+    <active>yes</active>
+  </lead>
+  <lead>
+    <name>Tomas Srnka</name>
+    <user>tomassrnka</user>
+    <email>tomas.srnka@gmail.com</email>
+    <active>yes</active>
+  </lead>
   <lead>
     <name>Antony Dovgal</name>
     <user>tony2001</user>
@@ -23,50 +36,40 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <name>Mikael Johansson</name>
     <user>mikl</user>
     <email>mikael@synd.info</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
   <lead>
     <name>Pierre-Alain Joye</name>
     <user>pajoye</user>
     <email>pierre.php@gmail.com</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
   <lead>
     <name>Herman J. Radtke III</name>
     <user>hradtke</user>
     <email>hradtke@php.net</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
-  <date>2013-04-07</date>
+  <date>2019-05-28</date>
   <version>
-    <release>3.0.9</release>
-    <api>3.0.8</api>
+    <release>4.0.4</release>
+    <api>4.0.4</api>
   </version>
   <stability>
-    <release>beta</release>
-    <api>beta</api>
+    <release>stable</release>
+    <api>stable</api>
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-   - Fix Bug #63142 - memcache client Segmentation fault
-   - Fix Bug #63272 - Explicitly reserve range of flags in php_memcache.h so application code can use
-   - Fix Bug #59602 - getExtendedStats fails on the host intermittently after restarting memcache
-   - Fix Bug #63141 - Added LICENSE file and include tests folder in package
+   - Version 4.x supports PHP 7.0-7.3. 
+   - Version 4.x is considered to be stable for production usage. 
+   - Support for PHP 5.x has been removed, please use memcache extension ver. 3.x 
   </notes>
   <contents>
     <dir name="/">
-      <dir name="php5">
-        <file name="memcache.c" role="src" />
-        <file name="memcache_pool.c" role="src" />
-        <file name="memcache_queue.c" role="src" />
-        <file name="memcache_session.c" role="src" />
-        <file name="memcache_ascii_protocol.c" role="src" />
-        <file name="memcache_binary_protocol.c" role="src" />
-        <file name="memcache_standard_hash.c" role="src" />
-        <file name="memcache_consistent_hash.c" role="src" />
-        <file name="php_memcache.h" role="src" />
-        <file name="memcache_pool.h" role="src" />
-        <file name="memcache_queue.h" role="src" />
+      <dir name="docker">
+        <file name="host.conf" role="src" />
+        <file name="start.sh" role="src" />
       </dir>
       <dir name="php7">
         <file name="memcache.c" role="src" />
@@ -89,6 +92,8 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="example.php" role="doc" />
       <file name="README" role="doc" />
       <file name="memcache.php" role="doc" />
+      <file name="Dockerfile" role="src" />
+      <file name="cloudbuild.yaml" role="src" />
       <file name ="tests/connect.inc" role="test" />
       <file name ="tests/memcache.sh" role="test" />
       <file name ="tests/001.phpt" role="test" />
@@ -131,6 +136,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name ="tests/034.phpt" role="test" />
       <file name ="tests/035.phpt" role="test" />
       <file name ="tests/036.phpt" role="test" />
+      <file name ="tests/036b.phpt" role="test" />
       <file name ="tests/037.phpt" role="test" />
       <file name ="tests/038.phpt" role="test" />
       <file name ="tests/039.phpt" role="test" />
@@ -162,12 +168,14 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name ="tests/pecl17518.phpt" role="test" />
       <file name ="tests/pecl17566.phpt" role="test" />
       <file name ="tests/pecl63142.phpt" role="test" />
+      <file name ="tests/bug73539.phpt" role="test" />
+      <file name ="tests/githubbug13.phpt" role="test" />
     </dir>
   </contents>
   <dependencies>
     <required>
       <php>
-        <min>4.3.11</min>
+        <min>7.0.0</min>
       </php>
       <pearinstaller>
         <min>1.4.0b1</min>
@@ -179,6 +187,24 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <configureoption name="enable-memcache-session" default="yes" prompt="Enable memcache session handler support?" />
   </extsrcrelease>
   <changelog>
+    <release>
+      <date>2013-04-07</date>
+      <version>
+        <release>3.0.9</release>
+        <api>3.0.9</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fix Bug #63142 - memcache client Segmentation fault
+        - Fix Bug #63272 - Explicitly reserve range of flags in php_memcache.h so application code can use
+        - Fix Bug #59602 - getExtendedStats fails on the host intermittently after restarting memcache
+        - Fix Bug #63141 - Added LICENSE file and include tests folder in package
+      </notes>
+    </release>
     <release>
       <date>2013-04-07</date>
       <version>
