@@ -27,3 +27,6 @@ chown memcache:memcache /var/run/memcached
 # Let's start tests
 cd /usr/src/pecl-memcache
 TEST_PHP_ARGS="--show-diff --keep-all -w fails.log" make test 
+
+# Clean it
+make clean

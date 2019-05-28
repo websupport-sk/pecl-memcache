@@ -69,16 +69,15 @@ if test "$PHP_MEMCACHE" != "no"; then
     export OLD_CPPFLAGS="$CPPFLAGS"
     export CPPFLAGS="$CPPFLAGS $INCLUDES"
     AC_TRY_COMPILE([#include <php_version.h>], [
-#if PHP_MAJOR_VERSION > 5
-#error  PHP > 5
+#if PHP_MAJOR_VERSION < 7
+  #error "PHP < 7"
 #endif
-    ], [
-      subdir=php5
-      AC_MSG_RESULT([PHP 5.x])
     ], [
       subdir=php7
       AC_MSG_RESULT([PHP 7.x])
-    ])
+    ],
+      AC_MSG_ERROR([PHP 7.x required for pecl-php-memcache ver 4+. Use pecl-php-memcache ver 3.x for PHP 5.x.])
+    )
     export CPPFLAGS="$OLD_CPPFLAGS"
   else
     AC_MSG_ERROR([unknown])
