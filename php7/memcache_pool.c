@@ -406,6 +406,11 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 			php_var_serialize(&buf, value_copy_ptr, &value_hash);
 			PHP_VAR_SERIALIZE_DESTROY(value_hash);
 
+			if (!buf.s) {
+				php_error_docref(NULL, E_WARNING, "Failed to serialize value");
+				return MMC_REQUEST_FAILURE;
+			}
+
 			smart_string_appendl(&(buffer->value), ZSTR_VAL(buf.s), ZSTR_LEN(buf.s));
 			smart_str_free(&buf);
 
