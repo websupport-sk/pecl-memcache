@@ -44,7 +44,8 @@ var_dump($result['items'][$slab]['number']);
 //var_dump($result['64']);
 
 $result = $memcache->getExtendedStats('abc');
-var_dump($result["$host:$port"]);
+// adding "@" to suppress new behaviour in PHP 7.4+, see: https://wiki.php.net/rfc/notice-for-non-valid-array-container
+@var_dump($result["$host:$port"]);
 
 $result = $memcache->getExtendedStats('items');
 var_dump(isset($result["$host:$port"]['items']));
