@@ -3,10 +3,10 @@ This is an official repository for pecl-memcache plugin since 2019.
 This repository contains modified pecl-memcache plugin ported to PHP7, 
 which was originally developed for the need of hosting company in Slovakia (Websupport.sk). 
 
-The latest release is 4.0.5 (released: 2019-12-19) with support for PHP 7.0-7.4. 
+The latest release is 4.0.5.1 (released: 2019-12-19) with support for PHP 7.0-7.4. 
 
-See: https://github.com/websupport-sk/pecl-memcache/releases/tag/4.0.5
-See also release on PECL: https://pecl.php.net/package/memcache/4.0.5
+See: https://github.com/websupport-sk/pecl-memcache/releases
+See also release on PECL: https://pecl.php.net/package/memcache
 
 Feel free to use it and post patches. 
 
