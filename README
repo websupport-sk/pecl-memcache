@@ -1,4 +1,4 @@
-This is NOT an official repository. 
+This is an official repository for pecl-memcache plugin since 2019. 
 
 This repository contains modified pecl-memcache plugin ported to PHP7, 
 which was originally developed for the need of hosting company in Slovakia (Websupport.sk). 
