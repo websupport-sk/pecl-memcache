@@ -1,4 +1,4 @@
-ARG PHP_IMAGE=php:7.3-stretch
+ARG PHP_IMAGE=php:7.4-rc
 FROM $PHP_IMAGE
 
 RUN apt-get update && apt-get install -y \ 
