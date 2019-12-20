@@ -130,6 +130,10 @@ if test "$PHP_MEMCACHE" != "no"; then
     PHP_NEW_EXTENSION(memcache, $SOURCES, $ext_shared)
   fi
 
+  if test ! -d $subdir; then
+	mkdir $subdir
+  fi
+
 dnl this is needed to build the extension with phpize and -Wall
 
   if test "$PHP_DEBUG" = "yes"; then
