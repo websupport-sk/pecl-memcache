@@ -1,0 +1,8 @@
+This directory contains Dockerfile and supporting files for building docker image for PHP 8.0-dev. Everytime you build the image, you will get a fresh build based on latest PHP's git. It is *NOT* stable at all :). 
+
+The Dockerfile & supporting files are based on official PHP's Docker images (Buster/CLI version).
+
+Just run this command to build it:
+
+$ docker build -t php8.0-dev .
+
