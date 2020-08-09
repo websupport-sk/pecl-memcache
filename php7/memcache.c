@@ -103,7 +103,7 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 	PHP_FALIAS(close,					memcache_close,						NULL)
 	PHP_FALIAS(flush,					memcache_flush,						NULL)
 	PHP_FALIAS(setSaslAuthData,			memcache_set_sasl_auth_data,				NULL)
-	
+
 	{NULL, NULL, NULL}
 };
 
@@ -292,14 +292,14 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.session_redundancy",	"2",			PHP_INI_ALL, OnUpdateRedundancy,	session_redundancy,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.compress_threshold",	"20000",		PHP_INI_ALL, OnUpdateCompressThreshold,	compress_threshold,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.lock_timeout",			"15",			PHP_INI_ALL, OnUpdateLockTimeout,		lock_timeout,		zend_memcache_globals,	memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.session_prefix_host_key",       			"0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key, zend_memcache_globals, memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.session_prefix_host_key_remove_www",    	"1",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_www, zend_memcache_globals, memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.session_prefix_host_key_remove_subdomain",  "0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_subdomain, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_BOOLEAN("memcache.session_prefix_host_key",       			"0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_BOOLEAN("memcache.session_prefix_host_key_remove_www",    	"1",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_www, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_BOOLEAN("memcache.session_prefix_host_key_remove_subdomain",  "0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_subdomain, zend_memcache_globals, memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.session_prefix_static_key",         		NULL,			PHP_INI_ALL, OnUpdatePrefixStaticKey, session_prefix_static_key, zend_memcache_globals, memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.session_save_path",         				NULL,			PHP_INI_ALL, OnUpdateString, session_save_path, zend_memcache_globals, memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.prefix_host_key",       					"0",			PHP_INI_ALL, OnUpdateBool, prefix_host_key, zend_memcache_globals, memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.prefix_host_key_remove_www",    			"1",			PHP_INI_ALL, OnUpdateBool, prefix_host_key_remove_www, zend_memcache_globals, memcache_globals)
-	STD_PHP_INI_ENTRY("memcache.prefix_host_key_remove_subdomain",  		"0",			PHP_INI_ALL, OnUpdateBool, prefix_host_key_remove_subdomain, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_BOOLEAN("memcache.prefix_host_key",       					"0",			PHP_INI_ALL, OnUpdateBool, prefix_host_key, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_BOOLEAN("memcache.prefix_host_key_remove_www",    			"1",			PHP_INI_ALL, OnUpdateBool, prefix_host_key_remove_www, zend_memcache_globals, memcache_globals)
+	STD_PHP_INI_BOOLEAN("memcache.prefix_host_key_remove_subdomain",  		"0",			PHP_INI_ALL, OnUpdateBool, prefix_host_key_remove_subdomain, zend_memcache_globals, memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.prefix_static_key",         				NULL,			PHP_INI_ALL, OnUpdatePrefixStaticKey, prefix_static_key, zend_memcache_globals, memcache_globals)
 PHP_INI_END()
 /* }}} */
@@ -878,7 +878,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 	memcpy((char *)persistent_id, key, key_len+1);
 	if (zend_register_persistent_resource ( (char*) persistent_id, key_len, mmc, le_memcache_server) == NULL) ;
 
-	then not forget to pefree, check refcounts in _mmc_server_free / _mmc_server_list_dtor ,  etc. 
+	then not forget to pefree, check refcounts in _mmc_server_free / _mmc_server_list_dtor ,  etc.
 	otherwise we will leak mem with persistent connections /run into other trouble with later versions
 	*/
 mmc_t *mmc_find_persistent(const char *host, int host_len, unsigned short port, unsigned short udp_port, double timeout, int retry_interval) /* {{{ */
