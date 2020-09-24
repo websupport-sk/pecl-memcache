@@ -64,7 +64,7 @@ if test "$PHP_MEMCACHE" != "no"; then
   fi
 
   AC_MSG_CHECKING(PHP version)
-  if test -d $abs_srcdir/php7 ; then
+  if test -d $abs_srcdir/php8 ; then
     dnl # only when for PECL, not for PHP
     export OLD_CPPFLAGS="$CPPFLAGS"
     export CPPFLAGS="$CPPFLAGS $INCLUDES"
@@ -73,7 +73,7 @@ if test "$PHP_MEMCACHE" != "no"; then
   #error "PHP < 7"
 #endif
     ], [
-      subdir=php7
+      subdir=php8
       AC_MSG_RESULT([PHP 7.x])
     ],
       AC_MSG_ERROR([PHP 7.x required for pecl-php-memcache ver 4+. Use pecl-php-memcache ver 3.x for PHP 5.x.])
