@@ -14,8 +14,16 @@ memcache_add_server($memcache, $host2, $port2);
 
 $result1 = @memcache_get_stats($memcache);
 $result2 = @memcache_get_extended_stats($memcache);
-var_dump(memcache_get_extended_stats(array()));
-var_dump(memcache_get_extended_stats(new stdClass));
+try {
+    var_dump(memcache_get_extended_stats(array()));
+} catch (TypeError $e) {
+     echo "{$e->getMessage()}\n";
+}
+try {
+    var_dump(memcache_get_extended_stats(new stdClass));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 var_dump($result1['pid']);
 
@@ -26,11 +34,8 @@ var_dump($result2["$nonExistingHost:$nonExistingPort"]);
 
 ?>
 --EXPECTF--
-Warning: memcache_get_extended_stats() expects parameter 1 to be MemcachePool, array given in %s on line %d
-NULL
-
-Warning: memcache_get_extended_stats() expects parameter 1 to be MemcachePool, object given in %s on line %d
-NULL
+memcache_get_extended_stats(): Argument #1 ($memcache) must be of type MemcachePool, array given
+memcache_get_extended_stats(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
 string(%d) "%d"
 int(3)
 string(%d) "%d"

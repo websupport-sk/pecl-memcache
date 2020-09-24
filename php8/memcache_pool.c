@@ -733,7 +733,16 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 
 	/* check connection and extract socket for select() purposes */
 	if (!io->stream || php_stream_cast(io->stream, PHP_STREAM_AS_FD_FOR_SELECT, (void **)&fd, 1) != SUCCESS) {
-		mmc_server_seterror(mmc, errstr != NULL ? ZSTR_VAL(errstr) : "Connection failed", errnum);
+		if (errstr != NULL) {
+			zend_string* error = zend_string_concat2(
+				"Connection failed: ", sizeof("Connection failed: ") - 1,
+				ZSTR_VAL(errstr), ZSTR_LEN(errstr));
+
+			mmc_server_seterror(mmc, ZSTR_VAL(error), errnum);
+			zend_string_release(error);
+		} else {
+			mmc_server_seterror(mmc, "Connection failed", errnum);
+		}
 		mmc_server_deactivate(pool, mmc);
 
 		if (errstr != NULL) {
@@ -821,6 +830,8 @@ void mmc_server_sleep(mmc_t *mmc) /*
 
 void mmc_server_free(mmc_t *mmc) /* {{{ */
 {
+	mmc_server_sleep(mmc);
+
 	pefree(mmc->host, mmc->persistent);
 	pefree(mmc, mmc->persistent);
 }

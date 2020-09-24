@@ -1,7 +1,7 @@
 <?php
 
 if (!extension_loaded("memcache")) {
-	die("skip");
+	die("skip memcache module not loaded");
 }
 
 error_reporting(E_ALL);
@@ -93,5 +93,3 @@ function test_connect_pool() {
 if (!$memcache) {
 	die('skip Connection to memcached failed');
 }
-
-?>

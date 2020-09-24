@@ -19,8 +19,17 @@ memcache_set($memcache, $key, $value, false, 10);
 var_dump($key);
 var_dump($value);
 
-memcache_set($memcache, $key);
-$memcache->set($key);
+try {
+    memcache_set($memcache, $key);
+} catch (ArgumentCountError $e) {
+    echo "{$e->getMessage()}\n";
+}
+
+try {
+    $memcache->set($key);
+} catch (ArgumentCountError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 echo "Done\n";
 
@@ -28,8 +37,6 @@ echo "Done\n";
 --EXPECTF--
 int(123)
 int(123)
-
-Warning: %s parameter%s
-
-Warning: %s parameter%s
+Wrong parameter count for memcache_set()
+Wrong parameter count for MemcachePool::set()
 Done

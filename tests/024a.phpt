@@ -29,8 +29,16 @@ var_dump($result5);
 
 var_dump(memcache_close($memcache));
 var_dump(memcache_close($memcache));
-var_dump(memcache_close(new stdClass));
-var_dump(memcache_close(""));
+try {
+    var_dump(memcache_close(new stdClass));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
+try {
+    var_dump(memcache_close(""));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 echo "Done\n";
 
@@ -43,10 +51,6 @@ bool(true)
 bool(false)
 bool(true)
 bool(true)
-
-Warning: memcache_close() expects parameter 1 to be MemcachePool, object given in %s on line %d
-NULL
-
-Warning: memcache_close() expects parameter 1 to be MemcachePool, string given in %s on line %d
-NULL
+memcache_close(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
+memcache_close(): Argument #1 ($memcache) must be of type MemcachePool, string given
 Done

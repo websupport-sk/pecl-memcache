@@ -2,11 +2,7 @@
 memcache multi host save path function
 --SKIPIF--
 <?php 
-include 'connect.inc'; 
-if (defined('PHP_VERSION_ID') && PHP_VERSION_ID > 70000) {
-	    die("skip not relevant for php 7.1+
-");
-}
+include 'connect.inc';
 ?>
 --FILE--
 <?php
@@ -17,7 +13,12 @@ $session_save_path = "tcp://$host:$port,tcp://$host2:$port2";
 ini_set('session.save_handler', 'memcache');
 ini_set('memcache.session_save_path', $session_save_path);
 
+session_id('abcdef');
 session_start();
+$_SESSION['bof.test'] = 42;
+session_write_close();
+
+$_SESSION = array();
 
 function test() {
         session_name('SID_bof');
@@ -31,6 +32,11 @@ function test() {
         session_write_close();
 }
 
+ini_set('memcache.session_save_path', "tcp://$host:$port");
+test();
+ini_set('memcache.session_save_path', "tcp://$host2:$port2");
+test();
+ini_set('memcache.session_save_path', "tcp://$host:$port, tcp://$host2:$port2");
 test();
 
 echo "Done\n";
@@ -38,16 +44,15 @@ ob_flush();
 ?>
 --EXPECTF--
 array(1) {
-  'bof.test' =>
+  ["bof.test"]=>
   int(42)
 }
 array(1) {
-  'bof.test' =>
+  ["bof.test"]=>
   int(42)
 }
 array(1) {
-  'bof.test' =>
+  ["bof.test"]=>
   int(42)
 }
-
 Done

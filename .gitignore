@@ -31,6 +31,14 @@
 # Debug files
 *.dSYM/
 
+# Tests-generated stuff
+tests/*.diff
+tests/*.php
+tests/*.out
+tests/*.sh
+tests/*.log
+tests/*.exp
+
 *.fragments
 Makefile*
 autom4te*
@@ -55,6 +63,6 @@ mkinstalldirs
 run-tests.php
 fails.log
 configure.ac
-tests/*.php
 *.code-workspace
 .vscode/*
+.idea/

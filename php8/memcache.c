@@ -26,7 +26,6 @@
 #include "php.h"
 #include "php_ini.h"
 #include "ext/standard/info.h"
-#include "ext/standard/php_string.h"
 #include "php_memcache.h"
 
 /* True global resources - no need for thread safety here */
@@ -38,80 +37,276 @@ ZEND_EXTERN_MODULE_GLOBALS(memcache)
 
 /* {{{ memcache_functions[]
  */
-ZEND_BEGIN_ARG_INFO(arginfo_memcache_get, 1)
-	ZEND_ARG_PASS_INFO(0)
-	ZEND_ARG_PASS_INFO(0)
-	ZEND_ARG_PASS_INFO(1)
-	ZEND_ARG_PASS_INFO(1)
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_connect, 0, 0, 1)
+	ZEND_ARG_INFO(0, host)
+	ZEND_ARG_INFO(0, port)
+	ZEND_ARG_INFO(0, udp_port)
+	ZEND_ARG_INFO(0, persistent)
+	ZEND_ARG_INFO(0, weight)
+	ZEND_ARG_INFO(0, timeout)
+	ZEND_ARG_INFO(0, retry_interval)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO(arginfo_memcache_object_get, 1)
-	ZEND_ARG_PASS_INFO(0)
-	ZEND_ARG_PASS_INFO(1)
-	ZEND_ARG_PASS_INFO(1)
+#define arginfo_memcache_pconnect arginfo_memcache_connect
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_add_server, 0, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, host)
+	ZEND_ARG_INFO(0, port)
+	ZEND_ARG_INFO(0, persistent)
+	ZEND_ARG_INFO(0, weight)
+	ZEND_ARG_INFO(0, timeout)
+	ZEND_ARG_INFO(0, retry_interval)
+	ZEND_ARG_INFO(0, status)
+	ZEND_ARG_INFO(0, failure_callback)
+	ZEND_ARG_INFO(0, timeoutms)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_server_params, 0, 0, 1)
+	ZEND_ARG_INFO(0, host)
+	ZEND_ARG_INFO(0, port)
+	ZEND_ARG_INFO(0, timeout)
+	ZEND_ARG_INFO(0, retry_interval)
+	ZEND_ARG_INFO(0, status)
+	ZEND_ARG_INFO(0, failure_callback)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_failure_callback, 1, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, failure_callback)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get_server_status, 0, 0, 1)
+	ZEND_ARG_INFO(0, host)
+	ZEND_ARG_INFO(0, port)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get_version, 1, 0, 1)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_add, 0, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, flag)
+	ZEND_ARG_INFO(0, exptime)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_set arginfo_memcache_add
+#define arginfo_memcache_replace arginfo_memcache_add
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_cas, 0, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, flag)
+	ZEND_ARG_INFO(0, exptime)
+	ZEND_ARG_INFO(0, cas)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_append arginfo_memcache_add
+#define arginfo_memcache_prepend arginfo_memcache_add
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get, 1, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(1, flags)
+	ZEND_ARG_INFO(1, cas)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_delete, 0, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, exptime)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_debug, 0, 0, 1)
+	ZEND_ARG_INFO(0, on_off)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get_stats, 0, 0, 1)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, type)
+	ZEND_ARG_INFO(0, slabid)
+	ZEND_ARG_INFO(0, limit)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_get_extended_stats arginfo_memcache_get_stats
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_compress_threshold, 0, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, threshold)
+	ZEND_ARG_INFO(0, min_savings)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_increment, 0, 0, 2)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, defval)
+	ZEND_ARG_INFO(0, exptime)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_decrement arginfo_memcache_increment
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_close, 0, 0, 1)
+        ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_flush, 0, 0, 1)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, delay)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_sasl_auth_data, 1, 0, 3)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_INFO(0, username)
+	ZEND_ARG_INFO(0, password)
 ZEND_END_ARG_INFO()
 
 zend_function_entry memcache_functions[] = {
-	PHP_FE(memcache_connect,				NULL)
-	PHP_FE(memcache_pconnect,				NULL)
-	PHP_FE(memcache_add_server,				NULL)
-	PHP_FE(memcache_set_server_params,		NULL)
-	PHP_FE(memcache_set_failure_callback,	NULL)
-	PHP_FE(memcache_get_server_status,		NULL)
-	PHP_FE(memcache_get_version,			NULL)
-	PHP_FE(memcache_add,					NULL)
-	PHP_FE(memcache_set,					NULL)
-	PHP_FE(memcache_replace,				NULL)
-	PHP_FE(memcache_cas,					NULL)
-	PHP_FE(memcache_append,					NULL)
-	PHP_FE(memcache_prepend,				NULL)
+	PHP_FE(memcache_connect,				arginfo_memcache_connect)
+	PHP_FE(memcache_pconnect,				arginfo_memcache_pconnect)
+	PHP_FE(memcache_add_server,				arginfo_memcache_add_server)
+	PHP_FE(memcache_set_server_params,		arginfo_memcache_set_server_params)
+	PHP_FE(memcache_set_failure_callback,	arginfo_memcache_set_failure_callback)
+	PHP_FE(memcache_get_server_status,		arginfo_memcache_get_server_status)
+	PHP_FE(memcache_get_version,			arginfo_memcache_get_version)
+	PHP_FE(memcache_add,					arginfo_memcache_add)
+	PHP_FE(memcache_set,					arginfo_memcache_set)
+	PHP_FE(memcache_replace,				arginfo_memcache_replace)
+	PHP_FE(memcache_cas,					arginfo_memcache_cas)
+	PHP_FE(memcache_append,					arginfo_memcache_append)
+	PHP_FE(memcache_prepend,				arginfo_memcache_prepend)
 	PHP_FE(memcache_get,					arginfo_memcache_get)
-	PHP_FE(memcache_delete,					NULL)
-	PHP_FE(memcache_debug,					NULL)
-	PHP_FE(memcache_get_stats,				NULL)
-	PHP_FE(memcache_get_extended_stats,		NULL)
-	PHP_FE(memcache_set_compress_threshold,	NULL)
-	PHP_FE(memcache_increment,				NULL)
-	PHP_FE(memcache_decrement,				NULL)
-	PHP_FE(memcache_close,					NULL)
-	PHP_FE(memcache_flush,					NULL)
-	PHP_FE(memcache_set_sasl_auth_data,		NULL)
-	{NULL, NULL, NULL}
+	PHP_FE(memcache_delete,					arginfo_memcache_delete)
+	PHP_FE(memcache_debug,					arginfo_memcache_debug)
+	PHP_FE(memcache_get_stats,				arginfo_memcache_get_stats)
+	PHP_FE(memcache_get_extended_stats,		arginfo_memcache_get_extended_stats)
+	PHP_FE(memcache_set_compress_threshold,	arginfo_memcache_set_compress_threshold)
+	PHP_FE(memcache_increment,				arginfo_memcache_increment)
+	PHP_FE(memcache_decrement,				arginfo_memcache_decrement)
+	PHP_FE(memcache_close,					arginfo_memcache_close)
+	PHP_FE(memcache_flush,					arginfo_memcache_flush)
+	PHP_FE(memcache_set_sasl_auth_data,		arginfo_memcache_set_sasl_auth_data)
+	ZEND_FE_END
 };
 
+#define arginfo_memcache_object_connect arginfo_memcache_connect
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_addserver, 0, 0, 1)
+	ZEND_ARG_INFO(0, host)
+	ZEND_ARG_INFO(0, port)
+	ZEND_ARG_INFO(0, persistent)
+	ZEND_ARG_INFO(0, weight)
+	ZEND_ARG_INFO(0, timeout)
+	ZEND_ARG_INFO(0, retry_interval)
+	ZEND_ARG_INFO(0, status)
+	ZEND_ARG_INFO(0, failure_callback)
+	ZEND_ARG_INFO(0, timeoutms)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_object_setserverparams arginfo_memcache_set_server_params
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_setfailurecallback, 0, 0, 1)
+	ZEND_ARG_INFO(0, failure_callback)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_object_getserverstatus arginfo_memcache_get_server_status
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_findserver, 0, 0, 1)
+	ZEND_ARG_INFO(0, key)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_getversion, 0, 0, 0)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_add, 0, 0, 1)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, flag)
+	ZEND_ARG_INFO(0, exptime)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_object_set arginfo_memcache_object_add
+#define arginfo_memcache_object_replace arginfo_memcache_object_add
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_cas, 0, 0, 1)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, flag)
+	ZEND_ARG_INFO(0, exptime)
+	ZEND_ARG_INFO(0, cas)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_object_append arginfo_memcache_object_add
+#define arginfo_memcache_object_prepend arginfo_memcache_object_add
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_get, 0, 0, 1)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(1, flags)
+	ZEND_ARG_INFO(1, cas)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_delete, 0, 0, 1)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, exptime)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_getstats, 0, 0, 0)
+	ZEND_ARG_INFO(0, type)
+	ZEND_ARG_INFO(0, slabid)
+	ZEND_ARG_INFO(0, limit)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_object_getextendedstats arginfo_memcache_object_getstats
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_setcompressthreshold, 0, 0, 1)
+	ZEND_ARG_INFO(0, threshold)
+	ZEND_ARG_INFO(0, min_savings)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_increment, 0, 0, 1)
+	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_INFO(0, value)
+	ZEND_ARG_INFO(0, defval)
+	ZEND_ARG_INFO(0, exptime)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_object_decrement arginfo_memcache_object_increment
+
+ZEND_BEGIN_ARG_INFO(arginfo_memcache_object_close, 0)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_flush, 0, 0, 0)
+	ZEND_ARG_INFO(0, delay)
+ZEND_END_ARG_INFO()
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_setSaslAuthData, 0, 0, 2)
+	ZEND_ARG_INFO(0, username)
+	ZEND_ARG_INFO(0, password)
+ZEND_END_ARG_INFO()
+
 static zend_function_entry php_memcache_pool_class_functions[] = {
-	PHP_NAMED_FE(connect,				zif_memcache_pool_connect,			NULL)
-	PHP_NAMED_FE(addserver,				zif_memcache_pool_addserver,		NULL)
-	PHP_FALIAS(setserverparams,			memcache_set_server_params,			NULL)
-	PHP_FALIAS(setfailurecallback,		memcache_set_failure_callback,		NULL)
-	PHP_FALIAS(getserverstatus,			memcache_get_server_status,			NULL)
-	PHP_NAMED_FE(findserver,			zif_memcache_pool_findserver,		NULL)
-	PHP_FALIAS(getversion,				memcache_get_version,				NULL)
-	PHP_FALIAS(add,						memcache_add,						NULL)
-	PHP_FALIAS(set,						memcache_set,						NULL)
-	PHP_FALIAS(replace,					memcache_replace,					NULL)
-	PHP_FALIAS(cas,						memcache_cas,						NULL)
-	PHP_FALIAS(append,					memcache_append,					NULL)
-	PHP_FALIAS(prepend,					memcache_prepend,					NULL)
+	PHP_NAMED_FE(connect,				zif_memcache_pool_connect,			arginfo_memcache_object_connect)
+	PHP_NAMED_FE(addserver,				zif_memcache_pool_addserver,		arginfo_memcache_object_addserver)
+	PHP_FALIAS(setserverparams,			memcache_set_server_params,			arginfo_memcache_object_setserverparams)
+	PHP_FALIAS(setfailurecallback,		memcache_set_failure_callback,		arginfo_memcache_object_setfailurecallback)
+	PHP_FALIAS(getserverstatus,			memcache_get_server_status,			arginfo_memcache_object_getserverstatus)
+	PHP_NAMED_FE(findserver,			zif_memcache_pool_findserver,		arginfo_memcache_object_findserver)
+	PHP_FALIAS(getversion,				memcache_get_version,				arginfo_memcache_object_getversion)
+	PHP_FALIAS(add,						memcache_add,						arginfo_memcache_object_add)
+	PHP_FALIAS(set,						memcache_set,						arginfo_memcache_object_set)
+	PHP_FALIAS(replace,					memcache_replace,					arginfo_memcache_object_replace)
+	PHP_FALIAS(cas,						memcache_cas,						arginfo_memcache_object_cas)
+	PHP_FALIAS(append,					memcache_append,					arginfo_memcache_object_append)
+	PHP_FALIAS(prepend,					memcache_prepend,					arginfo_memcache_object_prepend)
 	PHP_FALIAS(get,						memcache_get,						arginfo_memcache_object_get)
-	PHP_FALIAS(delete,					memcache_delete,					NULL)
-	PHP_FALIAS(getstats,				memcache_get_stats,					NULL)
-	PHP_FALIAS(getextendedstats,		memcache_get_extended_stats,		NULL)
-	PHP_FALIAS(setcompressthreshold,	memcache_set_compress_threshold,	NULL)
-	PHP_FALIAS(increment,				memcache_increment,					NULL)
-	PHP_FALIAS(decrement,				memcache_decrement,					NULL)
-	PHP_FALIAS(close,					memcache_close,						NULL)
-	PHP_FALIAS(flush,					memcache_flush,						NULL)
-	PHP_FALIAS(setSaslAuthData,			memcache_set_sasl_auth_data,				NULL)
-	
-	{NULL, NULL, NULL}
+	PHP_FALIAS(delete,					memcache_delete,					arginfo_memcache_object_delete)
+	PHP_FALIAS(getstats,				memcache_get_stats,					arginfo_memcache_object_getstats)
+	PHP_FALIAS(getextendedstats,		memcache_get_extended_stats,		arginfo_memcache_object_getextendedstats)
+	PHP_FALIAS(setcompressthreshold,	memcache_set_compress_threshold,	arginfo_memcache_object_setcompressthreshold)
+	PHP_FALIAS(increment,				memcache_increment,					arginfo_memcache_object_increment)
+	PHP_FALIAS(decrement,				memcache_decrement,					arginfo_memcache_object_decrement)
+	PHP_FALIAS(close,					memcache_close,						arginfo_memcache_object_close)
+	PHP_FALIAS(flush,					memcache_flush,						arginfo_memcache_object_flush)
+	PHP_FALIAS(setSaslAuthData,			memcache_set_sasl_auth_data,		arginfo_memcache_object_setSaslAuthData)
+	ZEND_FE_END
 };
 
 static zend_function_entry php_memcache_class_functions[] = {
-	PHP_FALIAS(connect,					memcache_connect,					NULL)
-	PHP_FALIAS(pconnect,				memcache_pconnect,					NULL)
-	PHP_FALIAS(addserver,				memcache_add_server,				NULL)
-	{NULL, NULL, NULL}
+	PHP_ME_MAPPING(connect, memcache_connect, arginfo_memcache_connect, ZEND_ACC_PUBLIC)
+	PHP_ME_MAPPING(pconnect, memcache_pconnect, arginfo_memcache_pconnect, ZEND_ACC_PUBLIC)
+	PHP_ME_MAPPING(addserver, memcache_add_server, arginfo_memcache_object_addserver, ZEND_ACC_PUBLIC)
+	ZEND_FE_END
 };
 
 /* }}} */
@@ -269,7 +464,7 @@ static PHP_INI_MH(OnUpdatePrefixStaticKey) /* {{{ */
 	if (new_value) {
 		for (i=0 ; i<ZSTR_LEN(new_value) ; i++) {
 			if (ZSTR_VAL(new_value)[i]=='.') {
-				php_error_docref(NULL TSRMLS_CC, E_WARNING, "memcache.session_prefix_static_key cannot have dot inside (.)");
+				php_error_docref(NULL, E_WARNING, "memcache.session_prefix_static_key cannot have dot inside (.)");
 				return FAILURE;
 			}
 		}
@@ -458,7 +653,7 @@ static char *get_key_prefix() {
  */
 PHP_RINIT_FUNCTION(memcache)
 {
-	MEMCACHE_G(session_key_prefix) = get_session_key_prefix(TSRMLS_C);
+	MEMCACHE_G(session_key_prefix) = get_session_key_prefix();
 
 	return SUCCESS;
 }
@@ -1018,8 +1213,8 @@ static mmc_t *php_mmc_pool_addserver(
 
 	if (pool->protocol == &mmc_binary_protocol) {
 		zval rv1, rv2;
-		zval *username = zend_read_property(memcache_ce, mmc_object, "username", strlen("username"), 1, &rv1);
-		zval *password = zend_read_property(memcache_ce, mmc_object, "password", strlen("password"), 1, &rv2);
+		zval *username = zend_read_property(memcache_ce, Z_OBJ_P(mmc_object), "username", strlen("username"), 1, &rv1);
+		zval *password = zend_read_property(memcache_ce, Z_OBJ_P(mmc_object), "password", strlen("password"), 1, &rv2);
 		if (Z_TYPE_P(username) == IS_STRING && Z_TYPE_P(password) == IS_STRING) {
 			if (Z_STRLEN_P(username) > 1  && Z_STRLEN_P(password) > 1) {
 				mmc_request_t *request;
@@ -1058,7 +1253,7 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 	/* initialize pool and object if need be */
 	if (!mmc_object) {
 		zend_resource *list_res;
-		mmc_pool_t *pool = mmc_pool_new();
+		pool = mmc_pool_new();
 		pool->failure_callback = (mmc_failure_callback) &php_mmc_failure_callback;
 		list_res = zend_register_resource(pool, le_memcache_pool);
 		mmc_object = return_value;
@@ -1241,7 +1436,7 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, zval *param) 
 			}
 			ZVAL_LONG(errnum, mmc->errnum);
 
-			call_user_function_ex(EG(function_table), NULL, callback, &retval, 5, params, 0, NULL);
+			call_user_function(EG(function_table), NULL, callback, &retval, 5, params);
 
 			zval_ptr_dtor(host);
 			zval_ptr_dtor(tcp_port); zval_ptr_dtor(udp_port);
@@ -1252,7 +1447,7 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, zval *param) 
 			}
 		}
 		else {
-			php_mmc_set_failure_callback(pool, (zval *)param, NULL);
+			php_mmc_set_failure_callback(pool, param, NULL);
 			php_error_docref(NULL, E_WARNING, "Invalid failure callback");
 		}
 	}
@@ -1754,6 +1949,9 @@ int mmc_value_handler_multi(
 	if (Z_TYPE_P(result[0]) != IS_ARRAY) {
 		array_init(result[0]);
 	}
+
+	ZEND_ASSERT(key_len > 0);
+
 	add_assoc_zval_ex(result[0], (char *)key, key_len, value);
 
 	/* add flags to result */
@@ -2241,8 +2439,8 @@ PHP_FUNCTION(memcache_set_sasl_auth_data)
 	if (user_length < 1 || password_length < 1) {
 		RETURN_FALSE;
 	}
-	zend_update_property_stringl(memcache_pool_ce, mmc_object, "username", strlen("username"), user, user_length);
-	zend_update_property_stringl(memcache_pool_ce, mmc_object, "password", strlen("password"), password, password_length);
+	zend_update_property_stringl(memcache_pool_ce, Z_OBJ_P(mmc_object), "username", strlen("username"), user, user_length);
+	zend_update_property_stringl(memcache_pool_ce, Z_OBJ_P(mmc_object), "password", strlen("password"), password, password_length);
 	RETURN_TRUE;
 }
 /* }}} */

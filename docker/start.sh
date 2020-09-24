@@ -1,9 +1,8 @@
 #!/bin/bash
 
-CFLAGS="-fstack-protector-strong -fpic -fpie -O2"
-CPPFLAGS="$PHP_CFLAGS"
-LDFLAGS="-Wl,-O1 -Wl,--hash-style=both -pie"
-
+export CFLAGS="-fstack-protector-strong -O2"
+export CPPFLAGS="${CFLAGS}"
+export LDFLAGS="-Wl,-O1 -Wl,--hash-style=both"
 
 # Build extension
 set -eux
@@ -14,10 +13,11 @@ then
     git clone https://github.com/websupport-sk/pecl-memcache.git
 fi 
 
-cd pecl-memcache; 
-phpize 
+cd pecl-memcache;
+[[ -n "${LOCAL_DEV}" ]] && phpize --clean
+phpize
 ./configure 
-make -j$(nproc)
+make -j"$(nproc)"
 
 # Spawn memcached for tests
 echo "Starting memcached... "
@@ -29,4 +29,4 @@ chown memcache:memcache /var/run/memcached
 
 # Let's start tests
 cd /usr/src/pecl-memcache
-TEST_PHP_ARGS="--show-diff --keep-all -w fails.log" make test 
+NO_INTERACTION=1 TEST_PHP_ARGS="--show-diff --keep-all -w fails.log" make test
