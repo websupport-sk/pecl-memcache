@@ -129,7 +129,7 @@ static int mmc_request_parse_mutate(mmc_t *mmc, mmc_request_t *request) /*
 			return request->response_handler(mmc, request, response, line, line_len - (sizeof("\r\n")-1), request->response_handler_param);
 		}
 
-		if (sscanf(line, "%lu", &lval) < 1) {
+		if (sscanf(line, "%ld", &lval) < 1) {
 			return mmc_server_failure(mmc, request->io, "Malformed VALUE header", 0);
 		}
 	

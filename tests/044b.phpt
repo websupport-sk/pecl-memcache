@@ -3,11 +3,6 @@ ini_set('memcache.session_redundancy')
 --SKIPIF--
 <?php
 include 'connect.inc';
-include 'version.inc';
-print(PHP_VERSION_ID);
-if (defined('PHP_VERSION_ID') && (PHP_VERSION_ID > 70200)) {
-    die("skip");
-}
 ?>
 
 --FILE--

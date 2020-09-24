@@ -64,12 +64,13 @@ PS_OPEN_FUNC(memcache)
 	}
 	if (!path) {
 		PS_SET_MOD_DATA(NULL);
+		ZEND_ASSERT(0 && "open");
 		return FAILURE;
 	}
 
 	pool = mmc_pool_new();
 
-	for (i=0,j=0,path_len=strlen(path); i<path_len; i=j+1) {
+	for (i=0,path_len=strlen(path); i<path_len; i=j+1) {
 		/* find beginning of url */
 		while (i<path_len && (isspace(path[i]) || path[i] == ',')) {
 			i++;
@@ -205,6 +206,7 @@ PS_OPEN_FUNC(memcache)
 
 	mmc_pool_free(pool);
 	PS_SET_MOD_DATA(NULL);
+	ZEND_ASSERT(0 &&"open");
 	return FAILURE;
 }
 /* }}} */
@@ -417,6 +419,9 @@ PS_WRITE_FUNC(memcache)
 
 			if (mmc_prepare_key_ex(ZSTR_VAL(key), ZSTR_LEN(key), datarequest->key, &(datarequest->key_len), MEMCACHE_G(session_key_prefix)) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
+				if (lockrequest != NULL) {
+					mmc_pool_release(pool, lockrequest);
+				}
 				break;
 			}
 
@@ -450,6 +455,7 @@ PS_WRITE_FUNC(memcache)
 				 mmc_pool_schedule(pool, mmc, lockrequest) != MMC_OK) {
 				mmc_pool_release(pool, datarequest);
 				mmc_pool_release(pool, lockrequest);
+				lockrequest = NULL;
 				continue;
 			}
 		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers);

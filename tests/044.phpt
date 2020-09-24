@@ -3,12 +3,7 @@ ini_set('memcache.session_redundancy')
 --SKIPIF--
 <?php
 include 'connect.inc';
-include 'version.inc';
-if (defined('PHP_VERSION_ID') && !(PHP_VERSION_ID < 70300)) {
-    die("skip");
-}
 ?>
-
 --FILE--
 <?php
 ob_start();
@@ -23,7 +18,9 @@ ini_set('memcache.session_save_path', "tcp://$host:$port?udp_port=$udpPort, tcp:
 $memcache1 = test_connect1();
 $memcache2 = test_connect2();
 $memcache1->delete($balanceKey1);
+$memcache1->delete($balanceKey2);
 $memcache2->delete($balanceKey1);
+$memcache2->delete($balanceKey2);
 
 // Test set
 session_id($balanceKey1);
@@ -38,7 +35,7 @@ var_dump($result2);
 
 // Test delete
 session_id($balanceKey1);
-@session_start();
+session_start();
 session_destroy();
 
 $result1 = $memcache1->get($balanceKey1);
@@ -48,7 +45,7 @@ var_dump($result2);
 
 // Test lost session on server1
 session_id($balanceKey1);
-@session_start();
+session_start();
 $_SESSION['key'] = 'Test2';
 session_write_close();
 unset($_SESSION['key']);
@@ -63,7 +60,7 @@ session_write_close();
 
 // Test lost session on server2
 session_id($balanceKey2);
-@session_start();
+session_start();
 $_SESSION['key'] = 'Test3';
 session_write_close();
 unset($_SESSION['key']);
@@ -72,7 +69,7 @@ $result = $memcache2->delete($balanceKey1);
 var_dump($result);
 
 session_id($balanceKey2);
-@session_start();
+session_start();
 var_dump($_SESSION);
 session_write_close();
 ob_flush();

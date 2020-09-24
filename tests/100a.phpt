@@ -27,8 +27,16 @@ var_dump($result);
 
 memcache_close($memcache);
 var_dump(memcache_flush($memcache));
-var_dump(memcache_flush(new stdClass));
-var_dump(memcache_flush(''));
+try {
+    var_dump(memcache_flush(new stdClass));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
+try {
+    var_dump(memcache_flush(''));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 echo "Done\n";
 
@@ -38,10 +46,6 @@ bool(true)
 bool(false)
 bool(false)
 bool(true)
-
-Warning: memcache_flush() expects parameter 1 to be MemcachePool, object given in %s on line %d
-NULL
-
-Warning: memcache_flush() expects parameter 1 to be MemcachePool, string given in %s on line %d
-NULL
+memcache_flush(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
+memcache_flush(): Argument #1 ($memcache) must be of type MemcachePool, string given
 Done
