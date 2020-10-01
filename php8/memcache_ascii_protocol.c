@@ -56,10 +56,15 @@ static int mmc_stream_get_line(mmc_stream_t *io, char **line) /*
 }	
 /* }}} */
 
-static int mmc_request_check_response(const char *line, int line_len) /* 
+static int mmc_request_check_response(char *line, int line_len) /*
 	checks for response status and error codes {{{ */
 {
 	int response;
+
+	// remove newline and thus prevent passing it to userland
+	if (line_len >= 2 && line[line_len - 2] == '\r' && line[line_len - 1] == '\n') {
+		line[line_len - 2] = '\0';
+	}
 
 	if (mmc_str_left(line, "OK", line_len, sizeof("OK")-1) ||
 		mmc_str_left(line, "STORED", line_len, sizeof("STORED")-1) ||

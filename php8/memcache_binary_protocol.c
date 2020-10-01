@@ -61,6 +61,12 @@ uint64_t mmc_htonll(uint64_t value);
 # define htonll mmc_htonll
 #endif
 
+#ifdef __GNUC__
+# define MMC_ATTR_PACKED __attribute__((packed))
+#else
+# define MMC_ATTR_PACKED
+#endif /* UD_ATTR_PACKED */
+
 #define MMC_REQUEST_MAGIC	0x80
 #define	MMC_RESPONSE_MAGIC	0x81
 
@@ -79,6 +85,15 @@ uint64_t mmc_htonll(uint64_t value);
 #define MMC_BIN_OP_APPEND		0x0e
 #define MMC_BIN_OP_PREPEND		0x0f
 
+#define MMC_BINARY_STATUS_OK				0x00
+#define MMC_BINARY_STATUS_KEY_NOT_FOUND		0x01
+#define MMC_BINARY_STATUS_KEY_EXISTS		0x02
+#define MMC_BINARY_STATUS_VALUE_TOO_LARGE	0x03
+#define MMC_BINARY_STATUS_INVALID_ARGS		0x04
+#define MMC_BINARY_STATUS_ITEM_NOT_STORED	0x05
+#define MMC_BINARY_STATUS_INCR_DECR_ERROR	0x06 /* Incr/Decr on non-numeric value */
+#define MMC_BINARY_STATUS_UNKNOWN_COMMAND	0x81
+#define MMC_BINARY_STATUS_OUT_OF_MEMORY		0x82
 
 #define MMC_OP_SASL_LIST		0x20
 #define MMC_OP_SASL_AUTH		0x21
@@ -90,7 +105,7 @@ typedef struct mmc_binary_request {
 	mmc_queue_t			keys;					/* mmc_queue_t<zval *>, reqid -> key mappings */
 	struct {
 		uint8_t			opcode;
-		uint8_t			error;					/* error received in current request */
+		uint16_t		error;					/* error received in current request */
 		uint32_t		reqid;					/* current reqid being processed */
 	} command;
 	struct {									/* stores value info while the body is being read */
@@ -107,64 +122,63 @@ typedef struct mmc_request_header {
 	uint8_t		extras_len;
 	uint8_t		datatype;
 	uint16_t	_reserved;
-	uint32_t	length;							/* trailing body length (not including this header) */
+	uint32_t	length;							/* trailing body total_body_length (not including this header) */
 	uint32_t	reqid;							/* opaque request id */
 	uint64_t	cas;
-} mmc_request_header_t;
+} MMC_ATTR_PACKED mmc_request_header_t;
 
 typedef struct mmc_get_request_header {
 	mmc_request_header_t	base;
-} mmc_get_request_header_t;
+} MMC_ATTR_PACKED mmc_get_request_header_t;
 
 typedef struct mmc_version_request_header {
 	mmc_request_header_t	base;
-} mmc_version_request_header_t;
+} MMC_ATTR_PACKED mmc_version_request_header_t;
 
 typedef struct mmc_store_request_header {
 	mmc_request_header_t	base;
 	uint32_t				flags;
 	uint32_t				exptime;
-} mmc_store_request_header_t;
+} MMC_ATTR_PACKED mmc_store_request_header_t;
 
 typedef struct mmc_store_append_header {
 	mmc_request_header_t	base;
-} mmc_store_append_header_t;
+} MMC_ATTR_PACKED mmc_store_append_header_t;
 
 typedef struct mmc_delete_request_header {
 	mmc_request_header_t	base;
-	uint32_t				exptime;
-} mmc_delete_request_header_t;
+} MMC_ATTR_PACKED mmc_delete_request_header_t;
 
 typedef struct mmc_mutate_request_header {
 	mmc_request_header_t	base;
 	uint64_t				delta;
 	uint64_t				initial;
 	uint32_t				expiration;
-} mmc_mutate_request_header_t;
+} MMC_ATTR_PACKED mmc_mutate_request_header_t;
 
 typedef struct mmc_sasl_request_header {
 	mmc_request_header_t	base;
-} mmc_sasl_request_header;
+} MMC_ATTR_PACKED mmc_sasl_request_header;
 
 typedef struct mmc_response_header {
 	uint8_t		magic;
 	uint8_t		opcode;
-	uint16_t	error;
+	uint16_t	key_len;
 	uint8_t		extras_len;
 	uint8_t		datatype;
 	uint16_t	status;
-	uint32_t	length;				/* trailing body length (not including this header) */
+	uint32_t	total_body_length;	/* trailing body total_body_length (not including this header) */
 	uint32_t	reqid;				/* echo'ed from request */
 	uint64_t	cas;
-} mmc_response_header_t;
+} MMC_ATTR_PACKED mmc_response_header_t;
 
 typedef struct mmc_get_response_header {
 	uint32_t				flags;
-} mmc_get_response_header_t;
+} MMC_ATTR_PACKED mmc_get_response_header_t;
 
 typedef struct mmc_mutate_response_header {
 	uint64_t				value;
-} mmc_mutate_response_header_t;
+} MMC_ATTR_PACKED mmc_mutate_response_header_t;
 
 static int mmc_request_read_response(mmc_t *, mmc_request_t *);
 static int mmc_request_parse_value(mmc_t *, mmc_request_t *);
@@ -252,9 +266,40 @@ static int mmc_request_parse_response(mmc_t *mmc, mmc_request_t *request) /*
 		}
 
 		req->command.opcode = header->opcode;
-		req->command.error = ntohs(header->error);
+
+		switch (ntohs(header->status)) {
+			case MMC_BINARY_STATUS_OK:
+				req->command.error = MMC_OK;
+				break;
+			case MMC_BINARY_STATUS_KEY_NOT_FOUND:
+				req->command.error = MMC_RESPONSE_NOT_FOUND;
+				break;
+			case MMC_BINARY_STATUS_KEY_EXISTS:
+				req->command.error = MMC_RESPONSE_EXISTS;
+				break;
+			case MMC_BINARY_STATUS_VALUE_TOO_LARGE:
+				req->command.error = MMC_RESPONSE_TOO_LARGE;
+				break;
+			case MMC_BINARY_STATUS_INVALID_ARGS:
+			case MMC_BINARY_STATUS_INCR_DECR_ERROR:
+				req->command.error = MMC_RESPONSE_CLIENT_ERROR;
+				break;
+			case MMC_BINARY_STATUS_ITEM_NOT_STORED:
+				req->command.error = MMC_RESPONSE_NOT_STORED;
+				break;
+			case MMC_BINARY_STATUS_UNKNOWN_COMMAND:
+				req->command.error = MMC_RESPONSE_UNKNOWN_CMD;
+				break;
+			case MMC_BINARY_STATUS_OUT_OF_MEMORY:
+				req->command.error = MMC_RESPONSE_OUT_OF_MEMORY;
+				break;
+			default:
+				req->command.error = MMC_RESPONSE_UNKNOWN;
+				break;
+		}
+
 		req->command.reqid = ntohl(header->reqid);
-		req->value.length = ntohl(header->length);
+		req->value.length = ntohl(header->total_body_length);
 		req->value.cas = ntohll(header->cas);
 
 		if (req->value.length == 0) {
@@ -434,6 +479,7 @@ static inline void mmc_pack_header(mmc_request_header_t *header, uint8_t opcode,
 	header->_reserved = 0;
 	header->length = htonl(key_len + extras_len + length);
 	header->reqid = htonl(reqid);
+	header->cas = 0;
 }
 /* }}} */
 
@@ -618,8 +664,7 @@ static void mmc_binary_delete(mmc_request_t *request, const char *key, unsigned 
 	request->parse = mmc_request_parse_response;
 	req->next_parse_handler = mmc_request_read_response;
 
-	mmc_pack_header(&(header.base), MMC_OP_DELETE, 0, key_len, sizeof(header) - sizeof(header.base), 0);
-	header.exptime = htonl(exptime);
+	mmc_pack_header(&(header.base), MMC_OP_DELETE, 0, key_len, 0, 0);
 
 	smart_string_appendl(&(request->sendbuf.value), (const char *)&header, sizeof(header));
 	smart_string_appendl(&(request->sendbuf.value), key, key_len);
@@ -659,7 +704,6 @@ static void mmc_binary_mutate(mmc_request_t *request, zval *zkey, const char *ke
 	else {
 		/* server replies with NOT_FOUND if exptime ~0 and key doesn't exist */
 		header.expiration = ~(uint32_t)0;
-		header.expiration = htonl(0x00000e10);
 	}
 
 	/* mutate request is 43 bytes */

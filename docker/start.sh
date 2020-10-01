@@ -29,4 +29,8 @@ chown memcache:memcache /var/run/memcached
 
 # Let's start tests
 cd /usr/src/pecl-memcache
-NO_INTERACTION=1 TEST_PHP_ARGS="--show-diff --keep-all -w fails.log" make test
+export NO_INTERACTION=1
+export TEST_PHP_ARGS="--show-diff --keep-all -w fails.log"
+
+MEMCACHE_PROTOCOL=ascii make test
+MEMCACHE_PROTOCOL=binary make test
