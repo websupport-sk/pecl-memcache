@@ -41,6 +41,24 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(memcache)
 
+#if PHP_VERSION_ID >= 80000
+#define mmc_string_concat2 zend_string_concat2
+#else
+static zend_string* mmc_string_concat2(
+		const char *str1, size_t str1_len,
+		const char *str2, size_t str2_len)
+{
+	size_t len = str1_len + str2_len;
+	zend_string *res = zend_string_alloc(len, 0);
+
+	memcpy(ZSTR_VAL(res), str1, str1_len);
+	memcpy(ZSTR_VAL(res) + str1_len, str2, str2_len);
+	ZSTR_VAL(res)[len] = '\0';
+
+	return res;
+}
+#endif
+
 MMC_POOL_INLINE void mmc_buffer_alloc(mmc_buffer_t *buffer, unsigned int size)  /*
 	ensures space for an additional size bytes {{{ */
 {
@@ -734,7 +752,7 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 	/* check connection and extract socket for select() purposes */
 	if (!io->stream || php_stream_cast(io->stream, PHP_STREAM_AS_FD_FOR_SELECT, (void **)&fd, 1) != SUCCESS) {
 		if (errstr != NULL) {
-			zend_string* error = zend_string_concat2(
+			zend_string* error = mmc_string_concat2(
 				"Connection failed: ", sizeof("Connection failed: ") - 1,
 				ZSTR_VAL(errstr), ZSTR_LEN(errstr));
 

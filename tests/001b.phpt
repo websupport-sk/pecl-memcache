@@ -2,8 +2,8 @@
 memcache_set() function
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80000)
-    die('skip php 8+ only');
+if (PHP_VERSION_ID >= 80000)
+    die('skip php prior to 8 only');
 include 'connect.inc';
 --FILE--
 <?php
@@ -40,6 +40,8 @@ echo "Done\n";
 --EXPECTF--
 int(123)
 int(123)
-Wrong parameter count for memcache_set()
-Wrong parameter count for MemcachePool::set()
+
+Warning: %s parameter%s
+
+Warning: %s parameter%s
 Done

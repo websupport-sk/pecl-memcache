@@ -1214,8 +1214,13 @@ static mmc_t *php_mmc_pool_addserver(
 
 	if (pool->protocol == &mmc_binary_protocol) {
 		zval rv1, rv2;
+#if PHP_VERSION_ID >= 80000
 		zval *username = zend_read_property(memcache_ce, Z_OBJ_P(mmc_object), "username", strlen("username"), 1, &rv1);
 		zval *password = zend_read_property(memcache_ce, Z_OBJ_P(mmc_object), "password", strlen("password"), 1, &rv2);
+#else
+		zval *username = zend_read_property(memcache_ce, mmc_object, "username", strlen("username"), 1, &rv1);
+		zval *password = zend_read_property(memcache_ce, mmc_object, "password", strlen("password"), 1, &rv2);
+#endif
 		if (Z_TYPE_P(username) == IS_STRING && Z_TYPE_P(password) == IS_STRING) {
 			if (Z_STRLEN_P(username) > 1  && Z_STRLEN_P(password) > 1) {
 				mmc_request_t *request;
@@ -2440,8 +2445,13 @@ PHP_FUNCTION(memcache_set_sasl_auth_data)
 	if (user_length < 1 || password_length < 1) {
 		RETURN_FALSE;
 	}
+#if PHP_VERSION_ID >= 80000
 	zend_update_property_stringl(memcache_pool_ce, Z_OBJ_P(mmc_object), "username", strlen("username"), user, user_length);
 	zend_update_property_stringl(memcache_pool_ce, Z_OBJ_P(mmc_object), "password", strlen("password"), password, password_length);
+#else
+	zend_update_property_stringl(memcache_pool_ce, mmc_object, "username", strlen("username"), user, user_length);
+	zend_update_property_stringl(memcache_pool_ce, mmc_object, "password", strlen("password"), password, password_length);
+#endif
 	RETURN_TRUE;
 }
 /* }}} */
