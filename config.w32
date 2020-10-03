@@ -9,8 +9,8 @@ if (PHP_MEMCACHE != "no") {
 		var dll = get_define('PHPDLL');
 		var old_conf_dir = configure_module_dirname;
 
-		if (dll.match(/^php8/) != null) {
-			configure_module_dirname = configure_module_dirname + "\\php8";
+		if (dll.match(/^src/) != null) {
+			configure_module_dirname = configure_module_dirname + "\\src";
 		} else if (dll.match(/^php5/) != null) {
 			ERROR("PHP 7.x required for pecl-php-memcache ver 4+. Use pecl-php-meachce ver 3.x for PHP 5.x.");
 		} else {
