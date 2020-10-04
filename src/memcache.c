@@ -39,123 +39,145 @@ ZEND_EXTERN_MODULE_GLOBALS(memcache)
 /* {{{ memcache_functions[]
  */
 
+#ifndef ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX
+#define ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(name, ref, num, type) \
+			ZEND_BEGIN_ARG_INFO_EX(name, 0u, ref, num)
+#endif
+
+#ifndef ZEND_ARG_TYPE_MASK
+#define ZEND_ARG_TYPE_MASK(ref, name, mask, def) \
+			ZEND_ARG_INFO(ref, name)
+#endif
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_connect, 0, 0, 1)
 	ZEND_ARG_INFO(0, host)
 	ZEND_ARG_INFO(0, port)
-	ZEND_ARG_INFO(0, udp_port)
-	ZEND_ARG_INFO(0, persistent)
-	ZEND_ARG_INFO(0, weight)
 	ZEND_ARG_INFO(0, timeout)
-	ZEND_ARG_INFO(0, retry_interval)
+	ZEND_ARG_INFO(0, unused4)
+	ZEND_ARG_INFO(0, unused5)
+	ZEND_ARG_INFO(0, unused6)
+	ZEND_ARG_INFO(0, unused7)
+	ZEND_ARG_INFO(0, unugsed8)
 ZEND_END_ARG_INFO()
 
 #define arginfo_memcache_pconnect arginfo_memcache_connect
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_add_server, 0, 0, 2)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_add_server, 0, 2, _IS_BOOL, 0)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
 	ZEND_ARG_INFO(0, host)
 	ZEND_ARG_INFO(0, port)
+	ZEND_ARG_INFO(0, tcp_port)
 	ZEND_ARG_INFO(0, persistent)
 	ZEND_ARG_INFO(0, weight)
 	ZEND_ARG_INFO(0, timeout)
 	ZEND_ARG_INFO(0, retry_interval)
 	ZEND_ARG_INFO(0, status)
 	ZEND_ARG_INFO(0, failure_callback)
-	ZEND_ARG_INFO(0, timeoutms)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_server_params, 0, 0, 1)
-	ZEND_ARG_INFO(0, host)
-	ZEND_ARG_INFO(0, port)
-	ZEND_ARG_INFO(0, timeout)
-	ZEND_ARG_INFO(0, retry_interval)
-	ZEND_ARG_INFO(0, status)
-	ZEND_ARG_INFO(0, failure_callback)
-ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_failure_callback, 1, 0, 2)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_set_server_params, 0, 2, _IS_BOOL, 0)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, failure_callback)
+	ZEND_ARG_TYPE_INFO(0, host, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, tcp_port, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, timeout, IS_DOUBLE, 0)
+	ZEND_ARG_TYPE_INFO(0, retry_interval, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, status, _IS_BOOL, 0)
+	ZEND_ARG_INFO(0, failure_callbac)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get_server_status, 0, 0, 1)
-	ZEND_ARG_INFO(0, host)
-	ZEND_ARG_INFO(0, port)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_set_failure_callback, 0, 2, _IS_BOOL, 0)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_TYPE_INFO(0, failure_callback, IS_CALLABLE, 1)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get_version, 1, 0, 1)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_get_server_status, 0, 2, MAY_BE_BOOL|MAY_BE_LONG)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+	ZEND_ARG_TYPE_INFO(0, host, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, tcp_port, IS_LONG, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_get_version, 0, 1, MAY_BE_STRING|MAY_BE_BOOL)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_add, 0, 0, 2)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_add, 0, 2, _IS_BOOL, 0)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, key)
+	ZEND_ARG_TYPE_MASK(0, key, MAY_BE_STRING|MAY_BE_ARRAY, 0)
+#ifdef IS_MIXED
+	ZEND_ARG_TYPE_INFO(0, value, IS_MIXED, 0)
+#else
 	ZEND_ARG_INFO(0, value)
-	ZEND_ARG_INFO(0, flag)
-	ZEND_ARG_INFO(0, exptime)
+#endif
+	ZEND_ARG_TYPE_INFO(0, flags, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, exptime, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, cas, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 #define arginfo_memcache_set arginfo_memcache_add
 #define arginfo_memcache_replace arginfo_memcache_add
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_cas, 0, 0, 2)
-	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, key)
-	ZEND_ARG_INFO(0, value)
-	ZEND_ARG_INFO(0, flag)
-	ZEND_ARG_INFO(0, exptime)
-	ZEND_ARG_INFO(0, cas)
-ZEND_END_ARG_INFO()
-
+#define arginfo_memcache_cas arginfo_memcache_add
 #define arginfo_memcache_append arginfo_memcache_add
 #define arginfo_memcache_prepend arginfo_memcache_add
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get, 1, 0, 2)
+#ifdef IS_MIXED
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_get, 0, 2, IS_MIXED, 0)
+#else
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get, 0, 0, 1)
+#endif
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
 	ZEND_ARG_INFO(0, key)
 	ZEND_ARG_INFO(1, flags)
 	ZEND_ARG_INFO(1, cas)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_delete, 0, 0, 2)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_delete, 0, 2, MAY_BE_BOOL|MAY_BE_ARRAY)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
 	ZEND_ARG_INFO(0, key)
 	ZEND_ARG_INFO(0, exptime)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_debug, 0, 0, 1)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_debug, 0, 1, _IS_BOOL, 0)
 	ZEND_ARG_INFO(0, on_off)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_get_stats, 0, 0, 1)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_get_stats, 0, 1, MAY_BE_BOOL|MAY_BE_ARRAY)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, type)
-	ZEND_ARG_INFO(0, slabid)
-	ZEND_ARG_INFO(0, limit)
+	ZEND_ARG_TYPE_INFO(0, type, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, slabid, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, limit, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 #define arginfo_memcache_get_extended_stats arginfo_memcache_get_stats
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_compress_threshold, 0, 0, 2)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_set_compress_threshold, 0, 2, _IS_BOOL, 0)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, threshold)
-	ZEND_ARG_INFO(0, min_savings)
+	ZEND_ARG_TYPE_INFO(0, threshold, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, min_savings, IS_DOUBLE, 0)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_increment, 0, 0, 2)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_increment, 0, 2, MAY_BE_BOOL|MAY_BE_ARRAY|MAY_BE_LONG)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, key)
-	ZEND_ARG_INFO(0, value)
-	ZEND_ARG_INFO(0, defval)
-	ZEND_ARG_INFO(0, exptime)
+	ZEND_ARG_TYPE_MASK(0, key, MAY_BE_STRING|MAY_BE_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO(0, value, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, defval, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, exptime, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 #define arginfo_memcache_decrement arginfo_memcache_increment
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_close, 0, 0, 1)
-        ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_close, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_flush, 0, 0, 1)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_flush, 0, 1, _IS_BOOL, 0)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, delay)
+	ZEND_ARG_TYPE_INFO(0, delay, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_set_sasl_auth_data, 1, 0, 3)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_set_sasl_auth_data, 0, 3, _IS_BOOL, 0)
 	ZEND_ARG_OBJ_INFO(0, memcache, MemcachePool, 0)
-	ZEND_ARG_INFO(0, username)
-	ZEND_ARG_INFO(0, password)
+	ZEND_ARG_TYPE_INFO(0, username, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, password, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
 zend_function_entry memcache_functions[] = {
@@ -186,99 +208,142 @@ zend_function_entry memcache_functions[] = {
 	ZEND_FE_END
 };
 
-#define arginfo_memcache_object_connect arginfo_memcache_connect
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_addserver, 0, 0, 1)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_pool_object_connect, 0, 0, 1)
 	ZEND_ARG_INFO(0, host)
-	ZEND_ARG_INFO(0, port)
+	ZEND_ARG_INFO(0, tcp_port)
+	ZEND_ARG_INFO(0, udp_port)
+	ZEND_ARG_INFO(0, persistent)
+	ZEND_ARG_INFO(0, weight)
+	ZEND_ARG_INFO(0, timeout)
+	ZEND_ARG_INFO(0, retry_interval)
+ZEND_END_ARG_INFO()
+
+#define arginfo_memcache_object_connect arginfo_memcache_connect
+#define arginfo_memcache_object_pconnect arginfo_memcache_connect
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_pool_object_addserver, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_INFO(0, host)
+	ZEND_ARG_INFO(0, tcp_port)
+	ZEND_ARG_INFO(0, udp_port)
+	ZEND_ARG_INFO(0, persistent)
+	ZEND_ARG_INFO(0, weight)
+	ZEND_ARG_INFO(0, timeout)
+	ZEND_ARG_INFO(0, retry_interval)
+	ZEND_ARG_INFO(0, status)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_addserver, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_INFO(0, host)
+	ZEND_ARG_INFO(0, tcp_port)
 	ZEND_ARG_INFO(0, persistent)
 	ZEND_ARG_INFO(0, weight)
 	ZEND_ARG_INFO(0, timeout)
 	ZEND_ARG_INFO(0, retry_interval)
 	ZEND_ARG_INFO(0, status)
 	ZEND_ARG_INFO(0, failure_callback)
-	ZEND_ARG_INFO(0, timeoutms)
 ZEND_END_ARG_INFO()
 
-#define arginfo_memcache_object_setserverparams arginfo_memcache_set_server_params
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_setfailurecallback, 0, 0, 1)
-	ZEND_ARG_INFO(0, failure_callback)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_setserverparams, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, host, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, tcp_port, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, timeout, IS_DOUBLE, 0)
+	ZEND_ARG_TYPE_INFO(0, retry_interval, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, status, _IS_BOOL, 0)
+	ZEND_ARG_INFO(0, failure_callbac)
 ZEND_END_ARG_INFO()
 
-#define arginfo_memcache_object_getserverstatus arginfo_memcache_get_server_status
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_setfailurecallback, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, failure_callback, IS_CALLABLE, 1)
+ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_findserver, 0, 0, 1)
-	ZEND_ARG_INFO(0, key)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_object_getserverstatus, 0, 1, MAY_BE_BOOL|MAY_BE_LONG)
+	ZEND_ARG_TYPE_INFO(0, host, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, tcp_port, IS_LONG, 0)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_getversion, 0, 0, 0)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_object_findserver, 0, 1, MAY_BE_STRING|MAY_BE_BOOL)
+	ZEND_ARG_TYPE_INFO(0, key, IS_STRING, 0)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_add, 0, 0, 1)
-	ZEND_ARG_INFO(0, key)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_object_getversion, 0, 0, MAY_BE_STRING|MAY_BE_BOOL)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_add, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_MASK(0, key, MAY_BE_STRING|MAY_BE_ARRAY, 0)
+#ifdef IS_MIXED
+	ZEND_ARG_TYPE_INFO(0, value, IS_MIXED, 0)
+#else
 	ZEND_ARG_INFO(0, value)
-	ZEND_ARG_INFO(0, flag)
-	ZEND_ARG_INFO(0, exptime)
+#endif
+	ZEND_ARG_TYPE_INFO(0, flags, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, exptime, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, cas, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 #define arginfo_memcache_object_set arginfo_memcache_object_add
 #define arginfo_memcache_object_replace arginfo_memcache_object_add
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_cas, 0, 0, 1)
-	ZEND_ARG_INFO(0, key)
-	ZEND_ARG_INFO(0, value)
-	ZEND_ARG_INFO(0, flag)
-	ZEND_ARG_INFO(0, exptime)
-	ZEND_ARG_INFO(0, cas)
-ZEND_END_ARG_INFO()
-
+#define arginfo_memcache_object_set arginfo_memcache_object_add
+#define arginfo_memcache_object_cas arginfo_memcache_object_add
 #define arginfo_memcache_object_append arginfo_memcache_object_add
 #define arginfo_memcache_object_prepend arginfo_memcache_object_add
 
+#ifdef IS_MIXED
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_get, 0, 1, IS_MIXED, 0)
+#else
 ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_get, 0, 0, 1)
-	ZEND_ARG_INFO(0, key)
+#endif
+	ZEND_ARG_TYPE_MASK(0, key, MAY_BE_STRING|MAY_BE_ARRAY, 0)
+#ifdef IS_MIXED
+	ZEND_ARG_TYPE_INFO(1, flags, IS_MIXED, 0)
+	ZEND_ARG_TYPE_INFO(1, cas, IS_MIXED, 0)
+#else
 	ZEND_ARG_INFO(1, flags)
 	ZEND_ARG_INFO(1, cas)
+#endif
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_delete, 0, 0, 1)
-	ZEND_ARG_INFO(0, key)
-	ZEND_ARG_INFO(0, exptime)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_object_delete, 0, 1, MAY_BE_BOOL|MAY_BE_ARRAY)
+	ZEND_ARG_TYPE_MASK(0, key, MAY_BE_STRING|MAY_BE_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO(0, exptime, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_getstats, 0, 0, 0)
-	ZEND_ARG_INFO(0, type)
-	ZEND_ARG_INFO(0, slabid)
-	ZEND_ARG_INFO(0, limit)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_object_getstats, 0, 0, MAY_BE_BOOL|MAY_BE_ARRAY)
+	ZEND_ARG_TYPE_INFO(0, type, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, slabid, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, limit, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 #define arginfo_memcache_object_getextendedstats arginfo_memcache_object_getstats
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_setcompressthreshold, 0, 0, 1)
-	ZEND_ARG_INFO(0, threshold)
-	ZEND_ARG_INFO(0, min_savings)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_setcompressthreshold, 0, 1, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, threshold, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, min_savings, IS_DOUBLE, 0)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_increment, 0, 0, 1)
-	ZEND_ARG_INFO(0, key)
-	ZEND_ARG_INFO(0, value)
-	ZEND_ARG_INFO(0, defval)
-	ZEND_ARG_INFO(0, exptime)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_memcache_object_increment, 0, 1, MAY_BE_BOOL|MAY_BE_ARRAY|MAY_BE_LONG)
+	ZEND_ARG_TYPE_MASK(0, key, MAY_BE_STRING|MAY_BE_ARRAY, 0)
+	ZEND_ARG_TYPE_INFO(0, value, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, defval, IS_LONG, 0)
+	ZEND_ARG_TYPE_INFO(0, exptime, IS_LONG, 0)
 ZEND_END_ARG_INFO()
 
 #define arginfo_memcache_object_decrement arginfo_memcache_object_increment
 
-ZEND_BEGIN_ARG_INFO(arginfo_memcache_object_close, 0)
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_close, 0, 0, _IS_BOOL, 0)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_flush, 0, 0, 0)
-	ZEND_ARG_INFO(0, delay)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_flush, 0, 0, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, delay, IS_LONG, 0)
 ZEND_END_ARG_INFO()
-ZEND_BEGIN_ARG_INFO_EX(arginfo_memcache_object_setSaslAuthData, 0, 0, 2)
-	ZEND_ARG_INFO(0, username)
-	ZEND_ARG_INFO(0, password)
+
+ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_setSaslAuthData, 0, 2, _IS_BOOL, 0)
+	ZEND_ARG_TYPE_INFO(0, username, IS_STRING, 0)
+	ZEND_ARG_TYPE_INFO(0, password, IS_STRING, 0)
 ZEND_END_ARG_INFO()
 
 static zend_function_entry php_memcache_pool_class_functions[] = {
-	PHP_NAMED_FE(connect,				zif_memcache_pool_connect,			arginfo_memcache_object_connect)
-	PHP_NAMED_FE(addserver,				zif_memcache_pool_addserver,		arginfo_memcache_object_addserver)
+	PHP_NAMED_FE(connect,				zif_memcache_pool_connect,			arginfo_memcache_pool_object_connect)
+	PHP_NAMED_FE(addserver,				zif_memcache_pool_addserver,		arginfo_memcache_pool_object_addserver)
 	PHP_FALIAS(setserverparams,			memcache_set_server_params,			arginfo_memcache_object_setserverparams)
 	PHP_FALIAS(setfailurecallback,		memcache_set_failure_callback,		arginfo_memcache_object_setfailurecallback)
 	PHP_FALIAS(getserverstatus,			memcache_get_server_status,			arginfo_memcache_object_getserverstatus)
@@ -304,8 +369,8 @@ static zend_function_entry php_memcache_pool_class_functions[] = {
 };
 
 static zend_function_entry php_memcache_class_functions[] = {
-	PHP_ME_MAPPING(connect, memcache_connect, arginfo_memcache_connect, ZEND_ACC_PUBLIC)
-	PHP_ME_MAPPING(pconnect, memcache_pconnect, arginfo_memcache_pconnect, ZEND_ACC_PUBLIC)
+	PHP_ME_MAPPING(connect, memcache_connect, arginfo_memcache_object_connect, ZEND_ACC_PUBLIC)
+	PHP_ME_MAPPING(pconnect, memcache_pconnect, arginfo_memcache_object_pconnect, ZEND_ACC_PUBLIC)
 	PHP_ME_MAPPING(addserver, memcache_add_server, arginfo_memcache_object_addserver, ZEND_ACC_PUBLIC)
 	ZEND_FE_END
 };
@@ -1063,6 +1128,10 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 
 	/* execute all requests */
 	mmc_pool_run(pool);
+
+	if (Z_TYPE_P(return_value) == IS_NULL) {
+		RETURN_FALSE;
+	}
 }
 /* }}} */
 
@@ -1893,6 +1962,10 @@ PHP_FUNCTION(memcache_get_version)
 			}
 		}
 	}
+
+	if (Z_TYPE_P(return_value) == IS_NULL) {
+		RETURN_FALSE;
+	}
 }
 /* }}} */
 
@@ -2085,19 +2158,23 @@ PHP_FUNCTION(memcache_get)
 		if (mmc_prepare_key(keys, request->key, &(request->key_len)) != MMC_OK) {
 			mmc_pool_release(pool, request);
 			php_error_docref(NULL, E_WARNING, "Invalid key");
-			return;
+			RETURN_FALSE;
 		}
 
 		pool->protocol->get(request, cas != NULL ? MMC_OP_GETS : MMC_OP_GET, keys, request->key, request->key_len);
 
 		/* schedule request */
 		if (mmc_pool_schedule_key(pool, request->key, request->key_len, request, 1) != MMC_OK) {
-			return;
+			RETURN_FALSE;
 		}
 	}
 
 	/* execute all requests */
 	mmc_pool_run(pool);
+
+	if (Z_TYPE_P(return_value) == IS_NULL) {
+		RETURN_FALSE;
+	}
 }
 /* }}} */
 
@@ -2204,6 +2281,10 @@ PHP_FUNCTION(memcache_get_stats)
 
 	/* execute all requests */
 	mmc_pool_run(pool);
+
+	if (Z_TYPE_P(return_value) == IS_NULL) {
+		RETURN_FALSE;
+	}
 }
 /* }}} */
 
@@ -2261,6 +2342,10 @@ PHP_FUNCTION(memcache_get_extended_stats)
 
 	/* execute all requests */
 	mmc_pool_run(pool);
+
+	if (Z_TYPE_P(return_value) == IS_NULL) {
+		RETURN_FALSE;
+	}
 }
 /* }}} */
 
@@ -2461,6 +2546,8 @@ PHP_FUNCTION(memcache_set_sasl_auth_data)
 PHP_FUNCTION(memcache_debug)
 {
 	php_error_docref(NULL, E_WARNING, "memcache_debug() is deprecated, please use a debugger (like Eclipse + CDT)");
+
+	RETVAL_BOOL(PHP_DEBUG);
 }
 /* }}} */
 
