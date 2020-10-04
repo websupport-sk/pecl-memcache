@@ -425,6 +425,7 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 			PHP_VAR_SERIALIZE_DESTROY(value_hash);
 
 			if (!buf.s) {
+				zval_dtor(&value_copy);
 				php_error_docref(NULL, E_WARNING, "Failed to serialize value");
 				return MMC_REQUEST_FAILURE;
 			}
