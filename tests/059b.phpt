@@ -87,7 +87,7 @@ Class [ <internal:memcache> class MemcachePool ] {
         Parameter #2 [ <optional> float $timeout ]
         Parameter #3 [ <optional> int $retry_interval ]
         Parameter #4 [ <optional> bool $status ]
-        Parameter #5 [ <optional> $failure_callbac ]
+        Parameter #5 [ <optional> $failure_callback ]
       }
       - Return [ bool ]
     }
@@ -348,7 +348,7 @@ Class [ <internal:memcache> class Memcache extends MemcachePool ] {
         Parameter #2 [ <optional> float $timeout ]
         Parameter #3 [ <optional> int $retry_interval ]
         Parameter #4 [ <optional> bool $status ]
-        Parameter #5 [ <optional> $failure_callbac ]
+        Parameter #5 [ <optional> $failure_callback ]
       }
       - Return [ bool ]
     }
@@ -594,7 +594,7 @@ Function [ <internal:memcache> function memcache_set_server_params ] {
     Parameter #3 [ <optional> float $timeout ]
     Parameter #4 [ <optional> int $retry_interval ]
     Parameter #5 [ <optional> bool $status ]
-    Parameter #6 [ <optional> $failure_callbac ]
+    Parameter #6 [ <optional> $failure_callback ]
   }
   - Return [ bool ]
 }

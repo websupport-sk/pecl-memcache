@@ -82,7 +82,7 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_set_server_params, 0, 2
 	ZEND_ARG_TYPE_INFO(0, timeout, IS_DOUBLE, 0)
 	ZEND_ARG_TYPE_INFO(0, retry_interval, IS_LONG, 0)
 	ZEND_ARG_TYPE_INFO(0, status, _IS_BOOL, 0)
-	ZEND_ARG_INFO(0, failure_callbac)
+	ZEND_ARG_INFO(0, failure_callback)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_set_failure_callback, 0, 2, _IS_BOOL, 0)
@@ -249,7 +249,7 @@ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_setserverparams,
 	ZEND_ARG_TYPE_INFO(0, timeout, IS_DOUBLE, 0)
 	ZEND_ARG_TYPE_INFO(0, retry_interval, IS_LONG, 0)
 	ZEND_ARG_TYPE_INFO(0, status, _IS_BOOL, 0)
-	ZEND_ARG_INFO(0, failure_callbac)
+	ZEND_ARG_INFO(0, failure_callback)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_memcache_object_setfailurecallback, 0, 1, _IS_BOOL, 0)
