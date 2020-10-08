@@ -10,13 +10,20 @@ include 'connect.inc';
 $var = 'test';
 $key = "test\r\n\0 - really strange key";
 
-memcache_set($memcache, $key, $var, false, 10);
+memcache_set($memcache, $key, $var, false);
 $result = memcache_get($memcache, $key);
+var_dump($result);
+
 $result = memcache_get($memcache, $key."1");
 var_dump($result);
 
-$result = memcache_get($memcache, Array($key, $key."1"));
-var_dump($result);
+$result = memcache_get($memcache, array($key, $key."1"));
+var_dump(count($result));
+
+if (is_array($result)) {
+	$keys = array_keys($result);
+	var_dump(strtr($keys[0], "\r\n\0", "___"));
+}
 
 // Test empty key
 $result = memcache_set($memcache, '', 'test1');
@@ -94,21 +101,38 @@ var_dump($result);
 $result = $memcache->get(array($key));
 var_dump($result);
 
+// Array keys
+$memcache->set('test_key', 'value');
+$result = $memcache->get(array('test_key'));
+var_dump($result['test_key']);
+
+// Long keys
+var_dump(memcache_increment($memcache, 'forum_thread.php_55461ANDis_show=1ORDERBYis_topDESC,update_timeDESC_0', 1));
+
+// Whitespace key
+$values = array(' ' => 'value', 'test test' => 'value2');
+$result = $memcache->set($values);
+var_dump($result);
+
+$keys = array_keys($values);
+$result = $memcache->get($keys);
+var_dump($keys);
+var_dump(array_values($result));
+
 ?>
 --EXPECTF--
+string(4) "test"
 bool(false)
-array(1) {
-  ["test____-_really_strange_key"]=>
-  string(4) "test"
-}
+int(1)
+string(28) "%s"
 
-Warning: memcache_set(): Key cannot be empty %s
-bool(false)
-
-Warning: memcache_get(): Key cannot be empty %s
+Warning: memcache_set(): %s
 bool(false)
 
-Warning: memcache_get(): Key cannot be empty %s
+Warning: memcache_get(): %s
+bool(false)
+
+Warning: memcache_get(): %s
 array(2) {
   ["test_key1"]=>
   string(5) "test1"
@@ -116,13 +140,13 @@ array(2) {
   string(5) "test2"
 }
 
-Warning: memcache_get(): Key cannot be empty %s
+Warning: memcache_get(): %s
 bool(false)
 
-Warning: memcache_increment(): Key cannot be empty %s
+Warning: memcache_increment(): %s
 bool(false)
 
-Warning: memcache_delete(): Key cannot be empty %s
+Warning: memcache_delete(): %s
 bool(false)
 int(123)
 int(123)
@@ -157,4 +181,19 @@ string(5) "test1"
 array(1) {
   ["abcÿabc"]=>
   string(5) "test1"
+}
+string(5) "value"
+bool(false)
+bool(true)
+array(2) {
+  [0]=>
+  string(1) " "
+  [1]=>
+  string(9) "test test"
+}
+array(2) {
+  [0]=>
+  string(5) "value"
+  [1]=>
+  string(6) "value2"
 }

@@ -27,7 +27,8 @@ var_dump($result3);
 var_dump($result4);
 
 $result = $memcache->get(array($balanceKey1, $balanceKey2));
-sort($result);
+if (is_array($result))
+	sort($result);
 var_dump($result);
 
 ini_set('memcache.allow_failover', 0);
@@ -39,7 +40,8 @@ var_dump($result1);
 var_dump($result2);
 
 $result = $memcache->get(array($balanceKey1, $balanceKey2));
-sort($result);
+if (is_array($result))
+	sort($result);
 var_dump($result);
 
 $result = ini_set('memcache.allow_failover', "abc");

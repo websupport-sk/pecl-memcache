@@ -1,0 +1,68 @@
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+
+# Tests-generated stuff
+tests/*.diff
+tests/*.php
+tests/*.out
+tests/*.sh
+tests/*.log
+tests/*.exp
+
+*.fragments
+Makefile*
+autom4te*
+aclocal*
+.libs/
+acinclude.m4
+build/
+config.guess
+config.h
+config.h.in
+config.log
+config.nice
+config.status
+config.sub
+configure
+configure.in
+install-sh
+libtool
+ltmain.sh
+missing
+mkinstalldirs
+run-tests.php
+fails.log
+configure.ac
+*.code-workspace
+.vscode/*
+.idea/

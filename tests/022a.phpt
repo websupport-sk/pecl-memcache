@@ -1,7 +1,10 @@
 --TEST--
 memcache_get_extended_stats()
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
+<?php
+if (PHP_VERSION_ID < 80000)
+    die('skip php 8+ only');
+include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); if (ini_get('memcache.protocol') == 'binary') die('skip binary protocol does not support stats');
 --FILE--
 <?php
 
@@ -14,8 +17,16 @@ memcache_add_server($memcache, $host2, $port2);
 
 $result1 = @memcache_get_stats($memcache);
 $result2 = @memcache_get_extended_stats($memcache);
-var_dump(memcache_get_extended_stats(array()));
-var_dump(memcache_get_extended_stats(new stdClass));
+try {
+    var_dump(memcache_get_extended_stats(array()));
+} catch (TypeError $e) {
+     echo "{$e->getMessage()}\n";
+}
+try {
+    var_dump(memcache_get_extended_stats(new stdClass));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 var_dump($result1['pid']);
 
@@ -26,11 +37,8 @@ var_dump($result2["$nonExistingHost:$nonExistingPort"]);
 
 ?>
 --EXPECTF--
-Warning: memcache_get_extended_stats() expects parameter 1 to be Memcache, array given in %s on line %d
-NULL
-
-Warning: memcache_get_extended_stats() expects parameter 1 to be Memcache, object given in %s on line %d
-NULL
+memcache_get_extended_stats(): Argument #1 ($memcache) must be of type MemcachePool, array given
+memcache_get_extended_stats(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
 string(%d) "%d"
 int(3)
 string(%d) "%d"

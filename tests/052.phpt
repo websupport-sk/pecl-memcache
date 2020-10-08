@@ -11,14 +11,14 @@ $start = time();
 $count = 100;
 
 $memcache = new Memcache();
-$memcache->connect($host, $port, false);
+$memcache->connect($host, $port);
 
 $key = 'test_key';
 $memcache->set($key, 'test');
 $memcache->close();
 
 for ($i=0; $i<$count; $i++) {
-	$memcache->connect($host, $port, false);
+	$memcache->connect($host, $port);
 	$result = $memcache->get($key);
 	
 	if (!$result) {
@@ -29,8 +29,12 @@ for ($i=0; $i<$count; $i++) {
 }
 
 $end = time();
-printf("%d seconds", $end - $start);
+if (($end - $start) < 2) {
+	echo "true";
+} else {
+	echo "false";
+}
 
 ?>
 --EXPECT--
-0 seconds
+true

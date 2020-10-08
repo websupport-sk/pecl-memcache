@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Authors: Antony Dovgal <tony@daylessday.org>                         |
+  | Authors: Antony Dovgal <tony2001@phpclub.net>                        |
   |          Mikael Johansson <mikael AT synd DOT info>                  |
   +----------------------------------------------------------------------+
 */
@@ -26,7 +26,7 @@
 #include "php.h"
 #include "memcache_queue.h"
 
-void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
+MMC_QUEUE_INLINE void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
 	if (mmc_queue_contains(queue, ptr)) return;
 
 	if (queue->len >= queue->alloc) {
@@ -53,7 +53,7 @@ void mmc_queue_push(mmc_queue_t *queue, void *ptr) {
 	queue->len++;
 }
 
-void *mmc_queue_pop(mmc_queue_t *queue) {
+MMC_QUEUE_INLINE void *mmc_queue_pop(mmc_queue_t *queue) {
 	if (queue->len) {
 		void *ptr;
 		
@@ -73,7 +73,7 @@ void *mmc_queue_pop(mmc_queue_t *queue) {
 	return NULL;
 }
 
-int mmc_queue_contains(mmc_queue_t *queue, void *ptr) {
+MMC_QUEUE_INLINE int mmc_queue_contains(mmc_queue_t *queue, void *ptr) {
 	if (queue != NULL) {
 		int i;
 		
@@ -87,17 +87,17 @@ int mmc_queue_contains(mmc_queue_t *queue, void *ptr) {
 	return 0;
 }
 
-void mmc_queue_free(mmc_queue_t *queue) {
+MMC_QUEUE_INLINE void mmc_queue_free(mmc_queue_t *queue) {
 	if (queue->items != NULL) {
 		efree(queue->items);
 	}
-	memset(queue, 0, sizeof(*queue));
+	ZEND_SECURE_ZERO(queue, sizeof(*queue));
 }
 
-void mmc_queue_copy(mmc_queue_t *source, mmc_queue_t *target) {
+MMC_QUEUE_INLINE void mmc_queue_copy(mmc_queue_t *target, mmc_queue_t *source) {
 	if (target->alloc != source->alloc) {
 		target->alloc = source->alloc;
-		erealloc(target->items, sizeof(*target->items) * target->alloc);
+		target->items = erealloc(target->items, sizeof(*target->items) * target->alloc);
 	}
 	
 	memcpy(target->items, source->items, sizeof(*source->items) * source->alloc);
@@ -106,7 +106,7 @@ void mmc_queue_copy(mmc_queue_t *source, mmc_queue_t *target) {
 	target->len = source->len;
 }
 
-void mmc_queue_remove(mmc_queue_t *queue, void *ptr) { 
+MMC_QUEUE_INLINE void mmc_queue_remove(mmc_queue_t *queue, void *ptr) { 
 	void *item;
 	mmc_queue_t original = *queue;
 	mmc_queue_release(queue);

@@ -1,7 +1,10 @@
 --TEST--
 memcache_close(), memcache_get()
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
+<?php
+if (PHP_VERSION_ID < 80000)
+    die('skip php 8+ only');
+include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
 --FILE--
 <?php
 
@@ -29,8 +32,16 @@ var_dump($result5);
 
 var_dump(memcache_close($memcache));
 var_dump(memcache_close($memcache));
-var_dump(memcache_close(new stdClass));
-var_dump(memcache_close(""));
+try {
+    var_dump(memcache_close(new stdClass));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
+try {
+    var_dump(memcache_close(""));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 echo "Done\n";
 
@@ -43,10 +54,6 @@ bool(true)
 bool(false)
 bool(true)
 bool(true)
-
-Warning: memcache_close() expects parameter 1 to be Memcache, object given in %s on line %d
-NULL
-
-Warning: memcache_close() expects parameter 1 to be Memcache, string given in %s on line %d
-NULL
+memcache_close(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
+memcache_close(): Argument #1 ($memcache) must be of type MemcachePool, string given
 Done

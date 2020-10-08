@@ -1,7 +1,10 @@
 --TEST--
 memcache_add_server()
 --SKIPIF--
-<?php include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
+<?php
+if (PHP_VERSION_ID < 80000)
+    die('skip php 8+ only');
+include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
 --FILE--
 <?php
 
@@ -9,8 +12,18 @@ include 'connect.inc';
 
 var_dump(memcache_add_server($memcache, $host2, $port2));
 var_dump(memcache_add_server($memcache, $nonExistingHost, $nonExistingPort));
-var_dump(memcache_add_server(new stdclass, $host2, $port2));
-var_dump(memcache_add_server($memcache, new stdclass, array()));
+
+try {
+    var_dump(memcache_add_server(new stdclass, $host2, $port2));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
+
+try {
+    var_dump(memcache_add_server($memcache, new stdclass, array()));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 echo "Done\n";
 
@@ -18,10 +31,6 @@ echo "Done\n";
 --EXPECTF--
 bool(true)
 bool(true)
-
-Warning: memcache_add_server() expects parameter 1 to be Memcache, object given in %s on line %d
-NULL
-
-Warning: memcache_add_server() expects parameter 2 to be string, object given in %s on line %d
-NULL
+memcache_add_server(): Argument #1 ($memcache) must be of type Memcache, stdClass given
+memcache_add_server(): Argument #2 ($host) must be of type string, stdClass given
 Done

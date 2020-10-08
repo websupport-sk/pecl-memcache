@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Authors: Antony Dovgal <tony@daylessday.org>                         |
+  | Authors: Antony Dovgal <tony2001@phpclub.net>                        |
   |          Mikael Johansson <mikael AT synd DOT info>                  |
   +----------------------------------------------------------------------+
 */
@@ -41,13 +41,13 @@ typedef struct mmc_consistent_state {
 	int						num_points;
 	mmc_t					*buckets[MMC_CONSISTENT_BUCKETS];
 	int						buckets_populated;
-	mmc_hash_function		hash;
+	mmc_hash_function_t		*hash;
 } mmc_consistent_state_t;
 
-void *mmc_consistent_create_state(mmc_hash_function hash) /* {{{ */
+void *mmc_consistent_create_state(mmc_hash_function_t *hash) /* {{{ */
 {
 	mmc_consistent_state_t *state = emalloc(sizeof(mmc_consistent_state_t));
-	memset(state, 0, sizeof(mmc_consistent_state_t));
+	ZEND_SECURE_ZERO(state, sizeof(mmc_consistent_state_t));
 	state->hash = hash;
 	return state;
 }
@@ -89,7 +89,6 @@ static mmc_t *mmc_consistent_find(mmc_consistent_state_t *state, unsigned int po
 
 		/* test middle point */
 		mid = lo + (hi - lo) / 2;
-		MMC_DEBUG(("mmc_consistent_find: lo %d, hi %d, mid %d, point %u, midpoint %u", lo, hi, mid, point, state->points[mid].point));
 
 		/* perfect match */
 		if (point <= state->points[mid].point && point > (mid ? state->points[mid-1].point : 0)) {
@@ -120,38 +119,22 @@ static void mmc_consistent_populate_buckets(mmc_consistent_state_t *state) /* {{
 }
 /* }}} */
 
-mmc_t *mmc_consistent_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
+mmc_t *mmc_consistent_find_server(void *s, const char *key, unsigned int key_len) /* {{{ */
 {
 	mmc_consistent_state_t *state = s;
-	mmc_t *mmc;
 
 	if (state->num_servers > 1) {
-		unsigned int i, hash = state->hash(key, key_len);
+		unsigned int hash;
 
 		if (!state->buckets_populated) {
 			mmc_consistent_populate_buckets(state);
 		}
-
-		mmc = state->buckets[hash % MMC_CONSISTENT_BUCKETS];
-
-		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
-			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
-			int next_len = sprintf(next_key, "%s-%d", key, i);
-			MMC_DEBUG(("mmc_consistent_find_server: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
-
-			hash = state->hash(next_key, next_len);
-			mmc = state->buckets[hash % MMC_CONSISTENT_BUCKETS];
-
-			efree(next_key);
-		}
-	}
-	else {
-		mmc = state->points[0].server;
-		mmc_open(mmc, 0, NULL, NULL TSRMLS_CC);
+		
+		hash = mmc_hash(state->hash, key, key_len);
+		return state->buckets[hash % MMC_CONSISTENT_BUCKETS];
 	}
 
-	return mmc->status != MMC_STATUS_FAILED ? mmc : NULL;
+	return state->points[0].server;
 }
 /* }}} */
 
@@ -159,18 +142,21 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 {
 	mmc_consistent_state_t *state = s;
 	int i, key_len, points = weight * MMC_CONSISTENT_POINTS;
-
+	unsigned int seed = state->hash->init(), hash;
+	
 	/* buffer for "host:port-i\0" */
 	char *key = emalloc(strlen(mmc->host) + MAX_LENGTH_OF_LONG * 2 + 3);
+	key_len = sprintf(key, "%s:%d-", mmc->host, mmc->tcp.port);
+	seed = state->hash->combine(seed, key, key_len);
 
 	/* add weight * MMC_CONSISTENT_POINTS number of points for this server */
-	state->points = erealloc(state->points, sizeof(mmc_consistent_point_t) * (state->num_points + points));
+	state->points = erealloc(state->points, sizeof(*state->points) * (state->num_points + points));
 
 	for (i=0; i<points; i++) {
-		key_len = sprintf(key, "%s:%d-%d", mmc->host, mmc->port, i);
+		key_len = sprintf(key, "%d", i);
+		hash = state->hash->finish(state->hash->combine(seed, key, key_len));
 		state->points[state->num_points + i].server = mmc;
-		state->points[state->num_points + i].point = state->hash(key, key_len);
-		MMC_DEBUG(("mmc_consistent_add_server: key %s, point %lu", key, state->points[state->num_points + i].point));
+		state->points[state->num_points + i].point = hash;
 	}
 
 	state->num_points += points;
@@ -181,7 +167,7 @@ void mmc_consistent_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ 
 }
 /* }}} */
 
-mmc_hash_t mmc_consistent_hash = {
+mmc_hash_strategy_t mmc_consistent_hash = {
 	mmc_consistent_create_state,
 	mmc_consistent_free_state,
 	mmc_consistent_find_server,

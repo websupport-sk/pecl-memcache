@@ -8,18 +8,20 @@ memcache->getVersion() & memcache->getStats()
 include 'connect.inc';
 
 $version = $memcache->getVersion();
+var_dump($version);
 
 $stats = $memcache->getStats();
-
-if ($version) {
-	echo "version ok\n";
+if (ini_get('memcache.protocol') == 'binary') {
+	var_dump($stats === false);
+	var_dump(1);
 }
-
-if ($stats) {
-	echo "stats ok\n";
+else {
+	var_dump(count($stats) > 10);
+	var_dump(count($stats));
 }
 
 ?>
---EXPECT--
-version ok
-stats ok
+--EXPECTF--
+string(%d) "%s"
+bool(true)
+int(%d)

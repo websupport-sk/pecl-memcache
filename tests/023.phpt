@@ -17,13 +17,13 @@ $memcache->addServer($host2, $port2);
 $memcache1 = memcache_connect($host, $port);
 $memcache2 = memcache_connect($host2, $port2);
 
-$memcache1->set($balanceKey1, '', false, 2);
-$memcache1->set($balanceKey2, '', false, 2);
-$memcache2->set($balanceKey1, '', false, 2);
-$memcache2->set($balanceKey2, '', false, 2);
+$memcache1->set($balanceKey1, '', 0, 10);
+$memcache1->set($balanceKey2, '', 0, 10);
+$memcache2->set($balanceKey1, '', 0, 10);
+$memcache2->set($balanceKey2, '', 0, 10);
 
-$result1 = $memcache->set($balanceKey1, $var1, false, 2); 	// hashes to host2
-$result2 = $memcache->set($balanceKey2, $var2, false, 2);	// hashes to host1
+$result1 = $memcache->set($balanceKey1, $var1, 0, 10); 	// hashes to host2
+$result2 = $memcache->set($balanceKey2, $var2, 0, 10);	// hashes to host1
 $result3 = $memcache->get($balanceKey1);
 $result4 = $memcache->get($balanceKey2);
 

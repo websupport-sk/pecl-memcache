@@ -17,7 +17,7 @@ var_dump($result);
 // Should generate a "SERVER_ERROR: out of memory"
 $var = str_repeat('a', 1500000);
 $memcache->setCompressThreshold(0);
-$result = $memcache->set('test_key', $var, false, 10);
+$result = @$memcache->set('test_key', $var, false, 10);
 var_dump($result);
 
 echo "Done\n";

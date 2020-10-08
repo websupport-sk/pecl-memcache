@@ -12,7 +12,14 @@ http://pear.php.net/dtd/package-2.0.xsd">
     storing objects in memory.
     This extension allows you to work with memcached through
     handy OO and procedural interfaces.
+    The extension allows use to store sessions in memcached via memcache.
   </description>
+  <lead>
+    <name>Tomas Srnka</name>
+    <user>tomassrnka</user>
+    <email>tomas.srnka@gmail.com</email>
+    <active>yes</active>
+  </lead>
   <lead>
     <name>Antony Dovgal</name>
     <user>tony2001</user>
@@ -23,18 +30,24 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <name>Mikael Johansson</name>
     <user>mikl</user>
     <email>mikael@synd.info</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
   <lead>
-    <name>Herman Radtke</name>
+    <name>Pierre-Alain Joye</name>
+    <user>pajoye</user>
+    <email>pierre.php@gmail.com</email>
+    <active>no</active>
+  </lead>
+  <lead>
+    <name>Herman J. Radtke III</name>
     <user>hradtke</user>
     <email>hradtke@php.net</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
-  <date>2012-09-22</date>
+  <date>2019-12-20</date>
   <version>
-    <release>2.2.7</release>
-    <api>2.2.7</api>
+    <release>4.0.5.2</release>
+    <api>4.0.5.2</api>
   </version>
   <stability>
     <release>stable</release>
@@ -42,87 +55,122 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
-    - PHP 5.4 compatibility
-    - Fixed return value error get_host_port_from_server().
-    - Fixed PECL Bug #16672 (memcache.php doesn't support unix socket)
-    - Fixed pecl bug #19374 (memcache.php throws Notice: Undefined index: VALUE when viewing expired items)
+   - Version 4.x supports PHP 7.0-7.4. 
+   - Version 4.x is considered to be stable for production usage. 
+   - Support for PHP 5.x has been removed, please use memcache extension ver. 3.x 
+   - Special thanks to Frantisek Drojak - thesource93 (github) for making this happen
   </notes>
   <contents>
     <dir name="/">
+      <dir name="docker">
+        <file name="host.conf" role="src" />
+        <file name="start.sh" role="src" />
+      </dir>
+      <dir name="src">
+        <file name="memcache.c" role="src" />
+        <file name="memcache_pool.c" role="src" />
+        <file name="memcache_queue.c" role="src" />
+        <file name="memcache_session.c" role="src" />
+        <file name="memcache_ascii_protocol.c" role="src" />
+        <file name="memcache_binary_protocol.c" role="src" />
+        <file name="memcache_standard_hash.c" role="src" />
+        <file name="memcache_consistent_hash.c" role="src" />
+        <file name="php_memcache.h" role="src" />
+        <file name="memcache_pool.h" role="src" />
+        <file name="memcache_queue.h" role="src" />
+      </dir>
       <file name="config.m4" role="src" />
       <file name="config9.m4" role="src" />
       <file name="config.w32" role="src" />
       <file name="CREDITS" role="doc" />
       <file name="LICENSE" role="doc" />
       <file name="example.php" role="doc" />
-      <file name="memcache.c" role="src" />
-      <file name="memcache_queue.c" role="src" />
-      <file name="memcache_session.c" role="src" />
-      <file name="memcache_standard_hash.c" role="src" />
-      <file name="memcache_consistent_hash.c" role="src" />
-      <file name="memcache.dsp" role="src" />
-      <file name="php_memcache.h" role="src" />
-      <file name="memcache_queue.h" role="src" />
       <file name="README" role="doc" />
       <file name="memcache.php" role="doc" />
-      <file name="tests/001.phpt" role="test" />
-      <file name="tests/002.phpt" role="test" />
-      <file name="tests/003.phpt" role="test" />
-      <file name="tests/004.phpt" role="test" />
-      <file name="tests/005.phpt" role="test" />
-      <file name="tests/006.phpt" role="test" />
-      <file name="tests/007.phpt" role="test" />
-      <file name="tests/008.phpt" role="test" />
-      <file name="tests/009.phpt" role="test" />
-      <file name="tests/010.phpt" role="test" />
-      <file name="tests/011.phpt" role="test" />
-      <file name="tests/012.phpt" role="test" />
-      <file name="tests/013.phpt" role="test" />
-      <file name="tests/014.phpt" role="test" />
-      <file name="tests/015.phpt" role="test" />
-      <file name="tests/016.phpt" role="test" />
-      <file name="tests/017.phpt" role="test" />
-      <file name="tests/018.phpt" role="test" />
-      <file name="tests/019a.phpt" role="test" />
-      <file name="tests/019.phpt" role="test" />
-      <file name="tests/020.phpt" role="test" />
-      <file name="tests/021.phpt" role="test" />
-      <file name="tests/022a.phpt" role="test" />
-      <file name="tests/022.phpt" role="test" />
-      <file name="tests/023.phpt" role="test" />
-      <file name="tests/024a.phpt" role="test" />
-      <file name="tests/024.phpt" role="test" />
-      <file name="tests/025.phpt" role="test" />
-      <file name="tests/026.phpt" role="test" />
-      <file name="tests/027a.phpt" role="test" />
-      <file name="tests/027.phpt" role="test" />
-      <file name="tests/028.phpt" role="test" />
-      <file name="tests/029.phpt" role="test" />
-      <file name="tests/030.phpt" role="test" />
-      <file name="tests/031.phpt" role="test" />
-      <file name="tests/032.phpt" role="test" />
-      <file name="tests/033.phpt" role="test" />
-      <file name="tests/034.phpt" role="test" />
-      <file name="tests/035.phpt" role="test" />
-      <file name="tests/036.phpt" role="test" />
-      <file name="tests/037.phpt" role="test" />
-      <file name="tests/045.phpt" role="test" />
-      <file name="tests/046.phpt" role="test" />
-      <file name="tests/047.phpt" role="test" />
-      <file name="tests/050.phpt" role="test" />
-      <file name="tests/051.phpt" role="test" />
-      <file name="tests/052.phpt" role="test" />
-      <file name="tests/053.phpt" role="test" />
-      <file name="tests/100a.phpt" role="test" />
-      <file name="tests/100.phpt" role="test" />
-      <file name="tests/pecl11221.phpt" role="test" />
-      <file name="tests/pecl16536.phpt" role="test" />
+      <file name="Dockerfile" role="src" />
+      <file name="cloudbuild.yaml" role="src" />
+      <file name ="tests/connect.inc" role="test" />
+      <file name ="tests/memcache.sh" role="test" />
+      <file name ="tests/001.phpt" role="test" />
+      <file name ="tests/002.phpt" role="test" />
+      <file name ="tests/003.phpt" role="test" />
+      <file name ="tests/004.phpt" role="test" />
+      <file name ="tests/005.phpt" role="test" />
+      <file name ="tests/006.phpt" role="test" />
+      <file name ="tests/007.phpt" role="test" />
+      <file name ="tests/008.phpt" role="test" />
+      <file name ="tests/009.phpt" role="test" />
+      <file name ="tests/010.phpt" role="test" />
+      <file name ="tests/011.phpt" role="test" />
+      <file name ="tests/012.phpt" role="test" />
+      <file name ="tests/013.phpt" role="test" />
+      <file name ="tests/014.phpt" role="test" />
+      <file name ="tests/015.phpt" role="test" />
+      <file name ="tests/016.phpt" role="test" />
+      <file name ="tests/017.phpt" role="test" />
+      <file name ="tests/018.phpt" role="test" />
+      <file name ="tests/019a.phpt" role="test" />
+      <file name ="tests/019.phpt" role="test" />
+      <file name ="tests/020.phpt" role="test" />
+      <file name ="tests/021.phpt" role="test" />
+      <file name ="tests/022a.phpt" role="test" />
+      <file name ="tests/022.phpt" role="test" />
+      <file name ="tests/023.phpt" role="test" />
+      <file name ="tests/024a.phpt" role="test" />
+      <file name ="tests/024.phpt" role="test" />
+      <file name ="tests/025.phpt" role="test" />
+      <file name ="tests/026.phpt" role="test" />
+      <file name ="tests/027a.phpt" role="test" />
+      <file name ="tests/027.phpt" role="test" />
+      <file name ="tests/028.phpt" role="test" />
+      <file name ="tests/029.phpt" role="test" />
+      <file name ="tests/030.phpt" role="test" />
+      <file name ="tests/031.phpt" role="test" />
+      <file name ="tests/032.phpt" role="test" />
+      <file name ="tests/033.phpt" role="test" />
+      <file name ="tests/034.phpt" role="test" />
+      <file name ="tests/035.phpt" role="test" />
+      <file name ="tests/036.phpt" role="test" />
+      <file name ="tests/036b.phpt" role="test" />
+      <file name ="tests/037.phpt" role="test" />
+      <file name ="tests/038.phpt" role="test" />
+      <file name ="tests/039.phpt" role="test" />
+      <file name ="tests/040.phpt" role="test" />
+      <file name ="tests/041.phpt" role="test" />
+      <file name ="tests/042.phpt" role="test" />
+      <file name ="tests/043.phpt" role="test" />
+      <file name ="tests/044.phpt" role="test" />
+      <file name ="tests/045.phpt" role="test" />
+      <file name ="tests/046.phpt" role="test" />
+      <file name ="tests/047.phpt" role="test" />
+      <file name ="tests/048.phpt" role="test" />
+      <file name ="tests/049.phpt" role="test" />
+      <file name ="tests/050.phpt" role="test" />
+      <file name ="tests/051.phpt" role="test" />
+      <file name ="tests/052.phpt" role="test" />
+      <file name ="tests/053.phpt" role="test" />
+      <file name ="tests/054.phpt" role="test" />
+      <file name ="tests/055.phpt" role="test" />
+      <file name ="tests/056.phpt" role="test" />
+      <file name ="tests/057.phpt" role="test" />
+      <file name ="tests/058.phpt" role="test" />
+      <file name ="tests/100a.phpt" role="test" />
+      <file name ="tests/100b.phpt" role="test" />
+      <file name ="tests/100.phpt" role="test" />
+      <file name ="tests/pecl11221.phpt" role="test" />
+      <file name ="tests/pecl16442.phpt" role="test" />
+      <file name ="tests/pecl16536.phpt" role="test" />
+      <file name ="tests/pecl17518.phpt" role="test" />
+      <file name ="tests/pecl17566.phpt" role="test" />
+      <file name ="tests/pecl63142.phpt" role="test" />
+      <file name ="tests/bug73539.phpt" role="test" />
+      <file name ="tests/githubbug13.phpt" role="test" />
     </dir>
   </contents>
   <dependencies>
     <required>
       <php>
-        <min>4.3.11</min>
+        <min>7.0.0</min>
       </php>
       <pearinstaller>
         <min>1.4.0b1</min>
@@ -135,10 +183,10 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </extsrcrelease>
   <changelog>
     <release>
-      <date>2010-10-03</date>
+      <date>2019-12-19</date>
       <version>
-        <release>2.2.6</release>
-        <api>2.2.6</api>
+        <release>4.0.5.1</release>
+        <api>4.0.5.1</api>
       </version>
       <stability>
         <release>stable</release>
@@ -146,48 +194,229 @@ http://pear.php.net/dtd/package-2.0.xsd">
       </stability>
       <license uri="http://www.php.net/license">PHP License</license>
       <notes>
-        - Fixed pecl bug #16536 (Weight of 0 causes SegFault on memcache_add_server)
-        - Fixed pecl bug #17130 (Uninitialized tv.tv_usec causing PHP to loop endlessly)
-        - Fixed pecl bug #13623 (Memcache-client makes php segfault in semi-related code)
+        - 4.0.5.1 fix in version number
       </notes>
     </release>
     <release>
-      <date>2009-02-27</date>
+      <date>2019-12-19</date>
       <version>
-        <release>2.2.5</release>
-        <api>2.2.5</api>
+        <release>4.0.5</release>
+        <api>4.0.5</api>
       </version>
       <stability>
         <release>stable</release>
         <api>stable</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - First official release for PHP 7+, supports PHP 7.0-7.4
+	- Support for PHP 5.x has been removed, please use 3.x version of this extension
+	- 4.0.5 version consits of fix for PHP 7.4 behaviour changes 
+      </notes>
+    </release>
+   <release>
+      <date>2013-04-07</date>
+      <version>
+        <release>3.0.8</release>
+        <api>3.0.8</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fix Bug #63142 - memcache client Segmentation fault
+        - Fix Bug #63272 - Explicitly reserve range of flags in php_memcache.h so application code can use
+        - Fix Bug #59602 - getExtendedStats fails on the host intermittently after restarting memcache
+        - Fix Bug #63141 - Added LICENSE file and include tests folder in package
+      </notes>
+    </release>
+    <release>
+      <date>2012-09-22</date>
+      <version>
+        <release>3.0.7</release>
+        <api>3.0.7</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fixed bug #62589 - missing "$" in memcache.php
+        - Fix php_stream_cast() usage.
+        - fixes for windows build and php 5.4 compat
+      </notes>
+    </release>
+    <release>
+      <date>2011-04-10</date>
+      <version>
+        <release>3.0.6</release>
+        <api>3.0.6</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fixed PECL Bug #16672 (memcache.php doesn't support unix socket)
+        - Fixed PECL Bug #19374 (memcache.php throws Notice: Undefined index: VALUE when viewing expired items)
+        - Fixed PECL Bug #17518 (Strange behavior in increment on non integer and after)
+        - Fixed potential segfault in memcache queue.
+        - Fixed various tests
+      </notes>
+    </release>
+    <release>
+      <date>2010-10-03</date>
+      <version>
+        <release>3.0.5</release>
+        <api>3.0.5</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fixed PECL bug #16059 (Build error: 'MSG_NOSIGNAL' undeclared)
+        - Added method MemcachePool::findServer(key) which returns the server a key hashes to
+        - Changed MemcachePool::findServer() to return only "hostname:port" since tcp port is significant
+        - Fixed PECL bug #16536 (Weight of 0 causes SegFault on memcache_add_server)
+        - Fixed PECL bug #17566 (3.0.4 cache delete bug)
+        - Fixed PECL Bug #16442 (memcache_set fail with integer value)
+      </notes>
+    </release>
+    <release>
+      <date>2009-02-22</date>
+      <version>
+        <release>3.0.4</release>
+        <api>3.0.4</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
       </stability>
       <license uri="http://www.php.net/license">PHP License</license>
       <notes>
         - Improved performance of consistent hash strategy
+        - Accept timeout parameter as float to enable microsecond timeouts, param is still 
+          given in seconds but with a microsecond fraction.
+        - Added session locking to avoid concurrency problems with AJAX apps
+        - Fixed PECL bug #14642 (3.0.x breaks BC with 2.2.x)
         - Fixed PECL request #13758 (Failed to extract 'connection' variable from object)
+        - Fixed PECL request #14658 (Allow connection timeouts in ms, not seconds)
+        - New INI directive
+           memcache.lock_timeout = 15
       </notes>
     </release>
     <release>
-      <date>2008-09-11</date>
+      <date>2009-01-13</date>
       <version>
-        <release>2.2.4</release>
-        <api>2.2.4</api>
+        <release>3.0.3</release>
+        <api>3.0.3</api>
       </version>
       <stability>
-        <release>stable</release>
-        <api>stable</api>
+        <release>beta</release>
+        <api>beta</api>
       </stability>
       <license uri="http://www.php.net/license">PHP License</license>
       <notes>
+        - Enabled compression by default for values larger than 20kb
+        - Scalar data types (int, bool, double) are preserved by get/set
+        - Reserved the lowest 2 bytes of the flags for internal use 
+        - Fixed PECL bug #14157 (Segmentation fault with errorcallback handler)
+        - Fixed PECL bug #15342 (memcache keys whitespaces replace issue)
+        - Fixed PECL bug #15447 (Persistent Connections Cause Segfaults if One Server Drops)
+        - Fixed PECL bug #15529 (memcache object loses port information)
+        - Fixed PECL bug #14730 (Types lost during get/set)
+        - Fixed PECL request #14801 (Session handler and large sessions)
+        - Added REPORT_ERRORS to php stream open
+        - New INI directive
+           memcache.compress_threshold = 20000
+      </notes>
+	</release>
+    <release>
+      <date>2008-09-11</date>
+      <version>
+        <release>3.0.2</release>
+        <api>3.0.2</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Updated binary protocol to be compatible with memcached 1.3.0
         - Added memcached stats script from Harun Yayli (http://livebookmark.net/memcachephp)
         - Fixed server weight not being used in the session handler
         - Fixed PECL bug #13343 (compilation breaks with CodeWarrior compiler)
         - Fixed PECL bug #13546 (Session handler through unix socket)
+        - Fixed PECL bug #13592 (error in opcode)
+        - Fixed PECL req #13588 (minor inefficiency in binary protocol implementation)
+        - Fixed PECL bug #14044 (send of 32768 bytes failed with errno=11 Resource temporarily unavailable)
         - Fixed PECL bug #14239 (Memcache::set() modifies value parameter)
+        - Fixed PECL bug #14156 (No check for parameter count in php_mmc_store)
+        - Fixed PECL bug #14458 (off-by-one causes corrupted arrays in 3.0.x)
+        - Fixed PECL bug #14104 (Malformed VALUE header (0))
         - Fixed PECL request #13725 (unnecessary allocations in mmc_consistent_add_server)
         - Changed behaviour when unserialize/uncompress fail to return false instead of failing the server
       </notes>
     </release>    
+    <release>
+      <date>2008-02-05</date>
+      <version>
+        <release>3.0.1</release>
+        <api>3.0.1</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>beta</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - Fixed PECL bug #12866 (Ignore memcache.default_port in memcache_connect)
+        - Fixed PECL bug #12883 (Breaks UTF-8 in keys)
+        - Fixed PECL bug #13060 (make problems, due to role="doc" instead of role="src")
+        - Changed behaviour of close() to actually remove all servers from pool (PECL bug #12555)
+        - Added configure option for PEAR installer to disable session handler support
+        - Added package version to phpinfo()
+      </notes>
+    </release>
+    <release>
+      <date>2007-11-26</date>
+      <version>
+        <release>3.0.0</release>
+        <api>3.0.0</api>
+      </version>
+      <stability>
+        <release>alpha</release>
+        <api>alpha</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        See README for details on new API and INI directives.
+    
+        - UDP support
+        - Binary protocol support 
+        - Non-blocking IO using select()
+        - Pipelined multi-set/delete/increment/decrement
+        - CAS (Compare-And-Swap) support
+        - Append/prepend support
+        - Key and session redundancy (values are written to N mirrors)
+        - Improved error reporting and failover handling
+        - Added class "MemcachePool" implementing the new API
+        - New INI directives
+           memcache.protocol = {ascii, binary}
+           memcache.redundancy = 1
+           memcache.session_redundancy = 2
+        - Changed INI defaults 
+           memcache.hash_strategy = consistent
+           memcache.chunk_size = 32768
+      </notes>
+    </release>
     <release>
       <date>2008-02-05</date>
       <version>

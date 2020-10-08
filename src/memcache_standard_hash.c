@@ -12,7 +12,7 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Authors: Antony Dovgal <tony@daylessday.org>                         |
+  | Authors: Antony Dovgal <tony2001@phpclub.net>                        |
   |          Mikael Johansson <mikael AT synd DOT info>                  |
   +----------------------------------------------------------------------+
 */
@@ -32,13 +32,13 @@ typedef struct mmc_standard_state {
 	int						num_servers;
 	mmc_t					**buckets;
 	int						num_buckets;
-	mmc_hash_function		hash;
+	mmc_hash_function_t		*hash;
 } mmc_standard_state_t;
 
-void *mmc_standard_create_state(mmc_hash_function hash) /* {{{ */
+void *mmc_standard_create_state(mmc_hash_function_t *hash) /* {{{ */
 {
 	mmc_standard_state_t *state = emalloc(sizeof(mmc_standard_state_t));
-	memset(state, 0, sizeof(mmc_standard_state_t));
+	ZEND_SECURE_ZERO(state, sizeof(mmc_standard_state_t));
 	state->hash = hash;
 	return state;
 }
@@ -56,40 +56,17 @@ void mmc_standard_free_state(void *s) /* {{{ */
 }
 /* }}} */
 
-static unsigned int mmc_hash(mmc_standard_state_t *state, const char *key, int key_len) /* {{{ */
-{
-	unsigned int hash = (state->hash(key, key_len) >> 16) & 0x7fff;
-  	return hash ? hash : 1;
-}
-/* }}} */
-
-mmc_t *mmc_standard_find_server(void *s, const char *key, int key_len TSRMLS_DC) /* {{{ */
+mmc_t *mmc_standard_find_server(void *s, const char *key, unsigned int key_len) /* {{{ */
 {
 	mmc_standard_state_t *state = s;
-	mmc_t *mmc;
 
 	if (state->num_servers > 1) {
-		unsigned int hash = mmc_hash(state, key, key_len), i;
-		mmc = state->buckets[hash % state->num_buckets];
-
-		/* perform failover if needed */
-		for (i=0; !mmc_open(mmc, 0, NULL, NULL TSRMLS_CC) && MEMCACHE_G(allow_failover) && i<MEMCACHE_G(max_failover_attempts); i++) {
-			char *next_key = emalloc(key_len + MAX_LENGTH_OF_LONG + 1);
-			int next_len = sprintf(next_key, "%d%s", i+1, key);
-			MMC_DEBUG(("mmc_standard_find_server: failed to connect to server '%s:%d' status %d, trying next", mmc->host, mmc->port, mmc->status));
-
-			hash += mmc_hash(state, next_key, next_len);
-			mmc = state->buckets[hash % state->num_buckets];
-
-			efree(next_key);
-		}
-	}
-	else {
-		mmc = state->buckets[0];
-		mmc_open(mmc, 0, NULL, NULL TSRMLS_CC);
+		/* "new-style" hash */
+		unsigned int hash = (mmc_hash(state->hash, key, key_len) >> 16) & 0x7fff; 
+		return state->buckets[(hash ? hash : 1) % state->num_buckets];
 	}
 
-	return mmc->status != MMC_STATUS_FAILED ? mmc : NULL;
+	return state->buckets[0];
 }
 /* }}} */
 
@@ -99,12 +76,7 @@ void mmc_standard_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ */
 	int i;
 
 	/* add weight number of buckets for this server */
-	if (state->num_buckets) {
-		state->buckets = erealloc(state->buckets, sizeof(mmc_t *) * (state->num_buckets + weight));
-	}
-	else {
-		state->buckets = emalloc(sizeof(mmc_t *) * (weight));
-	}
+	state->buckets = erealloc(state->buckets, sizeof(*state->buckets) * (state->num_buckets + weight));
 
 	for (i=0; i<weight; i++) {
 		state->buckets[state->num_buckets + i] = mmc;
@@ -115,7 +87,7 @@ void mmc_standard_add_server(void *s, mmc_t *mmc, unsigned int weight) /* {{{ */
 }
 /* }}} */
 
-mmc_hash_t mmc_standard_hash = {
+mmc_hash_strategy_t mmc_standard_hash = {
 	mmc_standard_create_state,
 	mmc_standard_free_state,
 	mmc_standard_find_server,

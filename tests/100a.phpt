@@ -1,7 +1,10 @@
 --TEST--
 memcache_flush()
 --SKIPIF--
-<?php include 'connect.inc'; ?>
+<?php
+if (PHP_VERSION_ID < 80000)
+    die('skip php 8+ only');
+include 'connect.inc'; ?>
 --FILE--
 <?php
 
@@ -11,36 +14,41 @@ memcache_flush()
 
 include 'connect.inc';
 
-memcache_add_server($memcache, $nonExistingHost, $nonExistingPort, false);
+$result = @memcache_flush($memcache);
+var_dump($result);
 
-$result1 = memcache_flush($memcache);
-var_dump($result1);
+memcache_add_server($memcache, $nonExistingHost, $nonExistingPort);
+
+$result = @memcache_flush($memcache);
+var_dump($result);
 
 $memcache2 = new Memcache();
-$memcache2->addServer($nonExistingHost, $nonExistingPort, false);
+$memcache2->addServer($nonExistingHost, $nonExistingPort);
 
-$result2 = memcache_flush($memcache2);
-var_dump($result2);
+$result = @memcache_flush($memcache2);
+var_dump($result);
 
 memcache_close($memcache);
 var_dump(memcache_flush($memcache));
-var_dump(memcache_flush(new stdClass));
-var_dump(memcache_flush(''));
+try {
+    var_dump(memcache_flush(new stdClass));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
+try {
+    var_dump(memcache_flush(''));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 echo "Done\n";
 
 ?>
 --EXPECTF--
-Notice: memcache_flush(): Server %s failed with: Connection %s
 bool(true)
-
-Notice: memcache_flush(): Server %s failed with: Connection %s
+bool(false)
 bool(false)
 bool(true)
-
-Warning: memcache_flush() expects parameter 1 to be Memcache, object given %s
-NULL
-
-Warning: memcache_flush() expects parameter 1 to be Memcache, string given %s
-NULL
+memcache_flush(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
+memcache_flush(): Argument #1 ($memcache) must be of type MemcachePool, string given
 Done

@@ -60,6 +60,27 @@ if test "$PHP_MEMCACHE" != "no"; then
       PHP_ADD_LIBRARY_WITH_PATH(z, $PHP_ZLIB_DIR/lib, MEMCACHE_SHARED_LIBADD)
     fi
     PHP_ADD_INCLUDE($PHP_ZLIB_INCDIR)
+    PHP_SUBST(MEMCACHE_SHARED_LIBADD)
+  fi
+
+  AC_MSG_CHECKING(PHP version)
+  if test -d $abs_srcdir/src ; then
+    dnl # only when for PECL, not for PHP
+    export OLD_CPPFLAGS="$CPPFLAGS"
+    export CPPFLAGS="$CPPFLAGS $INCLUDES"
+    AC_TRY_COMPILE([#include <php_version.h>], [
+#if PHP_MAJOR_VERSION < 7
+  #error "PHP < 7"
+#endif
+    ], [
+      subdir=src
+      AC_MSG_RESULT([PHP 7.x])
+    ],
+      AC_MSG_ERROR([PHP 7.x required for pecl-php-memcache ver 4+. Use pecl-php-memcache ver 3.x for PHP 5.x.])
+    )
+    export CPPFLAGS="$OLD_CPPFLAGS"
+  else
+    AC_MSG_ERROR([unknown])
   fi
  
   if test "$PHP_MEMCACHE_SESSION" != "no"; then 
@@ -87,12 +108,18 @@ if test "$PHP_MEMCACHE" != "no"; then
     fi
   fi
 
+  SOURCES_EX="memcache.c memcache_pool.c memcache_queue.c memcache_ascii_protocol.c memcache_binary_protocol.c memcache_standard_hash.c memcache_consistent_hash.c"
+  SESSION_SOURCES_EX="memcache_session.c"
+
+  SOURCES=`echo "$subdir/$SOURCES_EX" |sed "s:[ ]: $subdir/:g"`
+  SESSION_SOURCES=`echo "$subdir/$SESSION_SOURCES_EX" |sed "s:[ ]: $subdir/:g"`
+
   AC_MSG_CHECKING([for memcache session support])
   if test "$PHP_MEMCACHE_SESSION" != "no"; then
     AC_MSG_RESULT([enabled])
     AC_DEFINE(HAVE_MEMCACHE_SESSION,1,[Whether memcache session handler is enabled])
     AC_DEFINE(HAVE_MEMCACHE,1,[Whether you want memcache support])
-    PHP_NEW_EXTENSION(memcache, memcache.c memcache_queue.c memcache_standard_hash.c memcache_consistent_hash.c memcache_session.c, $ext_shared,,-I$session_inc_path)
+    PHP_NEW_EXTENSION(memcache, $SOURCES $SESSION_SOURCES, $ext_shared,,-I$session_inc_path)
     ifdef([PHP_ADD_EXTENSION_DEP],
     [
       PHP_ADD_EXTENSION_DEP(memcache, session)
@@ -100,7 +127,11 @@ if test "$PHP_MEMCACHE" != "no"; then
   else 
     AC_MSG_RESULT([disabled])
     AC_DEFINE(HAVE_MEMCACHE,1,[Whether you want memcache support])
-    PHP_NEW_EXTENSION(memcache, memcache.c memcache_queue.c memcache_standard_hash.c memcache_consistent_hash.c, $ext_shared)
+    PHP_NEW_EXTENSION(memcache, $SOURCES, $ext_shared)
+  fi
+
+  if test ! -d $subdir; then
+	mkdir $subdir
   fi
 
 dnl this is needed to build the extension with phpize and -Wall

@@ -49,6 +49,6 @@ bool(true)
 int(11)
 int(21)
 string(0) ""
-string(2) "21"
-string(2) "11"
+int(21)
+int(11)
 string(0) ""

@@ -12,20 +12,17 @@ $var2 = 'test2';
 
 $memcache = new Memcache();
 $memcache->addServer($host, $port);
-$memcache->addServer($nonExistingHost, $nonExistingPort);
+$memcache->addServer($nonExistingHost, $nonExistingPort, false, 1, 1, -1);
 
 $result1 = @$memcache->set($balanceKey1, $var1, false, 1);
 $result2 = $memcache->set($balanceKey2, $var2, false, 1);
 $result3 = $memcache->get($balanceKey1);
-$result4 = $memcache->get(array($balanceKey1,$balanceKey2));
+$result4 = $memcache->get(array($balanceKey1, $balanceKey2));
 
 var_dump($result1);
 var_dump($result2);
 var_dump($result3);
-
-if (is_array($result4))
-	sort($result4);
-var_dump($result4);
+var_dump(is_array($result4) ? array_values($result4) : $result4);
 
 $memcache = new Memcache();
 $memcache->addServer($nonExistingHost, $nonExistingPort);

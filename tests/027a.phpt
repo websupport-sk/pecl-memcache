@@ -1,7 +1,10 @@
 --TEST--
 memcache_set_compress_threshold()
 --SKIPIF--
-<?php include 'connect.inc'; ?>
+<?php
+if (PHP_VERSION_ID < 80000)
+    die('skip php 8+ only');
+include 'connect.inc'; ?>
 --FILE--
 <?php
 
@@ -30,12 +33,19 @@ $result6 = memcache_get($memcache, 'non_existing_test_key');
 var_dump($result5);
 var_dump($result6);
 
-
-var_dump(memcache_set_compress_threshold(array(), 10000, 0));
+try {
+    var_dump(memcache_set_compress_threshold(array(), 10000, 0));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 var_dump(memcache_set_compress_threshold($memcache, -1, -1));
 var_dump(memcache_set_compress_threshold($memcache, 1, -1));
 var_dump(memcache_set_compress_threshold($memcache, -1, 1));
-var_dump(memcache_set_compress_threshold(new stdClass, 1, 1));
+try {
+    var_dump(memcache_set_compress_threshold(new stdClass, 1, 1));
+} catch (TypeError $e) {
+    echo "{$e->getMessage()}\n";
+}
 
 echo "Done\n";
 
@@ -47,9 +57,7 @@ bool(true)
 bool(true)
 bool(true)
 string(3) "abc"
-
-Warning: memcache_set_compress_threshold() expects parameter 1 to be Memcache, array given in %s on line %d
-NULL
+memcache_set_compress_threshold(): Argument #1 ($memcache) must be of type MemcachePool, array given
 
 Warning: memcache_set_compress_threshold()%s threshold must be a positive integer in %s on line %d
 bool(false)
@@ -59,7 +67,5 @@ bool(false)
 
 Warning: memcache_set_compress_threshold()%s threshold must be a positive integer in %s on line %d
 bool(false)
-
-Warning: memcache_set_compress_threshold() expects parameter 1 to be Memcache, object given in %s on line %d
-NULL
+memcache_set_compress_threshold(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
 Done

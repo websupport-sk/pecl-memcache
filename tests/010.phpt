@@ -9,7 +9,7 @@ include 'connect.inc';
 
 $value = new stdClass;
 $value->plain_attribute = 'value';
-$value->array_attribute = Array('test1', 'test2');
+$value->array_attribute = array('test1', 'test2');
 $memcache->set('test_key', $value);
 
 $result = $memcache->get('test_key');

@@ -21,4 +21,4 @@ var_dump($result3);
 --EXPECT--
 int(6)
 int(5)
-string(1) "5"
+int(5)
