@@ -2,8 +2,8 @@
 memcache_flush()
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80000)
-    die('skip php 8+ only');
+if (PHP_VERSION_ID >= 80000)
+    die('skip php prior to 8 only');
 include 'connect.inc'; ?>
 --FILE--
 <?php
@@ -49,6 +49,6 @@ bool(true)
 bool(false)
 bool(false)
 bool(true)
-memcache_flush(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
-memcache_flush(): Argument #1 ($memcache) must be of type MemcachePool, string given
+Argument 1 passed to memcache_flush() must be an instance of MemcachePool, instance of stdClass given
+Argument 1 passed to memcache_flush() must be an instance of MemcachePool, string given
 Done

@@ -47,7 +47,7 @@
 
 /*
  * Mac OS X has no MSG_NOSIGNAL but >= 10.2 comes with SO_NOSIGPIPE which is a setsockopt() option
- * and not a send() parameter as MSG_NOSIGNAL. OpenBSD has none of the options so we need to ignore 
+ * and not a send() parameter as MSG_NOSIGNAL. OpenBSD has none of the options so we need to ignore
  * SIGPIPE events
  */
 #ifndef MSG_NOSIGNAL
@@ -285,7 +285,7 @@ typedef struct mmc_protocol {
 	mmc_protocol_flush		flush;
 	mmc_protocol_version	version;
 	mmc_protocol_stats		stats;
-	
+
 	mmc_protocol_set_sasl_auth_data set_sasl_auth_data;
 } mmc_protocol_t;
 
@@ -415,15 +415,15 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long compress_threshold;
 	long lock_timeout;
 	char *session_key_prefix;
-	char *session_prefix_host_key;
-	char *session_prefix_host_key_remove_www;
-	char *session_prefix_host_key_remove_subdomain;
+	zend_bool session_prefix_host_key;
+	zend_bool session_prefix_host_key_remove_www;
+	zend_bool session_prefix_host_key_remove_subdomain;
 	char *session_prefix_static_key;
 	char *session_save_path;
 	char *key_prefix;
-	char *prefix_host_key;
-	char *prefix_host_key_remove_www;
-	char *prefix_host_key_remove_subdomain;
+	zend_bool prefix_host_key;
+	zend_bool prefix_host_key_remove_www;
+	zend_bool prefix_host_key_remove_subdomain;
 	char *prefix_static_key;
 ZEND_END_MODULE_GLOBALS(memcache)
 

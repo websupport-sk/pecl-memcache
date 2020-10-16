@@ -2,8 +2,8 @@
 memcache_set_compress_threshold()
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80000)
-    die('skip php 8+ only');
+if (PHP_VERSION_ID >= 80000)
+    die('skip php prior to 8 only');
 include 'connect.inc'; ?>
 --FILE--
 <?php
@@ -57,7 +57,7 @@ bool(true)
 bool(true)
 bool(true)
 string(3) "abc"
-memcache_set_compress_threshold(): Argument #1 ($memcache) must be of type MemcachePool, array given
+Argument 1 passed to memcache_set_compress_threshold() must be an instance of MemcachePool, array given
 
 Warning: memcache_set_compress_threshold()%s threshold must be a positive integer in %s on line %d
 bool(false)
@@ -67,5 +67,5 @@ bool(false)
 
 Warning: memcache_set_compress_threshold()%s threshold must be a positive integer in %s on line %d
 bool(false)
-memcache_set_compress_threshold(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
+Argument 1 passed to memcache_set_compress_threshold() must be an instance of MemcachePool, instance of stdClass given
 Done

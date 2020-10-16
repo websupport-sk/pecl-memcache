@@ -20,7 +20,7 @@ $port2 = 11212;
 
 //ini_set('memcache.hash_strategy', 'standard');
 //ini_set('memcache.hash_function', 'fnv');
-//ini_set('memcache.protocol', 'binary');
+ini_set('memcache.protocol', getenv('MEMCACHE_PROTOCOL') ?: 'ascii');
 
 if (ini_get('memcache.protocol') == 'binary') {
 	$udpPort = 0;

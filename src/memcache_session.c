@@ -362,12 +362,12 @@ PS_READ_FUNC(memcache)
 				if (skip_servers.len == pool->num_servers && skip_servers.len < MEMCACHE_G(session_redundancy)) {
 					*val = ZSTR_EMPTY_ALLOC();
 					mmc_queue_free(&skip_servers);
-					zval_ptr_dtor(&dataresult);
 					return SUCCESS;
-
 				}
 			}
 			else {
+				zval_dtor(&dataresult);
+
 				/* if missing lock, back off and retry same server */
 				last_index = prev_index;
 				usleep(timeout);

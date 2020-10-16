@@ -2,8 +2,8 @@
 memcache_add_server()
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80000)
-    die('skip php 8+ only');
+if (PHP_VERSION_ID >= 80000)
+    die('skip php prior to 8 only');
 include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
 --FILE--
 <?php
@@ -31,6 +31,8 @@ echo "Done\n";
 --EXPECTF--
 bool(true)
 bool(true)
-memcache_add_server(): Argument #1 ($memcache) must be of type Memcache, stdClass given
-memcache_add_server(): Argument #2 ($host) must be of type string, stdClass given
+Argument 1 passed to memcache_add_server() must be an instance of MemcachePool, instance of stdClass given
+
+Warning: memcache_add_server() expects parameter 2 to be string, object given in %s on line %d
+NULL
 Done

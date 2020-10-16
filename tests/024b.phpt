@@ -2,8 +2,8 @@
 memcache_close(), memcache_get()
 --SKIPIF--
 <?php
-if (PHP_VERSION_ID < 80000)
-    die('skip php 8+ only');
+if (PHP_VERSION_ID >= 80000)
+    die('skip php prior to 8 only');
 include 'connect.inc'; if (!isset($host2)) die('skip $host2 not set'); ?>
 --FILE--
 <?php
@@ -54,6 +54,6 @@ bool(true)
 bool(false)
 bool(true)
 bool(true)
-memcache_close(): Argument #1 ($memcache) must be of type MemcachePool, stdClass given
-memcache_close(): Argument #1 ($memcache) must be of type MemcachePool, string given
+Argument 1 passed to memcache_close() must be an instance of MemcachePool, instance of stdClass given
+Argument 1 passed to memcache_close() must be an instance of MemcachePool, string given
 Done
