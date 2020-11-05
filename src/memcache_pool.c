@@ -851,6 +851,9 @@ void mmc_server_free(mmc_t *mmc) /* {{{ */
 {
 	mmc_server_sleep(mmc);
 
+	_mmc_server_disconnect(mmc, &(mmc->tcp), 0);
+	_mmc_server_disconnect(mmc, &(mmc->udp), 0);
+
 	pefree(mmc->host, mmc->persistent);
 	pefree(mmc, mmc->persistent);
 }
