@@ -1544,7 +1544,7 @@ void mmc_pool_select(mmc_pool_t *pool) /*
 		}
 
 		if ( ! pool->sending->len && ( mmc->sendreq != NULL || mmc->sendqueue.len ) ) {
-			php_error_docref( NULL TSRMLS_CC, E_WARNING, "mmc_pool_select() failed to cleanup when sending! Sendqueue: %d", mmc->sendqueue.len );
+			php_error_docref( NULL, E_WARNING, "mmc_pool_select() failed to cleanup when sending! Sendqueue: %d", mmc->sendqueue.len );
 		}
 	}
 
@@ -1643,7 +1643,7 @@ void mmc_pool_select(mmc_pool_t *pool) /*
 								/* take server offline and failover requests */
 								mmc_server_deactivate(pool, mmc);
 							} else {
-								mmc_select_retry(pool, mmc, mmc->readreq TSRMLS_CC);
+								mmc_select_retry(pool, mmc, mmc->readreq);
 							}
 						}
 						break;
@@ -1668,7 +1668,7 @@ void mmc_pool_select(mmc_pool_t *pool) /*
 		}
 
 		if ( ! pool->reading->len && ( mmc->readreq != NULL || mmc->readqueue.len ) ) {
-			php_error_docref( NULL TSRMLS_CC, E_WARNING, "mmc_pool_select() failed to cleanup when reading! Readqueue: %d", mmc->readqueue.len );
+			php_error_docref( NULL, E_WARNING, "mmc_pool_select() failed to cleanup when reading! Readqueue: %d", mmc->readqueue.len );
 		}
 	}
 
@@ -1680,7 +1680,7 @@ void mmc_pool_schedule_pending(mmc_pool_t *pool) {
 	mmc_t *mmc;
 	while ((mmc = mmc_queue_pop(&(pool->pending))) != NULL) {
 		pool->protocol->end_get(mmc->buildreq);
-		mmc_pool_schedule(pool, mmc, mmc->buildreq TSRMLS_CC);
+		mmc_pool_schedule(pool, mmc, mmc->buildreq);
 		mmc->buildreq = NULL;
 	}
 }
