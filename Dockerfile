@@ -1,4 +1,4 @@
-ARG PHP_IMAGE=php:8.0-rc
+ARG PHP_IMAGE=php:8.0
 FROM $PHP_IMAGE
 
 RUN apt-get update && apt-get install -y \ 
