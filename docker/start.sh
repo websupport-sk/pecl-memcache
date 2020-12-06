@@ -8,13 +8,10 @@ export LDFLAGS="-Wl,-O1 -Wl,--hash-style=both"
 set -eux
 cd /usr/src
 
-if [[ -z "${LOCAL_DEV:-}" ]] 
-then
-    git clone https://github.com/websupport-sk/pecl-memcache.git
-fi 
+git clone https://github.com/websupport-sk/pecl-memcache.git
+
 
 cd pecl-memcache;
-[[ -n "${LOCAL_DEV}" ]] && phpize --clean
 phpize
 ./configure 
 make -j"$(nproc)"
