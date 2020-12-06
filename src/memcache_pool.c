@@ -1542,6 +1542,10 @@ void mmc_pool_select(mmc_pool_t *pool) /*
 			/* add server to send queue once more */
 			mmc_queue_push(pool->sending, mmc);
 		}
+
+		if ( ! pool->sending->len && ( mmc->sendreq != NULL || mmc->sendqueue.len ) ) {
+			php_error_docref( NULL, E_WARNING, "mmc_pool_select() failed to cleanup when sending! Sendqueue: %d", mmc->sendqueue.len );
+		}
 	}
 
 	for (i=0; i < reading->len; i++) {
@@ -1638,6 +1642,8 @@ void mmc_pool_select(mmc_pool_t *pool) /*
 							if (result == MMC_REQUEST_FAILURE) {
 								/* take server offline and failover requests */
 								mmc_server_deactivate(pool, mmc);
+							} else {
+								mmc_select_retry(pool, mmc, mmc->readreq);
 							}
 						}
 						break;
@@ -1660,24 +1666,35 @@ void mmc_pool_select(mmc_pool_t *pool) /*
 			/* add server to read queue once more */
 			mmc_queue_push(pool->reading, mmc);
 		}
+
+		if ( ! pool->reading->len && ( mmc->readreq != NULL || mmc->readqueue.len ) ) {
+			php_error_docref( NULL, E_WARNING, "mmc_pool_select() failed to cleanup when reading! Readqueue: %d", mmc->readqueue.len );
+		}
 	}
 
 	pool->in_select = 0;
 }
 /* }}} */
 
-void mmc_pool_run(mmc_pool_t *pool)  /*
-	runs all scheduled requests to completion {{{ */
-{
+void mmc_pool_schedule_pending(mmc_pool_t *pool) {
 	mmc_t *mmc;
 	while ((mmc = mmc_queue_pop(&(pool->pending))) != NULL) {
 		pool->protocol->end_get(mmc->buildreq);
 		mmc_pool_schedule(pool, mmc, mmc->buildreq);
 		mmc->buildreq = NULL;
 	}
+}
+
+void mmc_pool_run(mmc_pool_t *pool)  /*
+	runs all scheduled requests to completion {{{ */
+{
+	mmc_t *mmc;
+
+	mmc_pool_schedule_pending(pool);
 
 	while (pool->reading->len || pool->sending->len) {
 		mmc_pool_select(pool);
+		mmc_pool_schedule_pending(pool);
 	}
 }
 /* }}} */
