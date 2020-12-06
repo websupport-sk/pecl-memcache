@@ -93,6 +93,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name ="tests/connect.inc" role="test" />
       <file name ="tests/memcache.sh" role="test" />
       <file name ="tests/001.phpt" role="test" />
+      <file name ="tests/001b.phpt" role="test" />
       <file name ="tests/002.phpt" role="test" />
       <file name ="tests/003.phpt" role="test" />
       <file name ="tests/004.phpt" role="test" />
@@ -111,17 +112,21 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name ="tests/017.phpt" role="test" />
       <file name ="tests/018.phpt" role="test" />
       <file name ="tests/019a.phpt" role="test" />
+      <file name ="tests/019b.phpt" role="test" />
       <file name ="tests/019.phpt" role="test" />
       <file name ="tests/020.phpt" role="test" />
       <file name ="tests/021.phpt" role="test" />
       <file name ="tests/022a.phpt" role="test" />
+      <file name ="tests/022b.phpt" role="test" />
       <file name ="tests/022.phpt" role="test" />
       <file name ="tests/023.phpt" role="test" />
       <file name ="tests/024a.phpt" role="test" />
       <file name ="tests/024.phpt" role="test" />
+      <file name ="tests/024b.phpt" role="test" />
       <file name ="tests/025.phpt" role="test" />
       <file name ="tests/026.phpt" role="test" />
       <file name ="tests/027a.phpt" role="test" />
+      <file name ="tests/027b.phpt" role="test" />
       <file name ="tests/027.phpt" role="test" />
       <file name ="tests/028.phpt" role="test" />
       <file name ="tests/029.phpt" role="test" />
@@ -157,6 +162,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name ="tests/058.phpt" role="test" />
       <file name ="tests/100a.phpt" role="test" />
       <file name ="tests/100b.phpt" role="test" />
+      <file name ="tests/100c.phpt" role="test" />
       <file name ="tests/100.phpt" role="test" />
       <file name ="tests/pecl11221.phpt" role="test" />
       <file name ="tests/pecl16442.phpt" role="test" />
@@ -164,8 +170,11 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name ="tests/pecl17518.phpt" role="test" />
       <file name ="tests/pecl17566.phpt" role="test" />
       <file name ="tests/pecl63142.phpt" role="test" />
+      <file name ="tests/pecl63272.phpt" role="test" />
+      <file name ="tests/pecl77900.phpt" role="test" />
       <file name ="tests/bug73539.phpt" role="test" />
       <file name ="tests/githubbug13.phpt" role="test" />
+      <file name ="tests/githubbug53.phpt" role="test" />
     </dir>
   </contents>
   <dependencies>
