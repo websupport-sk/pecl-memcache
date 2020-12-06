@@ -55,10 +55,11 @@ http://pear.php.net/dtd/package-2.0.xsd">
   </stability>
   <license uri="http://www.php.net/license">PHP License</license>
   <notes>
+   - Version 8.x support PHP 8.x
    - Version 4.x supports PHP 7.0-7.4. 
    - Version 4.x is considered to be stable for production usage. 
    - Support for PHP 5.x has been removed, please use memcache extension ver. 3.x 
-   - Special thanks to Frantisek Drojak - thesource93 (github) for making this happen
+   - Special thanks to Frantisek Drojak - thesource93 (github) & Zaffy (github) for making this happen
   </notes>
   <contents>
     <dir name="/">
@@ -170,7 +171,7 @@ http://pear.php.net/dtd/package-2.0.xsd">
   <dependencies>
     <required>
       <php>
-        <min>7.0.0</min>
+        <min>8.0.0</min>
       </php>
       <pearinstaller>
         <min>1.4.0b1</min>
@@ -182,6 +183,21 @@ http://pear.php.net/dtd/package-2.0.xsd">
     <configureoption name="enable-memcache-session" default="yes" prompt="Enable memcache session handler support?" />
   </extsrcrelease>
   <changelog>
+    <release>
+      <date>2020-12-06</date>
+      <version>
+        <release>8.0</release>
+        <api>8.0</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <license uri="http://www.php.net/license">PHP License</license>
+      <notes>
+        - 8.0 supports PHP 8.0+ and drops support for older PHP versions
+      </notes>
+    </release>
     <release>
       <date>2019-12-19</date>
       <version>
