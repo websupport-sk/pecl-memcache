@@ -10,7 +10,6 @@ cd /usr/src
 
 git clone https://github.com/websupport-sk/pecl-memcache.git
 
-
 cd pecl-memcache;
 phpize
 ./configure 
