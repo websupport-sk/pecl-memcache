@@ -1303,7 +1303,7 @@ int mmc_pool_schedule_get(
 		pool->protocol->end_get(mmc->buildreq);
 		mmc_pool_schedule(pool, mmc, mmc->buildreq);
 
-		/* begin sending requests immediatly */
+		/* begin sending requests immediately */
 		mmc_pool_select(pool);
 
 		mmc->buildreq = mmc_pool_request_get(
