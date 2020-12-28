@@ -924,7 +924,7 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 				continue;
 			}
 
-			/* begin sending requests immediatly */
+			/* begin sending requests immediately */
 			mmc_pool_select(pool);
 		} ZEND_HASH_FOREACH_END();
 	}
@@ -1089,7 +1089,7 @@ static void php_mmc_numeric(INTERNAL_FUNCTION_PARAMETERS, int deleted, int inver
 				continue;
 			}
 
-			/* begin sending requests immediatly */
+			/* begin sending requests immediately */
 			mmc_pool_select(pool);
 		} ZEND_HASH_FOREACH_END();
 
@@ -2492,7 +2492,7 @@ PHP_FUNCTION(memcache_flush)
 		pool->protocol->flush(request, delay);
 
 		if (mmc_pool_schedule(pool, pool->servers[i], request) == MMC_OK) {
-			/* begin sending requests immediatly */
+			/* begin sending requests immediately */
 			mmc_pool_select(pool);
 		}
 	}
