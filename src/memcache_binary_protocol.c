@@ -25,11 +25,10 @@
 
 #define MMC_DEBUG 0
 
+#include <stdint.h>
 #ifdef PHP_WIN32
-#include <win32/php_stdint.h>
 #include <winsock2.h>
 #else
-#include <stdint.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #endif
