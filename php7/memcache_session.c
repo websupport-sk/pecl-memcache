@@ -317,7 +317,7 @@ PS_READ_FUNC(memcache)
 			ZVAL_NULL(&addresult);
 
 			/* third request fetches the data, data is only valid if either of the lock requests succeeded */
-			ZVAL_EMPTY_STRING(&dataresult);
+			ZVAL_NULL(&dataresult);
 
 			/* create requests */
 			if (php_mmc_session_read_request(pool, &zkey, lockparam, &addresult, dataparam, &lockrequest, &addrequest, &datarequest) != MMC_OK) {
