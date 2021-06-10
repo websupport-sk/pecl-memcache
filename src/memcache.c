@@ -1319,8 +1319,9 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 	size_t host_len;
 	zend_long tcp_port = MEMCACHE_G(default_port);
 	double timeout = MMC_DEFAULT_TIMEOUT;
+	zend_bool null_port;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|ld", &host, &host_len, &tcp_port, &timeout) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|l!d", &host, &host_len, &tcp_port, &null_port, &timeout) == FAILURE) {
 		return;
 	}
 
