@@ -28,6 +28,7 @@
 #include <winsock2.h>
 #else
 #include <arpa/inet.h>
+#include <sys/poll.h>
 #endif
 
 #include "php.h"
@@ -899,6 +900,7 @@ mmc_pool_t *mmc_pool_new() /* {{{ */
 	mmc_pool_init_hash(pool);
 	pool->compress_threshold = MEMCACHE_G(compress_threshold);
 	pool->min_compress_savings = MMC_DEFAULT_SAVINGS;
+	pool->select_api = MEMCACHE_G(select_api);
 
 	pool->sending = &(pool->_sending1);
 	pool->reading = &(pool->_reading1);
@@ -1399,7 +1401,7 @@ static void mmc_select_retry(mmc_pool_t *pool, mmc_t *mmc, mmc_request_t *reques
 }
 /* }}} */
 
-void mmc_pool_select(mmc_pool_t *pool) /*
+static void mmc_pool_select_impl(mmc_pool_t *pool) /*
 	runs one select() round on all scheduled requests {{{ */
 {
 	int i, fd, result;
@@ -1676,6 +1678,346 @@ void mmc_pool_select(mmc_pool_t *pool) /*
 	}
 
 	pool->in_select = 0;
+}
+/* }}} */
+
+#ifndef PHP_WIN32
+static void mmc_pool_add_poll_event(mmc_pool_t *pool, int fd, short event) /*
+	add fd with event to array for poll {{{ */
+{
+	// remove duplicates as poll() doesn't guarantee to work properly with them
+	// as the list expected to be small linear search should work well
+	for (int i=0; i < pool->nfds; i++) {
+		if (pool->pollfds[i].fd == fd) {
+			pool->pollfds[i].events |= event;
+
+			return;
+		}
+	}
+
+	pool->pollfds[pool->nfds].fd = fd;
+	pool->pollfds[pool->nfds].events = event;
+	pool->nfds++;
+}
+/* }}} */
+#endif
+
+#ifndef PHP_WIN32
+static int mmc_pool_poll_event_idx(mmc_pool_t *pool, int fd, short event) /*
+	check if fd with event is present in revents array for poll {{{ */
+{
+	// remove duplicates as poll() doesn't guarantee to work properly with them
+	// as the list expected to be small linear search should work well
+	for (int i=0; i < pool->nfds; i++) {
+		if (pool->pollfds[i].fd == fd && pool->pollfds[i].revents & event) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+/* }}} */
+#endif
+
+#ifndef PHP_WIN32
+static void mmc_pool_poll(mmc_pool_t *pool) /*
+	runs one poll() round on all scheduled requests {{{ */
+{
+	int i, result;
+	mmc_t *mmc;
+	mmc_queue_t *sending, *reading;
+
+	int should_free_fds;
+
+	/* help complete previous run */
+	if (pool->in_select) {
+		if (pool->sending == &(pool->_sending1)) {
+			sending = &(pool->_sending2);
+			reading = &(pool->_reading2);
+		}
+		else {
+			sending = &(pool->_sending1);
+			reading = &(pool->_reading1);
+		}
+	}
+	else {
+		// poll takes timout as int in milliseconds
+		int timeout = ((int)pool->timeout.tv_sec) * 1000 + ((int)pool->timeout.tv_usec) / 1000;
+		pool->nfds = 0;
+
+		sending = pool->sending;
+		reading = pool->reading;
+		mmc_pool_switch(pool);
+
+		int max_nfds = sending->len + reading->len;
+		int memsize = max_nfds * sizeof(struct pollfd);
+
+		should_free_fds = 1;
+		pool->pollfds = emalloc(memsize);
+		memset(pool->pollfds, 0, memsize);
+
+		for (i=0; i < sending->len; i++) {
+			mmc = mmc_queue_item(sending, i);
+			mmc_pool_add_poll_event(pool, mmc->sendreq->io->fd, POLLOUT);
+		}
+
+		for (i=0; i < reading->len; i++) {
+			mmc = mmc_queue_item(reading, i);
+			mmc_pool_add_poll_event(pool, mmc->readreq->io->fd, POLLIN);
+		}
+
+		result = poll(pool->pollfds, pool->nfds, timeout);
+
+		/* if poll timed out or error */
+		if (result <= 0) {
+			for (i=0; i < sending->len; i++) {
+				mmc = (mmc_t *)mmc_queue_item(sending, i);
+
+				mmc_queue_remove(sending, mmc);
+				mmc_queue_remove(reading, mmc);
+				i--;
+
+				if (mmc_select_failure(pool, mmc, mmc->sendreq, result) == MMC_REQUEST_RETRY) {
+					/* allow request to try and send again */
+					mmc_select_retry(pool, mmc, mmc->sendreq);
+				}
+			}
+
+			for (i=0; i < reading->len; i++) {
+				mmc = (mmc_t *)mmc_queue_item(reading, i);
+
+				mmc_queue_remove(sending, mmc);
+				mmc_queue_remove(reading, mmc);
+				i--;
+
+				if (mmc_select_failure(pool, mmc, mmc->readreq, result) == MMC_REQUEST_RETRY) {
+					/* allow request to try and read again */
+					mmc_select_retry(pool, mmc, mmc->readreq);
+				}
+			}
+		}
+
+		pool->in_select = 1;
+	}
+
+	for (i=0; i < sending->len; i++) {
+		mmc = mmc_queue_item(sending, i);
+
+		/* skip servers which have failed */
+		if (!mmc->sendreq) {
+			continue;
+		}
+
+		int fd_idx = mmc_pool_poll_event_idx(pool, mmc->sendreq->io->fd, POLLOUT);
+
+		if (fd_idx != -1) {
+			/* clear bit for reentrancy reasons */
+			pool->pollfds[fd_idx].revents &= ~POLLOUT;
+
+			/* until stream buffer is empty */
+			do {
+				/* delegate to request send handler */
+				result = mmc_request_send(mmc, mmc->sendreq);
+
+				/* check if someone has helped complete our run */
+				if (!pool->in_select) {
+					if (should_free_fds) {
+						efree(pool->pollfds);
+					}
+					return;
+				}
+
+				switch (result) {
+					case MMC_REQUEST_FAILURE:
+						/* take server offline and failover requests */
+						mmc_server_deactivate(pool, mmc);
+
+						/* server is failed, remove from read queue */
+						mmc_queue_remove(reading, mmc);
+						break;
+
+					case MMC_REQUEST_RETRY:
+						/* allow request to reschedule itself */
+						mmc_select_retry(pool, mmc, mmc->sendreq);
+						break;
+
+					case MMC_REQUEST_DONE:
+						/* shift next request into send slot */
+						mmc_pool_slot_send(pool, mmc, mmc_queue_pop(&(mmc->sendqueue)), 1);
+						break;
+
+					case MMC_REQUEST_MORE:
+						/* send more data to socket */
+						break;
+
+					default:
+						php_error_docref(NULL, E_ERROR, "Invalid return value, bailing out");
+				}
+			} while (mmc->sendreq != NULL && (result == MMC_REQUEST_DONE || result == MMC_REQUEST_AGAIN));
+
+			if (result == MMC_REQUEST_MORE) {
+				/* add server to read queue once more */
+				mmc_queue_push(pool->sending, mmc);
+			}
+		}
+		else {
+			/* add server to send queue once more */
+			mmc_queue_push(pool->sending, mmc);
+		}
+
+		if ( ! pool->sending->len && ( mmc->sendreq != NULL || mmc->sendqueue.len ) ) {
+			php_error_docref( NULL, E_WARNING, "mmc_pool_select() failed to cleanup when sending! Sendqueue: %d", mmc->sendqueue.len );
+		}
+	}
+
+	for (i=0; i < reading->len; i++) {
+		mmc = mmc_queue_item(reading, i);
+
+		/* skip servers which have failed */
+		if (!mmc->readreq) {
+			continue;
+		}
+
+		int fd_idx = mmc_pool_poll_event_idx(pool, mmc->readreq->io->fd, POLLIN);
+
+		if (fd_idx != -1) {
+			/* clear bit for reentrancy reasons */
+			pool->pollfds[fd_idx].revents &= ~POLLIN;
+
+			/* fill read buffer if needed */
+			if (mmc->readreq->read != NULL) {
+				result = mmc->readreq->read(mmc, mmc->readreq);
+
+				if (result != MMC_OK) {
+					switch (result) {
+						case MMC_REQUEST_FAILURE:
+							/* take server offline and failover requests */
+							mmc_server_deactivate(pool, mmc);
+							break;
+
+						case MMC_REQUEST_RETRY:
+							/* allow request to reschedule itself */
+							mmc_select_retry(pool, mmc, mmc->readreq);
+							break;
+
+						case MMC_REQUEST_MORE:
+							/* add server to read queue once more */
+							mmc_queue_push(pool->reading, mmc);
+							break;
+
+						default:
+							php_error_docref(NULL, E_ERROR, "Invalid return value, bailing out");
+					}
+
+					/* skip to next request */
+					continue;
+				}
+			}
+
+			/* until stream buffer is empty */
+			do {
+				/* delegate to request response handler */
+				result = mmc->readreq->parse(mmc, mmc->readreq);
+
+				/* check if someone has helped complete our run */
+				if (!pool->in_select) {
+					if (should_free_fds) {
+						efree(pool->pollfds);
+					}
+					return;
+				}
+
+				switch (result) {
+					case MMC_REQUEST_FAILURE:
+						/* take server offline and failover requests */
+						mmc_server_deactivate(pool, mmc);
+						break;
+
+					case MMC_REQUEST_RETRY:
+						/* allow request to reschedule itself */
+						mmc_select_retry(pool, mmc, mmc->readreq);
+						break;
+
+					case MMC_REQUEST_DONE:
+						/* might have completed without having sent all data (e.g. object too large errors) */
+						if (mmc->sendreq == mmc->readreq) {
+							/* disconnect stream since data may have been sent before we received the SERVER_ERROR */
+							mmc_server_disconnect(mmc, mmc->readreq->io);
+
+							/* shift next request into send slot */
+							mmc_pool_slot_send(pool, mmc, mmc_queue_pop(&(mmc->sendqueue)), 1);
+
+							/* clear out connection from send queue if no new request was slotted */
+							if (!mmc->sendreq) {
+								mmc_queue_remove(pool->sending, mmc);
+							}
+						}
+
+						/* release completed request */
+						mmc_pool_release(pool, mmc->readreq);
+
+						/* shift next request into read slot */
+						mmc->readreq = mmc_queue_pop(&(mmc->readqueue));
+						break;
+
+					case MMC_REQUEST_MORE:
+						/* read more data from socket */
+						if (php_stream_eof(mmc->readreq->io->stream)) {
+							result = mmc_server_failure(mmc, mmc->readreq->io, "Read failed (socket was unexpectedly closed)", 0);
+							if (result == MMC_REQUEST_FAILURE) {
+								/* take server offline and failover requests */
+								mmc_server_deactivate(pool, mmc);
+							} else {
+								mmc_select_retry(pool, mmc, mmc->readreq);
+							}
+						}
+						break;
+
+					case MMC_REQUEST_AGAIN:
+						/* request wants another loop */
+						break;
+
+					default:
+						php_error_docref(NULL, E_ERROR, "Invalid return value, bailing out");
+				}
+			} while (mmc->readreq != NULL && (result == MMC_REQUEST_DONE || result == MMC_REQUEST_AGAIN));
+
+			if (result == MMC_REQUEST_MORE) {
+				/* add server to read queue once more */
+				mmc_queue_push(pool->reading, mmc);
+			}
+		}
+		else {
+			/* add server to read queue once more */
+			mmc_queue_push(pool->reading, mmc);
+		}
+
+		if ( ! pool->reading->len && ( mmc->readreq != NULL || mmc->readqueue.len ) ) {
+			php_error_docref( NULL, E_WARNING, "mmc_pool_select() failed to cleanup when reading! Readqueue: %d", mmc->readqueue.len );
+		}
+	}
+
+	pool->in_select = 0;
+
+	if (should_free_fds) {
+		efree(pool->pollfds);
+	}
+}
+/* }}} */
+#endif
+
+void mmc_pool_select(mmc_pool_t *pool) /*
+	runs one select() or poll() round on all scheduled requests {{{ */
+{
+	#ifdef PHP_WIN32
+	mmc_pool_select_impl(pool);
+	#else
+	if (pool->select_api == MMC_API_POLL) {
+		mmc_pool_poll(pool);
+	} else {
+		mmc_pool_select_impl(pool);
+	}
+	#endif
 }
 /* }}} */
 
