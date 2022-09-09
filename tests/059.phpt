@@ -302,7 +302,9 @@ Class [ <internal:memcache> class Memcache extends MemcachePool ] {
   - Static methods [0] {
   }
 
-  - Properties [0] {
+  - Properties [2] {
+    Property [ public mixed $connection = NULL ]
+    Property [ private ?callable $_failureCallback = NULL ]
   }
 
   - Methods [24] {

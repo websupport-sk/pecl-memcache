@@ -375,6 +375,9 @@ static zend_function_entry php_memcache_class_functions[] = {
 	ZEND_FE_END
 };
 
+#define Z_MEMCACHE_CONNECTION_P(zv) OBJ_PROP_NUM(Z_OBJ_P(zv), 0)
+#define Z_MEMCACHE__FAILURECALLBACK_P(zv) OBJ_PROP_NUM(Z_OBJ_P(zv), 1)
+
 /* }}} */
 
 /* {{{ memcache_module_entry
@@ -737,6 +740,18 @@ PHP_MINIT_FUNCTION(memcache)
 	INIT_CLASS_ENTRY(ce, "Memcache", php_memcache_class_functions);
 	memcache_ce = zend_register_internal_class_ex(&ce, memcache_pool_ce);
 
+	zval property_connection_default_value;
+	ZVAL_NULL(&property_connection_default_value);
+	zend_string *property_connection_name = zend_string_init("connection", sizeof("connection") - 1, 1);
+	zend_declare_typed_property(memcache_ce, property_connection_name, &property_connection_default_value, ZEND_ACC_PUBLIC, NULL, (zend_type) ZEND_TYPE_INIT_MASK(MAY_BE_ANY));
+	zend_string_release(property_connection_name);
+
+	zval property_failure_callback_default_value;
+	ZVAL_NULL(&property_failure_callback_default_value);
+	zend_string *property_failure_callback_name = zend_string_init("_failureCallback", sizeof("_failureCallback") - 1, 1);
+	zend_declare_typed_property(memcache_ce, property_failure_callback_name, &property_failure_callback_default_value, ZEND_ACC_PRIVATE, NULL, (zend_type) ZEND_TYPE_INIT_MASK(MAY_BE_CALLABLE|MAY_BE_NULL));
+	zend_string_release(property_failure_callback_name);
+
 	le_memcache_pool = zend_register_list_destructors_ex(_mmc_pool_list_dtor, NULL, "memcache connection", module_number);
 	le_memcache_server = zend_register_list_destructors_ex(NULL, _mmc_server_list_dtor, "persistent memcache connection", module_number);
 
@@ -813,7 +828,7 @@ static int mmc_get_pool(zval *id, mmc_pool_t **pool) /* {{{ */
 {
 	zval *zv;
 
-	if (Z_TYPE_P(id) != IS_OBJECT || (zv = zend_hash_str_find(Z_OBJPROP_P(id), "connection", sizeof("connection")-1)) == NULL) {
+	if (Z_TYPE_P(id) != IS_OBJECT || (zv = Z_MEMCACHE_CONNECTION_P(id)) == NULL || Z_TYPE_P(zv) == IS_NULL) {
 		php_error_docref(NULL, E_WARNING, "No servers added to memcache connection");
 		return 0;
 	}
@@ -1233,11 +1248,11 @@ static mmc_t *php_mmc_pool_addserver(
 		return NULL;
 	}
 	/* initialize pool if need be */
-	if ((connection = zend_hash_str_find(Z_OBJPROP_P(mmc_object), "connection", sizeof("connection")-1)) == NULL) {
+	if (Z_TYPE_P(connection = Z_MEMCACHE_CONNECTION_P(mmc_object)) != IS_RESOURCE) {
 		pool = mmc_pool_new();
 		pool->failure_callback = (mmc_failure_callback) &php_mmc_failure_callback;
 		list_res = zend_register_resource(pool, le_memcache_pool);
-		add_property_resource(mmc_object, "connection", list_res);
+		ZVAL_RES(Z_MEMCACHE_CONNECTION_P(mmc_object), list_res);
 
 #if PHP_VERSION_ID < 70300
 		GC_REFCOUNT(list_res)++;
@@ -1333,7 +1348,7 @@ static void php_mmc_connect(INTERNAL_FUNCTION_PARAMETERS, zend_bool persistent) 
 		list_res = zend_register_resource(pool, le_memcache_pool);
 		mmc_object = return_value;
 		object_init_ex(mmc_object, memcache_ce);
-		add_property_resource(mmc_object, "connection", list_res);
+		ZVAL_RES(Z_MEMCACHE_CONNECTION_P(mmc_object), list_res);
 #if PHP_VERSION_ID < 70300
 		GC_REFCOUNT(list_res)++;
 #else
@@ -1486,7 +1501,7 @@ static void php_mmc_failure_callback(mmc_pool_t *pool, mmc_t *mmc, zval *param) 
 	zval *callback;
 
 	/* check for userspace callback */
-	if (!Z_ISUNDEF_P(param) && (callback = zend_hash_str_find(Z_OBJPROP_P((zval *)param), "_failureCallback", sizeof("_failureCallback")-1)) != NULL && Z_TYPE_P(callback) != IS_NULL) {
+	if (!Z_ISUNDEF_P(param) && (callback = Z_MEMCACHE__FAILURECALLBACK_P(param)) != NULL && Z_TYPE_P(callback) != IS_NULL) {
 		if (MEMCACHE_IS_CALLABLE(callback, 0, NULL)) {
 			zval retval;
 			zval *host, *tcp_port, *udp_port, *error, *errnum;
@@ -1546,7 +1561,7 @@ static void php_mmc_set_failure_callback(mmc_pool_t *pool, zval *mmc_object, zva
 		callback_tmp = *callback;
 		zval_copy_ctor(&callback_tmp);
 
-		add_property_zval(mmc_object, "_failureCallback", &callback_tmp);
+		ZVAL_COPY(Z_MEMCACHE__FAILURECALLBACK_P(mmc_object), &callback_tmp);
 
 		zval_ptr_dtor(&callback_tmp);
 
@@ -1554,7 +1569,7 @@ static void php_mmc_set_failure_callback(mmc_pool_t *pool, zval *mmc_object, zva
 		Z_ADDREF_P(mmc_object);
 	}
 	else {
-		add_property_null(mmc_object, "_failureCallback");
+		ZVAL_NULL(Z_MEMCACHE__FAILURECALLBACK_P(mmc_object));
 		ZVAL_UNDEF(&pool->failure_callback_param);
 	}
 }

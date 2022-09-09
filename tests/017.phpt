@@ -26,5 +26,7 @@ foo
 object(test)%s%d) {
   ["connection"]=>
   resource(%d) of type (memcache connection)
+  ["_failureCallback":"Memcache":private]=>
+  NULL
 }
 Done
