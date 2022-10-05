@@ -733,9 +733,15 @@ PHP_MINIT_FUNCTION(memcache)
 
 	INIT_CLASS_ENTRY(ce, "MemcachePool", php_memcache_pool_class_functions);
 	memcache_pool_ce = zend_register_internal_class(&ce);
+#if PHP_VERSION_ID >= 80200
+	memcache_pool_ce->ce_flags |= ZEND_ACC_ALLOW_DYNAMIC_PROPERTIES;
+#endif
 
 	INIT_CLASS_ENTRY(ce, "Memcache", php_memcache_class_functions);
 	memcache_ce = zend_register_internal_class_ex(&ce, memcache_pool_ce);
+#if PHP_VERSION_ID >= 80200
+	memcache_ce->ce_flags |= ZEND_ACC_ALLOW_DYNAMIC_PROPERTIES;
+#endif
 
 	le_memcache_pool = zend_register_list_destructors_ex(_mmc_pool_list_dtor, NULL, "memcache connection", module_number);
 	le_memcache_server = zend_register_list_destructors_ex(NULL, _mmc_server_list_dtor, "persistent memcache connection", module_number);
