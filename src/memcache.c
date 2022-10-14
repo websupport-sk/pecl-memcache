@@ -752,6 +752,18 @@ PHP_MINIT_FUNCTION(memcache)
 	zend_declare_typed_property(memcache_ce, property_failure_callback_name, &property_failure_callback_default_value, ZEND_ACC_PRIVATE, NULL, (zend_type) ZEND_TYPE_INIT_MASK(MAY_BE_CALLABLE|MAY_BE_NULL));
 	zend_string_release(property_failure_callback_name);
 
+	zval property_username_default_value;
+	ZVAL_NULL(&property_username_default_value);
+	zend_string *property_username_name = zend_string_init("username", sizeof("username") - 1, 1);
+	zend_declare_typed_property(memcache_ce, property_username_name, &property_username_default_value, ZEND_ACC_PUBLIC, NULL, (zend_type) ZEND_TYPE_INIT_MASK(MAY_BE_STRING|MAY_BE_NULL));
+	zend_string_release(property_username_name);
+
+	zval property_password_default_value;
+	ZVAL_NULL(&property_password_default_value);
+	zend_string *property_password_name = zend_string_init("password", sizeof("password") - 1, 1);
+	zend_declare_typed_property(memcache_ce, property_password_name, &property_password_default_value, ZEND_ACC_PUBLIC, NULL, (zend_type) ZEND_TYPE_INIT_MASK(MAY_BE_STRING|MAY_BE_NULL));
+	zend_string_release(property_password_name);
+
 	le_memcache_pool = zend_register_list_destructors_ex(_mmc_pool_list_dtor, NULL, "memcache connection", module_number);
 	le_memcache_server = zend_register_list_destructors_ex(NULL, _mmc_server_list_dtor, "persistent memcache connection", module_number);
 

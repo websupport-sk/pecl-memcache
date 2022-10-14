@@ -28,5 +28,9 @@ object(test)%s%d) {
   resource(%d) of type (memcache connection)
   ["_failureCallback":"Memcache":private]=>
   NULL
+  ["username"]=>
+  NULL
+  ["password"]=>
+  NULL
 }
 Done
