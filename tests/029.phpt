@@ -44,7 +44,7 @@ if (is_array($result))
 	sort($result);
 var_dump($result);
 
-$result = ini_set('memcache.allow_failover', "abc");
+$result = @ini_set('memcache.allow_failover', "abc");
 var_dump($result);
 
 ?>

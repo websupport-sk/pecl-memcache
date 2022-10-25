@@ -8,6 +8,8 @@ Nested get's in __wakeup()
 include 'connect.inc';
 
 class testclass {
+	public $result = null;
+
 	function __wakeup() {
 		global $memcache;
 		$this->result = $memcache->get('_test_key3');
