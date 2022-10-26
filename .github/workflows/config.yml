@@ -1,0 +1,37 @@
+name: Build and Test
+on: [push, pull_request]
+jobs:
+  ubuntu:
+    strategy:
+      matrix:
+          version: ["8.0", "8.1", "8.2"]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pecl-memcache extension
+        uses: actions/checkout@v2
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{matrix.version}}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install zlib1g-dev memcached
+          sudo systemctl stop memcached
+      - name: Start memcached daemons
+        run: |
+          mkdir -p /var/run/memcached
+          sudo chmod a+w /var/run/memcached
+          /usr/bin/memcached -m 64 -s /var/run/memcached/memcached.sock -d
+          /usr/bin/memcached -m 64 -U 11211 -l 127.0.0.1 -p 11211 -d
+          /usr/bin/memcached -m 64 -U 11212 -l 127.0.0.1 -p 11212 -d
+      - name: phpize
+        run: phpize
+      - name: configure
+        run: ./configure
+      - name: make
+        run: make
+      - name: test
+        run: |
+          MEMCACHE_PROTOCOL=ascii make test TESTS="--show-diff"
+          MEMCACHE_PROTOCOL=binary make test TESTS="--show-diff"
