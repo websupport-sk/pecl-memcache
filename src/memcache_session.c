@@ -31,7 +31,7 @@
 #include "SAPI.h"
 #include "ext/standard/php_smart_string.h"
 #include "ext/standard/url.h"
-#include "session/php_session.h"
+#include "ext/session/php_session.h"
 #ifdef PHP_WIN32
 #include "win32/time.h"
 #endif
