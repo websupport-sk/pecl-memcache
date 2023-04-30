@@ -3,7 +3,7 @@ This is an official repository for pecl-memcache plugin since 2019.
 This repository contains modified pecl-memcache plugin ported to PHP8,
 which was originally developed for the need of hosting company in Slovakia (Websupport.sk). 
 
-The latest release is 8.0 (released: 2020-12-06) with support for PHP 8.0 and unofficial support for PHP 7.3 and 7.4
+The latest release is 8.2 (released: 2023-04-30) with support for PHP 8.0+ (incl. PHP 8.2).
 
 Please use version 4.0.5.1 (released: 2020-12-19) for PHP 7.x from branch NON_BLOCKING_IO_php7.
 
