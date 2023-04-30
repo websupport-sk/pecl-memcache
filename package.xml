@@ -89,7 +89,6 @@ http://pear.php.net/dtd/package-2.0.xsd">
       <file name="README" role="doc" />
       <file name="memcache.php" role="doc" />
       <file name="Dockerfile" role="src" />
-      <file name="cloudbuild.yaml" role="src" />
       <file name ="tests/connect.inc" role="test" />
       <file name ="tests/memcache.sh" role="test" />
       <file name ="tests/001.phpt" role="test" />
