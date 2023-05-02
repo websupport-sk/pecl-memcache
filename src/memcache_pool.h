@@ -35,9 +35,13 @@
 #endif
 
 #ifdef PHP_WIN32
-#include <win32/php_stdint.h>
+# if defined(_MSC_VER) && _MSC_VER < 1920
+#  include "win32/php_stdint.h"
+# else
+#  include <stdint.h>
+# endif
 #else
-#include <stdint.h>
+# include <stdint.h>
 #endif
 #include <string.h>
 
