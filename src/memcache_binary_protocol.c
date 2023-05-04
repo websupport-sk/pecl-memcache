@@ -26,12 +26,16 @@
 #define MMC_DEBUG 0
 
 #ifdef PHP_WIN32
-#include <win32/php_stdint.h>
-#include <winsock2.h>
+# if defined(_MSC_VER) && _MSC_VER < 1920
+#  include "win32/php_stdint.h"
+# else
+#  include <stdint.h>
+# endif
+# include <winsock2.h>
 #else
-#include <stdint.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
+# include <stdint.h>
+# include <arpa/inet.h>
+# include <netinet/in.h>
 #endif
 #include "memcache_pool.h"
 #include "ext/standard/php_smart_string.h"
