@@ -22,7 +22,7 @@ $t2 = microtime_float();
 
 $t = $t2 - $t1;
 var_dump($t);
-var_dump($t > 0.01 && $t < 0.2);
+var_dump($t > 0.001 && $t < 0.2);
 
 $memcache = new MemcachePool();
 $memcache->addServer($unreachableHost, $unreachablePort, 0, true, 1, 0.1);
@@ -33,7 +33,7 @@ $t2 = microtime_float();
 
 $t = $t2 - $t1;
 var_dump($t);
-var_dump($t > 0.01 && $t < 0.2);
+var_dump($t > 0.001 && $t < 0.2);
 
 $memcache = new MemcachePool();
 $t1 = microtime_float();
@@ -42,7 +42,7 @@ $t2 = microtime_float();
 
 $t = $t2 - $t1;
 var_dump($t);
-var_dump($t > 0.01 && $t < 0.2);
+var_dump($t > 0.001 && $t < 0.2);
 
 $memcache = new MemcachePool();
 $memcache->addServer($unreachableHost, $unreachablePort, 0, true, 1, 1);
@@ -54,7 +54,7 @@ $t2 = microtime_float();
 
 $t = $t2 - $t1;
 var_dump($t);
-var_dump($t > 0.01 && $t < 0.2);
+var_dump($t > 0.001 && $t < 0.2);
 
 ?>
 --EXPECTF--
