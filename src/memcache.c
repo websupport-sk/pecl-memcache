@@ -523,6 +523,33 @@ static PHP_INI_MH(OnUpdateLockTimeout) /* {{{ */
 }
 /* }}} */
 
+static PHP_INI_MH(OnUpdateSelectApi) /* {{{ */
+{
+	#ifdef PHP_WIN32
+	if (!strcasecmp(ZSTR_VAL(new_value), "select")) {
+		MEMCACHE_G(select_api) = MMC_API_SELECT;
+	}
+	else {
+		php_error_docref(NULL, E_WARNING, "memcache.select_api supports only 'select' on Windows ('%s' given)", ZSTR_VAL(new_value));
+		return FAILURE;
+	}
+	#else
+	if (!strcasecmp(ZSTR_VAL(new_value), "select")) {
+		MEMCACHE_G(select_api) = MMC_API_SELECT;
+	}
+	else if (!strcasecmp(ZSTR_VAL(new_value), "poll")) {
+		MEMCACHE_G(select_api) = MMC_API_POLL;
+	}
+	else {
+		php_error_docref(NULL, E_WARNING, "memcache.select_api must be in set {select, poll} ('%s' given)", ZSTR_VAL(new_value));
+		return FAILURE;
+	}
+	#endif
+
+	return SUCCESS;
+}
+/* }}} */
+
 static PHP_INI_MH(OnUpdatePrefixStaticKey) /* {{{ */
 {
 	int i;
@@ -553,6 +580,7 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("memcache.session_redundancy",	"2",			PHP_INI_ALL, OnUpdateRedundancy,	session_redundancy,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.compress_threshold",	"20000",		PHP_INI_ALL, OnUpdateCompressThreshold,	compress_threshold,	zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_ENTRY("memcache.lock_timeout",			"15",			PHP_INI_ALL, OnUpdateLockTimeout,		lock_timeout,		zend_memcache_globals,	memcache_globals)
+	STD_PHP_INI_ENTRY("memcache.select_api",			"select",		PHP_INI_ALL, OnUpdateSelectApi,		select_api,		zend_memcache_globals,	memcache_globals)
 	STD_PHP_INI_BOOLEAN("memcache.session_prefix_host_key",       			"0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key, zend_memcache_globals, memcache_globals)
 	STD_PHP_INI_BOOLEAN("memcache.session_prefix_host_key_remove_www",    	"1",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_www, zend_memcache_globals, memcache_globals)
 	STD_PHP_INI_BOOLEAN("memcache.session_prefix_host_key_remove_subdomain",  "0",			PHP_INI_ALL, OnUpdateBool, session_prefix_host_key_remove_subdomain, zend_memcache_globals, memcache_globals)
@@ -578,6 +606,7 @@ static void php_memcache_init_globals(zend_memcache_globals *memcache_globals_p)
 {
 	MEMCACHE_G(hash_strategy)	  = MMC_STANDARD_HASH;
 	MEMCACHE_G(hash_function)	  = MMC_HASH_CRC32;
+	MEMCACHE_G(select_api)        = MMC_API_SELECT;
 }
 /* }}} */
 

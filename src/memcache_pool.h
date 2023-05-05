@@ -119,6 +119,9 @@
 #define MMC_HASH_CRC32 			1			/* CRC32 hash function */
 #define MMC_HASH_FNV1A 			2			/* FNV-1a hash function */
 
+#define MMC_API_SELECT 		1
+#define MMC_API_POLL 		2
+
 #define MMC_CONSISTENT_POINTS	160			/* points per server */
 #define MMC_CONSISTENT_BUCKETS	1024		/* number of precomputed buckets, should be power of 2 */
 
@@ -343,6 +346,11 @@ struct mmc_pool {
 	void					*hash_state;				/* strategy specific state */
 	fd_set					wfds;
 	fd_set					rfds;
+	#ifndef PHP_WIN32
+	struct pollfd			*pollfds;
+	int						nfds;
+	#endif
+	long 					select_api;
 	struct timeval			timeout;					/* smallest timeout for any of the servers */
 	int						in_select;
 	mmc_queue_t				*sending;					/* mmc_queue_t<mmc_t *>, connections that want to send */
@@ -418,6 +426,7 @@ ZEND_BEGIN_MODULE_GLOBALS(memcache)
 	long session_redundancy;
 	long compress_threshold;
 	long lock_timeout;
+	long select_api;
 	char *session_key_prefix;
 	zend_bool session_prefix_host_key;
 	zend_bool session_prefix_host_key_remove_www;
