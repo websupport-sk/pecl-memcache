@@ -35,7 +35,7 @@
 #include "ext/standard/crc32.h"
 #include "ext/standard/php_var.h"
 #include "ext/standard/php_string.h"
-#include "ext/standard/php_smart_string.h"
+#include "Zend/zend_smart_string.h"
 #include "zend_smart_str.h"
 #include "memcache_pool.h"
 

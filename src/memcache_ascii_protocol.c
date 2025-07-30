@@ -24,7 +24,7 @@
 #endif
 
 #include "memcache_pool.h"
-#include "ext/standard/php_smart_string.h"
+#include "Zend/zend_smart_string.h"
 
 typedef struct mmc_ascii_request {
 	mmc_request_t	base;							/* enable cast to mmc_request_t */
