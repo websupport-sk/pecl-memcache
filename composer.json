@@ -1,0 +1,31 @@
+{
+    "name": "websupport-sk/pecl-memcache",
+    "type": "php-ext",
+    "license": "PHP-3.0",
+    "description": "PHP Extension - Memcache module with support of newer PHP 7.x and PHP 8.x",
+    "require": {
+        "php": ">= 8.0.0"
+    },
+    "php-ext": {
+        "extension-name": "memcache",
+        "configure-options": [
+            {
+                "name": "enable-memcache",
+                "description": "Enable memcache support"
+            },
+            {
+                "name": "disable-memcache-session",
+                "description": "Disable memcache session handler support"
+            },
+            {
+                "name": "with-zlib-dir",
+                "description": "Set the path to ZLIB install prefix.",
+                "needs-value": true
+            },
+            {
+                "name": "enable-debug",
+                "description": "compile with debugging symbols"
+            }
+        ]
+    }
+}
