@@ -770,6 +770,9 @@ static int mmc_server_connect(mmc_pool_t *pool, mmc_t *mmc, mmc_stream_t *io, in
 
 		return MMC_REQUEST_FAILURE;
 	}
+	if (fd >= FD_SETSIZE) {
+		php_error_docref(NULL, E_ERROR, "Too many open file descriptors: %d", fd);
+	}
 	php_stream_auto_cleanup(io->stream);
 	php_stream_set_chunk_size(io->stream, io->chunk_size);
 	php_stream_set_option(io->stream, PHP_STREAM_OPTION_BLOCKING, 0, NULL);
