@@ -38,7 +38,7 @@
 # include <netinet/in.h>
 #endif
 #include "memcache_pool.h"
-#include "ext/standard/php_smart_string.h"
+#include "Zend/zend_smart_string.h"
 
 #ifdef htonll
 #undef htonll

@@ -46,7 +46,7 @@
 #include <string.h>
 
 #include "php.h"
-#include "ext/standard/php_smart_string_public.h"
+#include "Zend/zend_smart_string.h"
 #include "memcache_queue.h"
 
 /*
