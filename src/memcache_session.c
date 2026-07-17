@@ -60,7 +60,11 @@ PS_OPEN_FUNC(memcache)
 	if (!path) {
 		/* allow to work with standard session.save_path option
 		   and session_save_path function */
+#if PHP_VERSION_ID < 80600
 		path = save_path;
+#else
+		path = ZSTR_VAL(save_path);
+#endif
 	}
 	if (!path) {
 		PS_SET_MOD_DATA(NULL);
@@ -355,7 +359,7 @@ PS_READ_FUNC(memcache)
 				}
 
 				/* if missing value, skip this server and try next */
-				zval_dtor(&dataresult);
+				zval_ptr_dtor_nogc(&dataresult);
 				mmc_queue_push(&skip_servers, mmc);
 				
 				/* if it is the last server in pool and connection was ok return success and empty string due to php70 changes */
@@ -366,7 +370,7 @@ PS_READ_FUNC(memcache)
 				}
 			}
 			else {
-				zval_dtor(&dataresult);
+				zval_ptr_dtor_nogc(&dataresult);
 
 				/* if missing lock, back off and retry same server */
 				last_index = prev_index;
@@ -382,7 +386,7 @@ PS_READ_FUNC(memcache)
 		} while (skip_servers.len < MEMCACHE_G(session_redundancy) && skip_servers.len < pool->num_servers && remainingtime > 0);
 
 		mmc_queue_free(&skip_servers);
-		zval_dtor(&dataresult);
+		zval_ptr_dtor_nogc(&dataresult);
 
 		return SUCCESS;
 	}
@@ -405,7 +409,7 @@ PS_WRITE_FUNC(memcache)
 		mmc_t *mmc;
 		mmc_request_t *lockrequest, *datarequest;
 		mmc_queue_t skip_servers = {0};
-		size_t lifetime = (size_t)time(NULL) + INI_INT("session.gc_maxlifetime");
+		size_t lifetime = (size_t)time(NULL) + zend_ini_long("session.gc_maxlifetime", strlen("session.gc_maxlifetime"), 0);
 		unsigned int last_index = 0;
 
 		ZVAL_NULL(&lockresult);
