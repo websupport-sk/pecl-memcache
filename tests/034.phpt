@@ -33,7 +33,15 @@ var_dump($result[key($result)]['chunk_size']);
 var_dump($result[key($result)]['free_chunks_end']);
 $slab = key($result);
 
-$result = $memcache->getStats('cachedump', $slab, 10);
+// memcached >= 1.5 only dumps the COLD LRU queue; a fresh item sits in HOT
+// until the LRU maintainer thread moves it, so wait for it (max ~3s)
+for ($i = 0; $i < 60; $i++) {
+	$result = $memcache->getStats('cachedump', $slab, 10);
+	if (is_array($result)) {
+		break;
+	}
+	usleep(50000);
+}
 var_dump($result[key($result)][0]);
 var_dump($result[key($result)][1]);
 

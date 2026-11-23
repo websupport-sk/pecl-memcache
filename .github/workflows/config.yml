@@ -4,7 +4,7 @@ jobs:
   ubuntu:
     strategy:
       matrix:
-          version: ["8.0", "8.1", "8.2"]
+          version: ["8.0", "8.1", "8.2", "8.3", "8.4", "8.5", "8.6"]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -34,5 +34,5 @@ jobs:
         run: make
       - name: test
         run: |
-          MEMCACHE_PROTOCOL=ascii make test TESTS="--show-diff"
-          MEMCACHE_PROTOCOL=binary make test TESTS="--show-diff"
+          MEMCACHE_PROTOCOL=ascii make test TESTS="-j1 --show-diff"
+          MEMCACHE_PROTOCOL=binary make test TESTS="-j1 --show-diff"
