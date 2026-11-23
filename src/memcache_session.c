@@ -577,6 +577,116 @@ PS_GC_FUNC(memcache)
 }
 /* }}} */
 
+#if PHP_VERSION_ID >= 80600
+static zend_result php_mmc_session_key_exists(mmc_pool_t *pool, zend_string *key)
+{
+	zval result, zkey;
+	zval *resultparam[3];
+	mmc_t *mmc;
+	mmc_request_t *request;
+	mmc_queue_t skip_servers = {0};
+	unsigned int last_index = 0;
+
+	ZVAL_STR(&zkey, key);
+
+	resultparam[0] = &result;
+	resultparam[1] = NULL;
+	resultparam[2] = NULL;
+
+	do {
+		ZVAL_NULL(&result);
+
+		request = mmc_pool_request_get(
+			pool, MMC_PROTO_TCP, mmc_value_handler_single, resultparam,
+			mmc_pool_failover_handler_null, NULL);
+
+		if (mmc_prepare_key_ex(
+				ZSTR_VAL(key), ZSTR_LEN(key),
+				request->key, &(request->key_len),
+				MEMCACHE_G(session_key_prefix)) != MMC_OK) {
+			mmc_pool_release(pool, request);
+			mmc_queue_free(&skip_servers);
+			return FAILURE;
+		}
+
+		pool->protocol->get(
+			request, MMC_OP_GET, &zkey,
+			request->key, request->key_len);
+
+		mmc = mmc_pool_find_next(
+			pool,
+			request->key, request->key_len,
+			&skip_servers, &last_index);
+
+		if (!mmc_server_valid(mmc) ||
+			mmc_pool_schedule(pool, mmc, request) != MMC_OK) {
+			mmc_pool_release(pool, request);
+			mmc_queue_push(&skip_servers, mmc);
+			continue;
+		}
+
+		mmc_pool_run(pool);
+
+		if (Z_TYPE(result) == IS_STRING) {
+			zval_ptr_dtor(&result);
+			mmc_queue_free(&skip_servers);
+			return SUCCESS;
+		}
+
+		zval_ptr_dtor(&result);
+		mmc_queue_push(&skip_servers, mmc);
+
+	} while (skip_servers.len < MEMCACHE_G(session_redundancy) &&
+		 skip_servers.len < pool->num_servers);
+
+	mmc_queue_free(&skip_servers);
+
+	return FAILURE;
+}
+
+PS_VALIDATE_SID_FUNC(memcache)
+{
+	mmc_pool_t *pool = PS_GET_MOD_DATA();
+
+	if (pool == NULL) {
+		return FAILURE;
+	}
+
+	return php_mmc_session_key_exists(pool, key);
+}
+
+PS_CREATE_SID_FUNC(memcache)
+{
+	mmc_pool_t *pool = PS_GET_MOD_DATA();
+	zend_string *sid;
+	int maxfail = 3;
+
+	do {
+		sid = php_session_create_id(mod_data);
+
+		if (sid == NULL) {
+			if (--maxfail < 0) {
+				return NULL;
+			}
+			continue;
+		}
+
+		if (pool != NULL &&
+			php_mmc_session_key_exists(pool, sid) == SUCCESS) {
+			zend_string_release_ex(sid, false);
+			sid = NULL;
+
+			if (--maxfail < 0) {
+				return NULL;
+			}
+		}
+	} while (sid == NULL);
+
+	return sid;
+}
+
+#endif /* PHP_VERSION_ID >= 80600 */
+
 /*
  * Local variables:
  * tab-width: 4

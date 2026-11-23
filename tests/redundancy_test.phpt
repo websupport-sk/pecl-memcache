@@ -1,5 +1,7 @@
 --TEST--
 redundancy test
+--INI--
+session.use_strict_mode=0
 --SKIPIF--
 <?php include 'connect.inc'; if (!MEMCACHE_HAVE_SESSION) print 'skip not compiled with session support'; else if (!function_exists('pcntl_fork')) print 'skip not compiled with pcntl_fork() support'; ?>
 --FILE--

@@ -1,5 +1,7 @@
 --TEST--
 ini_set('memcache.session_redundancy')
+--INI--
+session.use_strict_mode=0
 --SKIPIF--
 <?php
 include 'connect.inc';

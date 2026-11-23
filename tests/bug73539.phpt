@@ -1,5 +1,7 @@
 --TEST--
 memcache multi host save path function
+--INI--
+session.use_strict_mode=0
 --SKIPIF--
 <?php 
 include 'connect.inc';
