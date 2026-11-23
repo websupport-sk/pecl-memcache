@@ -2,9 +2,6 @@
 PECL bug #63142 (memcache 3.0.7 segfaults with object (un)serialization)
 --SKIPIF--
 <?php include 'connect.inc'; ?>
---INI--
-;fix me later
-report_memleaks=0
 --FILE--
 <?php
 

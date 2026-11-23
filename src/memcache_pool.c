@@ -426,7 +426,7 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 			PHP_VAR_SERIALIZE_DESTROY(value_hash);
 
 			if (!buf.s) {
-				zval_dtor(&value_copy);
+				zval_ptr_dtor_nogc(&value_copy);
 				php_error_docref(NULL, E_WARNING, "Failed to serialize value");
 				return MMC_REQUEST_FAILURE;
 			}
@@ -436,13 +436,13 @@ int mmc_pack_value(mmc_pool_t *pool, mmc_buffer_t *buffer, zval *value, unsigned
 
 			/* trying to save null or something went really wrong */
 			if (buffer->value.c == NULL || buffer->value.len == prev_len) {
-				zval_dtor(&value_copy);
+				zval_ptr_dtor_nogc(&value_copy);
 				php_error_docref(NULL, E_WARNING, "Failed to serialize value");
 				return MMC_REQUEST_FAILURE;
 			}
 
 			*flags |= MMC_SERIALIZED;
-			zval_dtor(&value_copy);
+			zval_ptr_dtor_nogc(&value_copy);
 
 			mmc_compress(pool, buffer, buffer->value.c + prev_len, buffer->value.len - prev_len, flags, 1);
 		}
@@ -2095,7 +2095,7 @@ MMC_POOL_INLINE int mmc_prepare_key(zval *key, char *result, unsigned int *resul
 
 		res = mmc_prepare_key_ex(Z_STRVAL(keytmp), Z_STRLEN(keytmp), result, result_len, MEMCACHE_G(key_prefix));
 
-		zval_dtor(&keytmp);
+		zval_ptr_dtor_nogc(&keytmp);
 		return res;
 	}
 }

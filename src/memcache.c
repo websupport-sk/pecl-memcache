@@ -985,7 +985,12 @@ static void php_mmc_store(INTERNAL_FUNCTION_PARAMETERS, int op) /* {{{ */
 		}
 	}
 	else {
+#if PHP_VERSION_ID < 80600
 		WRONG_PARAM_COUNT;
+#else
+		zend_wrong_param_count();
+		RETURN_THROWS();
+#endif
 	}
 
 	/* execute all requests */
@@ -2245,7 +2250,7 @@ static int mmc_stats_handler(mmc_t *mmc, mmc_request_t *request, int response, c
 			return MMC_REQUEST_AGAIN;
 		}
 
-		zval_dtor((zval *)param);
+		zval_ptr_dtor_nogc((zval *)param);
 		ZVAL_FALSE((zval *)param);
 		return MMC_REQUEST_FAILURE;
 	}

@@ -383,7 +383,7 @@ static int mmc_request_read_mutate(mmc_t *mmc, mmc_request_t *request) /*
 				Z_STRVAL(keytmp), Z_STRLEN(keytmp), &value,
 				req->value.flags, req->value.cas, request->value_handler_param);
 
-			zval_dtor(&keytmp);
+			zval_ptr_dtor_nogc(&keytmp);
 		}
 		else {
 			result = request->value_handler(
@@ -454,7 +454,7 @@ static int mmc_request_read_value(mmc_t *mmc, mmc_request_t *request) /*
 				mmc, request, &(request->readbuf), Z_STRVAL(keytmp), Z_STRLEN(keytmp),
 				req->value.flags, req->value.cas, req->value.length);
 
-			zval_dtor(&keytmp);
+			zval_ptr_dtor_nogc(&keytmp);
 		}
 		else {
 			result = mmc_unpack_value(
